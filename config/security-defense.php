@@ -8,7 +8,7 @@ return [
     | Globally enables or disables security defense analysis, alerting, and
     | preventive middleware.
     */
-    'enabled' => env('SECURITY_DEFENSE_ENABLED', true),
+    'enabled' => true,
 
     /*
     |--------------------------------------------------------------------------
@@ -17,7 +17,7 @@ return [
     | Cache repository used for sliding-window counters, deduplication, and
     | temporary IP quarantine. If null, application default cache is used.
     */
-    'cache_store' => env('SECURITY_DEFENSE_CACHE_STORE', null),
+    'cache_store' => null,
     'cache_prefix' => 'security_defense:',
 
     /*
@@ -136,7 +136,7 @@ return [
                 'enabled' => true,
                 'severity' => 'medium',
                 'block_known_scanners' => true, // sqlmap, nikto, dirbuster, gobuster, etc.
-                'block_empty_user_agent' => env('SECURITY_DEFENSE_BLOCK_EMPTY_UA', false), // Block requests with no User-Agent header
+                'block_empty_user_agent' => false, // Block requests with no User-Agent header
             ],
         ],
     ],
@@ -153,9 +153,9 @@ return [
         | workers for zero request latency overhead.
         */
         'queue' => [
-            'enabled' => env('SECURITY_DEFENSE_QUEUE_ENABLED', false),
-            'connection' => env('SECURITY_DEFENSE_QUEUE_CONNECTION', null),
-            'queue_name' => env('SECURITY_DEFENSE_QUEUE_NAME', 'security-alerts'),
+            'enabled' => false,
+            'connection' => null,
+            'queue_name' => 'security-alerts',
         ],
 
         'database' => [
@@ -163,21 +163,27 @@ return [
             'table' => 'security_alerts',
         ],
 
+        /*
+        | Telegram Bot Alerting & Interactive Control Panel
+        */
         'telegram' => [
-            'enabled' => env('SECURITY_TELEGRAM_ENABLED', false),
+            'enabled' => true,
             'bot_token' => env('SECURITY_TELEGRAM_BOT_TOKEN'),
             'chat_id' => env('SECURITY_TELEGRAM_CHAT_ID'),
             'timeout' => 5,
+            'interactive' => [
+                'enabled' => true,
+            ],
         ],
 
         'discord' => [
-            'enabled' => env('SECURITY_DISCORD_ENABLED', false),
+            'enabled' => true,
             'webhook_url' => env('SECURITY_DISCORD_WEBHOOK'),
             'timeout' => 5,
         ],
 
         'webhook' => [
-            'enabled' => env('SECURITY_WEBHOOK_ENABLED', false),
+            'enabled' => false,
             'url' => env('SECURITY_WEBHOOK_URL'),
             'secret' => env('SECURITY_WEBHOOK_SECRET'),
             'timeout' => 5,
@@ -185,13 +191,12 @@ return [
 
         /*
         | Native Laravel Email Alert Notifications
-        | Dispatches security notifications via Laravel's native mail system
-        | using standard SMTP / SES / Resend / Mailgun driver configured in app.
+        | Dispatches security notifications via Laravel's native mail system.
         */
         'mail' => [
-            'enabled' => env('SECURITY_MAIL_ENABLED', false),
-            'to' => env('SECURITY_ALERT_EMAIL'), // String or array of recipient email addresses
-            'subject_prefix' => env('SECURITY_MAIL_SUBJECT_PREFIX', '[SECURITY DEFENSE ALERT]'),
+            'enabled' => false,
+            'to' => env('SECURITY_ALERT_EMAIL'),
+            'subject_prefix' => '[SECURITY DEFENSE ALERT]',
             'timeout' => 10,
         ],
     ],
@@ -217,8 +222,6 @@ return [
             'action' => 'block', // 'block' or 'log_only'
             'response_status' => 403,
             'response_message' => 'Suspicious request payload detected and blocked.',
-            // Always run the regex scan even for empty/bodyless requests.
-            // Stronger but higher CPU cost at scale — leave false for cheap fast-path.
             'scan_empty_requests' => false,
             'excluded_paths' => [
                 // e.g. 'api/webhooks/*'
@@ -227,12 +230,9 @@ return [
 
         /*
         | Active Request Flood Protection (DDoS / scraper defense)
-        | Cheap per-IP windowed request counter (atomic cache increment, O(1)).
-        | An IP exceeding the cap is rejected and eventually auto-quarantined,
-        | keeping regex/scan cost near-zero during floods.
         */
         'request_flood' => [
-            'enabled' => env('SECURITY_DEFENSE_FLOOD_PROTECTION', true),
+            'enabled' => true,
             'max_requests_per_second' => 200, // windowed cap per IP
             'window' => 5,                    // seconds per counting window
             'jail_after_exceeding' => 2,      // consecutive windows over cap before auto-jail
@@ -244,13 +244,12 @@ return [
         | compound threat score thresholds to cut CPU load during active attacks.
         */
         'quarantine' => [
-            'enabled' => env('SECURITY_QUARANTINE_ENABLED', true),
+            'enabled' => true,
             'duration' => 900,                // Quarantine duration in seconds (15 mins)
             'auto_jail_on_critical' => true,  // Automatically jail on critical threat block
             'response_status' => 429,         // HTTP 429 Too Many Requests
             'response_message' => 'Your IP has been temporarily quarantined due to suspicious security activity.',
-            // Durable DB-backed quarantine — survives cache flush / restart / multi-server
-            'persist_to_database' => env('SECURITY_QUARANTINE_PERSIST_DB', false),
+            'persist_to_database' => false,
             'table' => 'security_quarantines',
             'whitelist' => [
                 '127.0.0.1',
@@ -265,12 +264,11 @@ return [
     |--------------------------------------------------------------------------
     | Dedicated real-time monitoring interface for security posture, threat stats,
     | IP quarantines, and alert channel diagnostic testing.
-    | STRICT LOCAL ACCESS: Restricted by default to local environment and localhost.
     */
     'dashboard' => [
-        'enabled' => env('SECURITY_DEFENSE_DASHBOARD_ENABLED', true),
-        'path' => env('SECURITY_DEFENSE_DASHBOARD_PATH', 'security-defense'),
-        'local_only' => env('SECURITY_DEFENSE_DASHBOARD_LOCAL_ONLY', true),
+        'enabled' => true,
+        'path' => 'security-defense',
+        'local_only' => true,
         'allowed_ips' => [
             '127.0.0.1',
             '::1',

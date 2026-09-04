@@ -28,6 +28,7 @@ use Mixudev\SecurityDefense\Services\IpQuarantineService;
 use Mixudev\SecurityDefense\Services\SecurityDefenseManager;
 use Mixudev\SecurityDefense\Services\ThreatScoringEngine;
 
+
 /**
  * Service provider for registering mixudev/security-defense enterprise components in Laravel container.
  */
@@ -95,6 +96,9 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         // Bind Channel Testing & Diagnostic Service
         $this->app->singleton(ChannelTestService::class);
 
+        // Bind Interactive Telegram Bot Service
+        $this->app->singleton(\Mixudev\SecurityDefense\Services\TelegramBotService::class);
+
         // Bind Primary Coordinator Manager with Enterprise Modules
         $this->app->singleton(SecurityDefenseManager::class, function ($app) {
             return new SecurityDefenseManager(
@@ -116,10 +120,8 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         // Load Blade views
         $this->loadViewsFrom(__DIR__ . '/../../resources/views', 'security-defense');
 
-        // Load dashboard routes if dashboard is enabled
-        if (config('security-defense.dashboard.enabled', true)) {
-            $this->loadRoutesFrom(__DIR__ . '/../../routes/web.php');
-        }
+        // Load package routes
+        $this->loadRoutesFrom(__DIR__ . '/../../routes/web.php');
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
@@ -136,6 +138,8 @@ class SecurityDefenseServiceProvider extends ServiceProvider
 
             $this->commands([
                 \Mixudev\SecurityDefense\Console\Commands\TestWebhookCommand::class,
+                \Mixudev\SecurityDefense\Console\Commands\TelegramPollCommand::class,
+                \Mixudev\SecurityDefense\Console\Commands\TelegramWebhookCommand::class,
             ]);
         }
 
