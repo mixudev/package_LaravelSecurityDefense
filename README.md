@@ -340,6 +340,9 @@ Event::listen(SecurityAlertCreated::class, function (SecurityAlertCreated $event
 | `middleware.quarantine.duration` | — | `900` | Default quarantine duration in seconds (15 minutes). |
 | `middleware.quarantine.auto_jail_on_critical` | — | `true` | Automatically quarantine IPs that trigger critical payload injection. |
 | `middleware.quarantine.persist_to_database` | `SECURITY_QUARANTINE_PERSIST_DB` | `false` | Enable durable DB-backed quarantine (survives cache flush / restart / multi-server). |
+| `middleware.request_flood.enabled` | `SECURITY_DEFENSE_FLOOD_PROTECTION` | `true` | Cheap per-IP windowed request limiter (DDoS/scraper guard, O(1)). |
+| `middleware.request_flood.max_requests_per_second` | — | `200` | Windowed request cap per IP before rejection/auto-jail. |
+| `middleware.payload_scanner.scan_empty_requests` | — | `false` | When false, skip the regex payload scan for empty/bodyless requests (fast-path). |
 
 **Note:** For production use, configure a **Redis or Memcached** cache driver. File/array cache drivers lose all detection counters and quarantine state on restart, which resets the protection (a bypass window at boot).
 | `detection.rules.user_agent_anomaly.block_empty_user_agent` | `SECURITY_DEFENSE_BLOCK_EMPTY_UA` | `false` | Flag requests with an empty User-Agent header as anomalies. |

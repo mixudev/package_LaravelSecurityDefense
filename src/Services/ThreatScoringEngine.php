@@ -36,6 +36,26 @@ class ThreatScoringEngine
         return sprintf('%sscore:%s', $prefix, md5($target));
     }
 
+    /**
+     * Atomic total counter key for an entity's accumulated score.
+     * Kept separate from the (bounded) records list so scoring is race-free
+     * under concurrent threats at scale.
+     */
+    protected function getCounterKey(string $target): string
+    {
+        $prefix = (string) config('security-defense.cache_prefix', 'security_defense:');
+
+        return sprintf('%sscore_total:%s', $prefix, md5($target));
+    }
+
+    /**
+     * Max threat records retained per entity (metadata only; bounds memory growth).
+     */
+    protected function maxRecords(): int
+    {
+        return (int) config('security-defense.detection.scoring.max_records', 50);
+    }
+
     public function isEnabled(): bool
     {
         $global = (bool) config('security-defense.enabled', true);
@@ -79,22 +99,31 @@ class ThreatScoringEngine
 
         $cache = $this->getCache();
         $cacheKey = $this->getCacheKey($target);
+        $counterKey = $this->getCounterKey($target);
         $now = time();
 
-        /** @var array<array{score: int, threat: string, time: int}> $records */
+        // Atomic, race-free total score increment with windowed TTL.
+        $totalScore = (int) $cache->increment($counterKey, $weight);
+        if ($totalScore === $weight) {
+            // First increment seeds the TTL for the accumulation window.
+            $cache->put($counterKey, $weight, $window);
+        }
+
+        // Bounded records list — metadata only (involved threats), capped to prevent
+        // unbounded memory growth in the cache under sustained attack.
         $records = (array) $cache->get($cacheKey, []);
-        $records = array_filter(
+        $records = array_values(array_filter(
             $records,
             static fn (array $entry): bool => ($now - (int) ($entry['time'] ?? 0)) <= $window
-        );
-
+        ));
         $records[] = [
             'score' => $weight,
             'threat' => $threat->threatType,
             'time' => $now,
         ];
-
-        $totalScore = array_sum(array_column($records, 'score'));
+        if (count($records) > $this->maxRecords()) {
+            $records = array_slice($records, -$this->maxRecords());
+        }
         $cache->put($cacheKey, $records, $window);
 
         if ($totalScore >= $threshold) {
@@ -122,29 +151,24 @@ class ThreatScoringEngine
     }
 
     /**
-     * Get current accumulated score for an entity.
+     * Get current accumulated score for an entity (atomic counter read).
      */
     public function getScore(string $target): int
     {
-        $cacheKey = $this->getCacheKey($target);
-        /** @var array<array{score: int, time: int}> $records */
-        $records = (array) $this->getCache()->get($cacheKey, []);
-        $window = (int) config('security-defense.detection.scoring.window', 900);
-        $now = time();
+        if (!$this->isEnabled()) {
+            return 0;
+        }
 
-        $validRecords = array_filter(
-            $records,
-            static fn (array $entry): bool => ($now - (int) ($entry['time'] ?? 0)) <= $window
-        );
-
-        return (int) array_sum(array_column($validRecords, 'score'));
+        return (int) $this->getCache()->get($this->getCounterKey($target), 0);
     }
 
     /**
-     * Reset score for a target entity.
+     * Reset score for a target entity (clears both atomic counter and records).
      */
     public function resetScore(string $target): void
     {
-        $this->getCache()->forget($this->getCacheKey($target));
+        $cache = $this->getCache();
+        $cache->forget($this->getCounterKey($target));
+        $cache->forget($this->getCacheKey($target));
     }
 }

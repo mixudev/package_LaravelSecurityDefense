@@ -144,4 +144,87 @@ Selalu verifikasi signature di sisi penerima sebelum memproses (lihat
 - [ ] Tambahkan `allowed_ips` server Anda bila perlu
 - [ ] Review `.env` — jangan commit token/channel key ke git
 
+---
+
+## 10. Enterprise Scale & Aggressive Bot Hunting
+
+Disediakan lapisan agresif yang hemat CPU untuk menangani jutaan request /
+bot scraping / auto-inject, tanpa membebani server.
+
+### 10a. Per-IP Request Flood Limiter (DDoS / scraper guard)
+
+Middleware `RequestThreatScanner` kini punya counter per-IP **O(1) atomic**
+(sebelum semua pemeriksaan regex). IP yang melebihi kapasitas per jendela waktu
+langsung ditolak 429 dan akhirnya auto-quarantine.
+
+```env
+# Aktif (default true)
+SECURITY_DEFENSE_FLOOD_PROTECTION=true
+```
+
+Config (`config/security-defense.php`):
+
+```php
+'middleware' => [
+    'request_flood' => [
+        'enabled' => true,
+        'max_requests_per_second' => 200, // kapasitas per-IP per jendela
+        'window' => 5,                    // detik per jendela counter
+        'jail_after_exceeding' => 2,      // jendela beruntun melebihi cap -> jail
+    ],
+],
+```
+
+> Tuning: untuk backend di balik reverse proxy / load balancer dengan banyak
+> pengguna NAT, naikkan `max_requests_per_second` atau minta proxy menulis IP asli
+> sebagai `REMOTE_ADDR`. Serangan masif memicu `fail-closed` (langsung tolak).
+
+### 10b. Fast-path Payload Scan (hemat CPU saat jutaan request)
+
+Secara default, `PayloadInjectionRule::inspect()` TIDAK dijalankan untuk request
+tanpa query string dan tanpa body (GET polos). Ini memotong biaya regex hampir
+ke nol untuk trafik normal GET/HEAD.
+
+```php
+'middleware' => [
+    'payload_scanner' => [
+        'scan_empty_requests' => false, // true = selalu scan (lebih agresif, CPU lebih tinggi)
+    ],
+],
+```
+
+### 10c. HTTP Method Abuse
+
+- `TRACE` / `TRACK` diblokir **tanpa syarat** (vektor reflected-XSS via TRACE,
+  tidak ada kegunaan sah).
+- Flood `OPTIONS` / `HEAD` dari bot terpotong oleh flood limiter (10a).
+
+### 10d. Bot Hunting Lebih Luas (User-Agent)
+
+Daftar scanner `UserAgentAnomalyRule` diperluas: sqlmap, nikto, dirbuster,
+gobuster, wpscan, masscan, nmap, acunetix, nessus, nuclei, zgrab, hydra,
+**ffuf, dirsearch, zmap, cadaver, wfuzz, testssl, whatweb, sublist3r, katana,
+jaeles, dalfox, xsstrike, commix, tplmap, arachni, wapiti**.
+
+Aktifkan (default `true`):
+
+```php
+'detection' => [
+    'rules' => [
+        'user_agent_anomaly' => [
+            'block_known_scanners' => true,
+        ],
+    ],
+],
+```
+
+### 10e. Threat Scoring race-free
+
+`ThreatScoringEngine` kini memakai **counter atomik** (`cache->increment()`) untuk
+skor agregat (bukan read-modify-write yang racy), dan membatasi cache records
+(`detection.scoring.max_records`, default 50) agar memori cache tidak tumbuh
+tanpa batas selama serangan berkelanjutan.
+
+---
+
 Lanjut ke [07-testing.md](./07-testing.md).

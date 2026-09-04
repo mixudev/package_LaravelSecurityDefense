@@ -47,8 +47,25 @@ class RequestThreatScanner
 
         $ip = (string) ($request->ip() ?: '127.0.0.1');
 
+        // 0. Unconditional block of TRACE/TRACK (reflective-XSS vector, no legitimate use)
+        $method = strtoupper((string) $request->method());
+        if (in_array($method, ['TRACE', 'TRACK'], true)) {
+            return $this->buildBlockedResponse($request, new SecurityThreat(
+                severity: 'high',
+                threatType: 'http_method_abuse',
+                fingerprint: hash('sha256', 'http_method_abuse:' . $method . ':' . $ip),
+                metadata: ['category' => 'http_method_abuse', 'method' => $method, 'ip' => $ip],
+                ruleIdentifier: 'request_threat_scanner'
+            ));
+        }
+
         // 1. Instant IP Quarantine Check (Zero CPU Overhead during active attack)
         if ($this->quarantineService->isQuarantined($ip)) {
+            return $this->buildQuarantinedResponse($request, $ip);
+        }
+
+        // 1b. Per-IP request flood limiter (cheap O(1) DoS/scraper guard)
+        if ($this->isRequestFloodExceeded($ip)) {
             return $this->buildQuarantinedResponse($request, $ip);
         }
 
@@ -99,30 +116,39 @@ class RequestThreatScanner
         }
 
         // 4. Payload Injection Inspection (Query, Path, Body)
-        $inputsToScan = [
-            'path' => $path,
-            'query' => $request->query(),
-            'body' => $request->all(),
-        ];
+        //    Fast-path: skip the regex scan entirely when there is no query string,
+        //    no request body, and the path already passed the recon check. This keeps
+        //    the cost of ordinary GET/HEAD traffic near-zero at scale (millions of req).
+        $query = $request->query();
+        $body = $this->hasRequestBody($request);
+        $scanPayloads = !empty($query) || $body || $this->alwaysScanPayloads();
 
-        $inspection = $this->payloadRule->inspect($inputsToScan);
+        if ($scanPayloads) {
+            $inputsToScan = [
+                'path' => $path,
+                'query' => $query,
+                'body' => $request->all(),
+            ];
 
-        if ($inspection['matched']) {
-            $threat = $this->handleDetectedAnomaly(
-                $request,
-                (string) ($inspection['category'] ?? 'payload_injection'),
-                (string) ($inspection['sample'] ?? ''),
-                (string) ($inspection['field'] ?? 'unknown'),
-                'critical'
-            );
+            $inspection = $this->payloadRule->inspect($inputsToScan);
 
-            // Auto-jail malicious IP if enabled
-            if ((bool) config('security-defense.middleware.quarantine.auto_jail_on_critical', true)) {
-                $this->quarantineService->jail($ip, null, 'Auto-quarantined due to payload injection attack: ' . ($inspection['category'] ?? ''));
-            }
+            if ($inspection['matched']) {
+                $threat = $this->handleDetectedAnomaly(
+                    $request,
+                    (string) ($inspection['category'] ?? 'payload_injection'),
+                    (string) ($inspection['sample'] ?? ''),
+                    (string) ($inspection['field'] ?? 'unknown'),
+                    'critical'
+                );
 
-            if (config('security-defense.middleware.payload_scanner.action', 'block') === 'block') {
-                return $this->buildBlockedResponse($request, $threat);
+                // Auto-jail malicious IP if enabled
+                if ((bool) config('security-defense.middleware.quarantine.auto_jail_on_critical', true)) {
+                    $this->quarantineService->jail($ip, null, 'Auto-quarantined due to payload injection attack: ' . ($inspection['category'] ?? ''));
+                }
+
+                if (config('security-defense.middleware.payload_scanner.action', 'block') === 'block') {
+                    return $this->buildBlockedResponse($request, $threat);
+                }
             }
         }
 
@@ -266,5 +292,78 @@ class RequestThreatScanner
         }
 
         return false;
+    }
+
+    /**
+     * Whether per-IP request flood limiting is enabled and this IP has exceeded
+     * the windowed cap. Implemented as a cheap atomic cache increment (O(1))
+     * so under a DDoS/scraper flood the expensive regex scans are never reached.
+     */
+    protected function isRequestFloodExceeded(string $ip): bool
+    {
+        $cfg = (array) config('security-defense.middleware.request_flood', []);
+        if (empty($cfg['enabled'])) {
+            return false;
+        }
+
+        $max = (int) ($cfg['max_requests_per_second'] ?? 200);
+        $window = (int) ($cfg['window'] ?? 5);
+        $targetJail = (int) ($cfg['jail_after_exceeding'] ?? 2);
+
+        $prefix = (string) config('security-defense.cache_prefix', 'security_defense:');
+        $key = sprintf('%sflood:%s:%d', $prefix, md5($ip), (int) floor(time() / $window));
+
+        $cache = $this->getFloodCache();
+
+        // Atomic increment; seeds TTL on first touch
+        $count = (int) $cache->increment($key);
+        if ($count === 1) {
+            $cache->put($key, 1, $window);
+        }
+
+        if ($count <= $max) {
+            return false;
+        }
+
+        // Exceeded: count consecutive windows; jail once past threshold
+        $strikeKey = sprintf('%sflood:strike:%s', $prefix, md5($ip));
+        $strikes = (int) $cache->increment($strikeKey);
+        if ($strikes === 1) {
+            $cache->put($strikeKey, 1, $window * 4);
+        }
+        if ($strikes >= $targetJail) {
+            $this->quarantineService->jail($ip, null, 'Auto-quarantined: request flood exceeding ' . $max . ' req/s per IP');
+        }
+
+        // Always reject while over cap (fail-closed under active flood)
+        return true;
+    }
+
+    /**
+     * Cheap check whether the request carries any body content worth scanning.
+     */
+    protected function hasRequestBody(Request $request): bool
+    {
+        $content = $request->getContent();
+
+        return is_string($content) && trim($content) !== '';
+    }
+
+    /**
+     * Whether payload scanning should run even for empty/bodyless requests.
+     */
+    protected function alwaysScanPayloads(): bool
+    {
+        return (bool) config('security-defense.middleware.payload_scanner.scan_empty_requests', false);
+    }
+
+    /**
+     * Cache repository used for flood counters (matches quarantine/scoring store).
+     */
+    protected function getFloodCache(): \Illuminate\Contracts\Cache\Repository
+    {
+        $store = config('security-defense.cache_store');
+
+        return \Illuminate\Support\Facades\Cache::store($store);
     }
 }

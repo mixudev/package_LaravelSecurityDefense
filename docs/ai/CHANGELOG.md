@@ -6,6 +6,38 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0] - 2026-09-04
+
+### Enterprise Scale & Aggressive Bot Hunting
+
+### Added
+- **Per-IP Request Flood Limiter** (`middleware.request_flood`) — counter windowed
+  O(1) atomic (`cache->increment()`) di `RequestThreatScanner` sebelum semua scan
+  regex. IP yang melebihi cap ditolak 429 dan auto-quarantine (fail-closed saat
+  serangan masif). Env: `SECURITY_DEFENSE_FLOOD_PROTECTION` (default true).
+- **Fast-path payload scan** — regex `PayloadInjectionRule::inspect()` dilewati
+  untuk request tanpa query dan tanpa body (GET/HEAD polos) kecuali
+  `middleware.payload_scanner.scan_empty_requests=true`. Memotong biaya CPU
+  hampir ke nol untuk trafik jutaan request.
+- **HTTP Method Abuse block** — `TRACE`/`TRACK` diblokir tanpa syarat
+  (vektor reflected-XSS, tidak ada kegunaan sah).
+- **Bot hunting diperluas** — daftar scanner `UserAgentAnomalyRule` ditambah:
+  ffuf, dirsearch, zmap, cadaver, wfuzz, testssl, whatweb, sublist3r, katana,
+  jaeles, dalfox, xsstrike, commix, tplmap, arachni, wapiti.
+
+### Changed
+- **`ThreatScoringEngine` race-free** — skor agregat kini pakai counter atomik
+  (`cache->increment()`), bukan read-modify-write yang racy di bawah concurrent
+  threats. Cache records dibatasi (`detection.scoring.max_records`, default 50)
+  agar memori cache tidak tumbuh tanpa batas.
+
+### Tests
+- `RequestThreatScannerEnterpriseTest` baru (5 test): fast-path, query tetap
+  discan, TRACE block, flood limiter jail, scanner UA diperluas.
+- Total suite: 77 tests, 300 assertions hijau.
+
+---
+
 ## [1.1.4] - 2026-09-04
 
 ### Email Theme Fix — always light default (no class-detectable theme)

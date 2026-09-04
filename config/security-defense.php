@@ -61,6 +61,7 @@ return [
             'enabled' => true,
             'threshold' => 100, // Aggregate score required to trigger compound threat
             'window' => 900,    // 15 minutes accumulation window
+            'max_records' => 50, // Max threat records retained per entity (bounds cache memory)
             'weights' => [
                 'brute_force' => 35,
                 'credential_stuffing' => 45,
@@ -216,9 +217,25 @@ return [
             'action' => 'block', // 'block' or 'log_only'
             'response_status' => 403,
             'response_message' => 'Suspicious request payload detected and blocked.',
+            // Always run the regex scan even for empty/bodyless requests.
+            // Stronger but higher CPU cost at scale — leave false for cheap fast-path.
+            'scan_empty_requests' => false,
             'excluded_paths' => [
                 // e.g. 'api/webhooks/*'
             ],
+        ],
+
+        /*
+        | Active Request Flood Protection (DDoS / scraper defense)
+        | Cheap per-IP windowed request counter (atomic cache increment, O(1)).
+        | An IP exceeding the cap is rejected and eventually auto-quarantined,
+        | keeping regex/scan cost near-zero during floods.
+        */
+        'request_flood' => [
+            'enabled' => env('SECURITY_DEFENSE_FLOOD_PROTECTION', true),
+            'max_requests_per_second' => 200, // windowed cap per IP
+            'window' => 5,                    // seconds per counting window
+            'jail_after_exceeding' => 2,      // consecutive windows over cap before auto-jail
         ],
 
         /*

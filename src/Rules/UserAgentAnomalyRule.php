@@ -40,6 +40,23 @@ class UserAgentAnomalyRule extends AbstractDetectionRule
         'nuclei' => '/\bnuclei\b/i',
         'zgrab' => '/\bzgrab\b/i',
         'hydra' => '/\bhydra\b/i',
+        // Additional hostile scanning & scraping tooling (aggressive bot hunting)
+        'ffuf' => '/\bffuf\b/i',
+        'dirsearch' => '/\bdirsearch\b/i',
+        'zmap' => '/\bzmap\b/i',
+        'cadaver' => '/\bcadaver\b/i',
+        'wfuzz' => '/\bwfuzz\b/i',
+        'testssl' => '/\btestssl(\.sh)?\b/i',
+        'whatweb' => '/\bwhatweb\b/i',
+        'sublist3r' => '/\bsublist3r\b/i',
+        'katana' => '/\bkatana(\s+v[0-9])?\b/i',
+        'jaeles' => '/\bjaeles\b/i',
+        'dalfox' => '/\bdalfox\b/i',
+        'xsstrike' => '/\bxsstrike\b/i',
+        'commix' => '/\bcommix\b/i',
+        'tplmap' => '/\btplmap\b/i',
+        'arachni' => '/\barachni\b/i',
+        'wapiti' => '/\bwapiti\b/i',
     ];
 
     public function evaluate(SecurityEvent $event): ?SecurityThreat
