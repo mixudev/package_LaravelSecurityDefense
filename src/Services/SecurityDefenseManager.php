@@ -12,13 +12,15 @@ use Mixudev\SecurityDefense\Models\SecurityAlert;
 use Mixudev\SecurityDefense\Sources\GenericArraySource;
 
 /**
- * Main coordinator service managing detection, persistence, and alerting.
+ * Enterprise coordinator service managing detection, threat scoring, persistence, and alerting.
  */
 class SecurityDefenseManager
 {
     public function __construct(
         protected ThreatDetector $detector,
-        protected AlertDispatcher $dispatcher
+        protected AlertDispatcher $dispatcher,
+        protected ?ThreatScoringEngine $scoringEngine = null,
+        protected ?IpQuarantineService $quarantineService = null
     ) {
     }
 
@@ -38,7 +40,7 @@ class SecurityDefenseManager
     }
 
     /**
-     * Process a normalized SecurityEvent through the detection engine and alert dispatcher.
+     * Process a normalized SecurityEvent through detection engine, threat scoring, and alert dispatcher.
      *
      * @param SecurityEvent $event
      * @return array<SecurityThreat>
@@ -49,6 +51,20 @@ class SecurityDefenseManager
 
         foreach ($threats as $threat) {
             $this->dispatcher->dispatch($threat);
+
+            // Feed threat into compound scoring engine
+            if ($this->scoringEngine !== null && $this->scoringEngine->isEnabled()) {
+                $compoundThreat = $this->scoringEngine->recordThreat($threat);
+                if ($compoundThreat !== null) {
+                    $threats[] = $compoundThreat;
+                    $this->dispatcher->dispatch($compoundThreat);
+
+                    // Auto-jail IP on compound critical threat
+                    if ($this->quarantineService !== null && $event->ip !== '') {
+                        $this->quarantineService->jail($event->ip, null, 'Auto-quarantined due to compound critical threat score');
+                    }
+                }
+            }
         }
 
         return $threats;
@@ -78,5 +94,21 @@ class SecurityDefenseManager
     public function dispatcher(): AlertDispatcher
     {
         return $this->dispatcher;
+    }
+
+    /**
+     * Get the threat scoring engine.
+     */
+    public function scoring(): ?ThreatScoringEngine
+    {
+        return $this->scoringEngine;
+    }
+
+    /**
+     * Get the IP quarantine service.
+     */
+    public function quarantine(): ?IpQuarantineService
+    {
+        return $this->quarantineService;
     }
 }

@@ -47,6 +47,19 @@ class SecurityAlert extends Model
     ];
 
     /**
+     * Get the attributes that should be cast (Laravel 11, 12, 13+ standard).
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'metadata' => 'array',
+            'resolved_at' => 'datetime',
+        ];
+    }
+
+    /**
      * Dynamically resolve table name from package configuration.
      */
     public function getTable(): string

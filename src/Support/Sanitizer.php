@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Support;
 
+use Illuminate\Support\Facades\Config;
+use Throwable;
+
 /**
  * Sanitizer for redacting sensitive credentials and tokens from telemetry and alerts.
+ * Hardened against memory exhaustion, deep recursive payloads, and standalone environments.
  */
 class Sanitizer
 {
@@ -44,11 +48,18 @@ class Sanitizer
      *
      * @param array<string, mixed> $data
      * @param array<string>|null $customSensitiveKeys
+     * @param int $depth Current recursion depth
      * @return array<string, mixed>
      */
-    public static function clean(array $data, ?array $customSensitiveKeys = null): array
+    public static function clean(array $data, ?array $customSensitiveKeys = null, int $depth = 0): array
     {
+        $maxDepth = static::resolveConfigInt('security-defense.hardening.max_traversal_depth', 5);
+        if ($depth >= $maxDepth) {
+            return ['_truncated_depth' => 'Depth limit reached'];
+        }
+
         $keysToRedact = $customSensitiveKeys ?? static::$sensitiveKeys;
+        $maxInspectionLength = static::resolveConfigInt('security-defense.hardening.max_inspection_length', 4096);
         $sanitized = [];
 
         foreach ($data as $key => $value) {
@@ -58,9 +69,14 @@ class Sanitizer
             }
 
             if (is_array($value)) {
-                $sanitized[$key] = static::clean($value, $keysToRedact);
+                $sanitized[$key] = static::clean($value, $keysToRedact, $depth + 1);
             } elseif (is_string($value)) {
-                $sanitized[$key] = static::cleanString($value);
+                $sanitizedString = static::cleanString($value);
+                if (strlen($sanitizedString) > $maxInspectionLength) {
+                    $sanitized[$key] = substr($sanitizedString, 0, $maxInspectionLength) . '...[TRUNCATED]';
+                } else {
+                    $sanitized[$key] = $sanitizedString;
+                }
             } else {
                 $sanitized[$key] = $value;
             }
@@ -102,5 +118,21 @@ class Sanitizer
         $value = (string) preg_replace('/:\/\/[^:]+:[^@]+@/', '://[REDACTED]:[REDACTED]@', $value);
 
         return $value;
+    }
+
+    /**
+     * Safely resolve integer config with fallback for standalone/unbooted environments.
+     */
+    protected static function resolveConfigInt(string $key, int $default): int
+    {
+        try {
+            if (class_exists(Config::class) && Config::hasFacadeRoot()) {
+                return (int) Config::get($key, $default);
+            }
+        } catch (Throwable) {
+            // Fallback if container is not initialized
+        }
+
+        return $default;
     }
 }

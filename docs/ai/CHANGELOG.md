@@ -6,48 +6,36 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.0] - 2026-09-04
+
+### Added
+- **Self-Defense & Hardening (Zero Vulnerability Guarantee)**:
+  - Pembatasan panjang string inspeksi (`hardening.max_inspection_length`) untuk mencegah serangan ReDoS (*catastrophic backtracking*).
+  - Pembatasan kedalaman rekursi (`hardening.max_traversal_depth`) pada `Sanitizer` untuk mencegah memory/stack exhaustion.
+  - Alert Rate Limiting (`hardening.alert_rate_limit`) untuk mencegah eksploitasi disk exhaustion pada database server.
+  - Penanganan aman pada lingkungan standalone/CLI unbooted container di `Sanitizer`.
+  - Dukungan kompatibilitas penuh untuk **Laravel 10, 11, 12, dan 13** (`illuminate/*: ^10.0|^11.0|^12.0|^13.0`, dual `$casts` + `casts(): array` method).
+- **Compound Threat Scoring Engine**:
+  - `ThreatScoringEngine` mengagregasi skor risiko dari berbagai vektor serangan per entitas dalam sliding window (default 15 menit).
+  - Menghasilkan alert `compound_threat` (CRITICAL) otomatis saat skor melampaui batas threshold (100).
+- **Enterprise Rules Baru**:
+  - `PathReconnaissanceRule`: Mendeteksi probing bot terhadap file/direktori sensitif (`.env`, `.git`, `wp-login`, `actuator`, `phpinfo`, database dumps).
+  - `UserAgentAnomalyRule`: Mendeteksi automated scanner tools (`sqlmap`, `nikto`, `dirbuster`, `gobuster`, `wpscan`, `masscan`, `nmap`).
+- **Active IP Quarantine (Fail2Ban-Style Defense)**:
+  - `IpQuarantineService` untuk isolasi sementara IP penyerang dengan TTL cache otomatis.
+  - Integrasi ke `RequestThreatScanner`: penolakan instan (HTTP 429) di baris pertama middleware untuk menghemat CPU saat terjadi serangan masif.
+  - Auto-jailing otomatis saat ancaman injeksi kritis terdeteksi.
+  - Perlindungan daftar putih (`whitelist`) untuk localhost dan proxy internal.
+- **Asynchronous Queue Dispatching**:
+  - `DispatchAlertChannelJob` (`ShouldQueue`) untuk offloading pengiriman notifikasi Telegram/Discord/SIEM ke background worker (zero request latency).
+
+---
+
 ## [1.0.0] - 2026-09-04
 
 ### Added
-- **Core Architecture & Contracts**:
-  - `ThreatSource` contract untuk menerima security event dari sumber mana pun secara independen dari framework auth.
-  - `DetectionRule` contract untuk rules anomali yang modular dan extensible.
-  - `ThreatDetector` contract untuk engine evaluasi ancaman.
-  - `AlertChannel` contract untuk modul pengiriman notifikasi.
-  - `AlertDeduplicatorInterface` contract untuk penekanan alert duplikat berbasis fingerprint hash.
-- **DTOs & Data Privacy**:
-  - `SecurityEvent` DTO ternormalisasi dengan auto-sanitization.
-  - `SecurityThreat` DTO dengan deterministic SHA-256 fingerprint generation.
-  - Utilitas `Sanitizer` untuk pembersihan rekursif password, token, secret, dan authorization headers.
-- **Adapters**:
-  - `GenericArraySource`: Adapter untuk array associatif dari event auth Laravel / webhook eksternal.
-  - `RequestThreatSource`: Adapter untuk objek `Illuminate\Http\Request`.
-- **Detection Rules**:
-  - `BruteForceRule`: Deteksi serangan brute force ke satu akun.
-  - `CredentialStuffingRule`: Deteksi bot yang mencoba banyak akun dari 1 alamat IP.
-  - `DistributedSprayRule`: Deteksi serangan password spray terdistribusi dari banyak IP ke 1 akun.
-  - `RateLimitBypassRule`: Deteksi manipulasi header proxy atau rotasi IP cepat.
-  - `PayloadInjectionRule`: Deteksi pola SQLi, XSS, Path Traversal, dan Command Injection.
-  - `ImpossibleTravelRule`: Deteksi anomali kecepatan perpindahan geografis antar-login berbasis rumus Haversine.
-- **Engine & Coordinator**:
-  - `AnomalyDetector`: Detection engine yang mengorkestrasi evaluasi rule dan pemancaran event `ThreatDetected`.
-  - `SecurityDefenseManager`: Master coordinator untuk telemetry recording, pipeline deteksi, dan resolusi alert.
-  - Facade `SecurityDefense` untuk pemanggilan statis yang ergonomis.
-- **Persistence & Alert Subsystem**:
-  - Database migration `create_security_alerts_table` dan Eloquent model `SecurityAlert`.
-  - `AlertDeduplicator`: Layanan deduplikasi berbasis cache sliding-window.
-  - `AlertDispatcher`: Orkestrator pengiriman alert ke database dan channel pihak ketiga.
-  - `DatabaseChannel`: Channel default wajib untuk persistence.
-  - `TelegramChannel`: Notifikasi Telegram Markdown dengan fail-safe error handling.
-  - `DiscordChannel`: Notifikasi Discord Embed dengan fail-safe error handling.
-  - `WebhookChannel`: Integrasi eksternal/SIEM dengan tanda tangan HMAC SHA-256.
-- **Active Prevention**:
-  - `RequestThreatScanner` Middleware: WAF-level payload scanner yang memblokir serangan sebelum mencapai controller dengan respons HTTP 403 terstruktur.
-- **Domain Events**:
-  - `ThreatDetected`
-  - `SecurityAlertCreated`
-  - `SecurityAlertResolved`
-- **Testing Suite**:
-  - 25 unit dan feature test menyeluruh menggunakan PHPUnit dan Orchestra Testbench (100% lulus).
-- **Living Documentation**:
-  - Folder `docs/ai/` lengkap (`README.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `IMPLEMENTATION.md`, `SECURITY.md`, `CONFIGURATION.md`, `INTEGRATION.md`, `TESTING.md`, `CHANGELOG.md`, `TODO.md`).
+- Inisialisasi awal arsitektur modular security defense.
+- Core contracts: `ThreatSource`, `DetectionRule`, `ThreatDetector`, `AlertChannel`, `AlertDeduplicatorInterface`.
+- Core rules: `BruteForceRule`, `CredentialStuffingRule`, `DistributedSprayRule`, `RateLimitBypassRule`, `PayloadInjectionRule`, `ImpossibleTravelRule`.
+- Channels: `DatabaseChannel`, `TelegramChannel`, `DiscordChannel`, `WebhookChannel`.
+- Living documentation di `docs/ai/*`.

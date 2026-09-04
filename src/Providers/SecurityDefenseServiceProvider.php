@@ -16,14 +16,18 @@ use Mixudev\SecurityDefense\Rules\BruteForceRule;
 use Mixudev\SecurityDefense\Rules\CredentialStuffingRule;
 use Mixudev\SecurityDefense\Rules\DistributedSprayRule;
 use Mixudev\SecurityDefense\Rules\ImpossibleTravelRule;
+use Mixudev\SecurityDefense\Rules\PathReconnaissanceRule;
 use Mixudev\SecurityDefense\Rules\PayloadInjectionRule;
 use Mixudev\SecurityDefense\Rules\RateLimitBypassRule;
+use Mixudev\SecurityDefense\Rules\UserAgentAnomalyRule;
 use Mixudev\SecurityDefense\Services\AlertDeduplicator;
 use Mixudev\SecurityDefense\Services\AlertDispatcher;
+use Mixudev\SecurityDefense\Services\IpQuarantineService;
 use Mixudev\SecurityDefense\Services\SecurityDefenseManager;
+use Mixudev\SecurityDefense\Services\ThreatScoringEngine;
 
 /**
- * Service provider for registering mixudev/security-defense components in Laravel container.
+ * Service provider for registering mixudev/security-defense enterprise components in Laravel container.
  */
 class SecurityDefenseServiceProvider extends ServiceProvider
 {
@@ -44,8 +48,10 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         $this->app->singleton(RateLimitBypassRule::class);
         $this->app->singleton(PayloadInjectionRule::class);
         $this->app->singleton(ImpossibleTravelRule::class);
+        $this->app->singleton(PathReconnaissanceRule::class);
+        $this->app->singleton(UserAgentAnomalyRule::class);
 
-        // Bind Detection Engine with default active rules
+        // Bind Detection Engine with all active rules
         $this->app->singleton(ThreatDetector::class, function ($app) {
             return new AnomalyDetector([
                 $app->make(BruteForceRule::class),
@@ -54,8 +60,14 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                 $app->make(RateLimitBypassRule::class),
                 $app->make(PayloadInjectionRule::class),
                 $app->make(ImpossibleTravelRule::class),
+                $app->make(PathReconnaissanceRule::class),
+                $app->make(UserAgentAnomalyRule::class),
             ]);
         });
+
+        // Bind Enterprise Threat Scoring Engine & IP Quarantine Service
+        $this->app->singleton(ThreatScoringEngine::class);
+        $this->app->singleton(IpQuarantineService::class);
 
         // Bind Alert Channels
         $this->app->singleton(DatabaseChannel::class);
@@ -76,11 +88,13 @@ class SecurityDefenseServiceProvider extends ServiceProvider
             );
         });
 
-        // Bind Primary Coordinator Manager
+        // Bind Primary Coordinator Manager with Enterprise Modules
         $this->app->singleton(SecurityDefenseManager::class, function ($app) {
             return new SecurityDefenseManager(
                 detector: $app->make(ThreatDetector::class),
-                dispatcher: $app->make(AlertDispatcher::class)
+                dispatcher: $app->make(AlertDispatcher::class),
+                scoringEngine: $app->make(ThreatScoringEngine::class),
+                quarantineService: $app->make(IpQuarantineService::class)
             );
         });
 
@@ -93,18 +107,15 @@ class SecurityDefenseServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
-            // Publish Configuration
             $this->publishes([
                 __DIR__ . '/../../config/security-defense.php' => config_path('security-defense.php'),
             ], 'security-defense-config');
 
-            // Publish Migrations
             $this->publishes([
                 __DIR__ . '/../../database/migrations/' => database_path('migrations'),
             ], 'security-defense-migrations');
         }
 
-        // Load Package Migrations directly
         $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
     }
 }

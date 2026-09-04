@@ -11,18 +11,24 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
+use Mixudev\SecurityDefense\Rules\PathReconnaissanceRule;
 use Mixudev\SecurityDefense\Rules\PayloadInjectionRule;
+use Mixudev\SecurityDefense\Rules\UserAgentAnomalyRule;
+use Mixudev\SecurityDefense\Services\IpQuarantineService;
 use Mixudev\SecurityDefense\Services\SecurityDefenseManager;
 use Mixudev\SecurityDefense\Support\Sanitizer;
 
 /**
- * Preventive WAF middleware inspecting inbound HTTP request payloads before reaching handlers.
+ * Enterprise preventive WAF middleware with active IP quarantine and payload scanning.
  */
 class RequestThreatScanner
 {
     public function __construct(
         protected SecurityDefenseManager $defenseManager,
-        protected PayloadInjectionRule $payloadRule
+        protected PayloadInjectionRule $payloadRule,
+        protected IpQuarantineService $quarantineService,
+        protected PathReconnaissanceRule $reconRule,
+        protected UserAgentAnomalyRule $uaRule
     ) {
     }
 
@@ -39,13 +45,55 @@ class RequestThreatScanner
             return $next($request);
         }
 
+        $ip = (string) ($request->ip() ?: '127.0.0.1');
+
+        // 1. Instant IP Quarantine Check (Zero CPU Overhead during active attack)
+        if ($this->quarantineService->isQuarantined($ip)) {
+            return $this->buildQuarantinedResponse($request, $ip);
+        }
+
         if ($this->isExcluded($request)) {
             return $next($request);
         }
 
-        // Collect inputs to scan: query params, body inputs, and URI path
+        // 2. User-Agent Scanner Tool Check
+        $userAgent = (string) ($request->userAgent() ?: '');
+        if ($userAgent !== '' && $this->uaRule->isEnabled() && (bool) config('security-defense.detection.rules.user_agent_anomaly.block_known_scanners', true)) {
+            $scannerTool = $this->uaRule->identifyScanner($userAgent);
+            if ($scannerTool !== null) {
+                $threat = $this->handleDetectedAnomaly(
+                    $request,
+                    'user_agent_anomaly',
+                    sprintf('Known scanning tool: %s', $scannerTool),
+                    'User-Agent',
+                    'medium'
+                );
+
+                if (config('security-defense.middleware.payload_scanner.action', 'block') === 'block') {
+                    return $this->buildBlockedResponse($request, $threat);
+                }
+            }
+        }
+
+        // 3. Path Reconnaissance Probing Check
+        $path = $request->path();
+        if ($this->reconRule->isEnabled() && $this->reconRule->isSensitivePath($path)) {
+            $threat = $this->handleDetectedAnomaly(
+                $request,
+                'path_reconnaissance',
+                $path,
+                'path',
+                'high'
+            );
+
+            if (config('security-defense.middleware.payload_scanner.action', 'block') === 'block') {
+                return $this->buildBlockedResponse($request, $threat);
+            }
+        }
+
+        // 4. Payload Injection Inspection (Query, Path, Body)
         $inputsToScan = [
-            'path' => $request->path(),
+            'path' => $path,
             'query' => $request->query(),
             'body' => $request->all(),
         ];
@@ -53,11 +101,20 @@ class RequestThreatScanner
         $inspection = $this->payloadRule->inspect($inputsToScan);
 
         if ($inspection['matched']) {
-            $threat = $this->handleDetectedThreat($request, $inspection);
+            $threat = $this->handleDetectedAnomaly(
+                $request,
+                (string) ($inspection['category'] ?? 'payload_injection'),
+                (string) ($inspection['sample'] ?? ''),
+                (string) ($inspection['field'] ?? 'unknown'),
+                'critical'
+            );
 
-            $action = config('security-defense.middleware.payload_scanner.action', 'block');
+            // Auto-jail malicious IP if enabled
+            if ((bool) config('security-defense.middleware.quarantine.auto_jail_on_critical', true)) {
+                $this->quarantineService->jail($ip, null, 'Auto-quarantined due to payload injection attack: ' . ($inspection['category'] ?? ''));
+            }
 
-            if ($action === 'block') {
+            if (config('security-defense.middleware.payload_scanner.action', 'block') === 'block') {
                 return $this->buildBlockedResponse($request, $threat);
             }
         }
@@ -67,21 +124,18 @@ class RequestThreatScanner
 
     /**
      * Process detected threat telemetry, record alert, and emit events.
-     *
-     * @param Request $request
-     * @param array{matched: bool, category: string|null, sample: string|null, field: string|null} $inspection
-     * @return SecurityThreat
      */
-    protected function handleDetectedThreat(Request $request, array $inspection): SecurityThreat
-    {
-        $category = (string) ($inspection['category'] ?? 'payload_injection');
-        $sample = (string) ($inspection['sample'] ?? '');
-        $field = (string) ($inspection['field'] ?? 'unknown');
-
+    protected function handleDetectedAnomaly(
+        Request $request,
+        string $category,
+        string $sample,
+        string $field,
+        string $severity = 'high'
+    ): SecurityThreat {
         $ip = (string) ($request->ip() ?: '127.0.0.1');
         $identifier = $request->user()?->getAuthIdentifier() ?: ($request->input('email') ?: 'guest');
 
-        $fingerprint = hash('sha256', sprintf('payload_injection:%s:%s:%s', $category, $ip, $sample));
+        $fingerprint = hash('sha256', sprintf('request_threat:%s:%s:%s', $category, $ip, $sample));
 
         $metadata = [
             'category' => $category,
@@ -94,7 +148,6 @@ class RequestThreatScanner
             'user_agent' => (string) ($request->userAgent() ?: ''),
         ];
 
-        // Safe logging without leaking unredacted secrets
         Log::warning(sprintf('SecurityDefense: Preventive WAF blocked %s attempt.', strtoupper($category)), [
             'ip' => $ip,
             'field' => $field,
@@ -104,11 +157,11 @@ class RequestThreatScanner
         ]);
 
         $threat = new SecurityThreat(
-            severity: 'critical',
+            severity: $severity,
             threatType: 'payload_injection',
             fingerprint: $fingerprint,
             metadata: $metadata,
-            ruleIdentifier: 'payload_injection'
+            ruleIdentifier: 'request_threat_scanner'
         );
 
         $event = new SecurityEvent(
@@ -120,10 +173,39 @@ class RequestThreatScanner
             metadata: $metadata
         );
 
-        // Record via manager (dispatches ThreatDetected, alert persistence, dedupe, channels)
         $this->defenseManager->dispatcher()->dispatch($threat);
 
         return $threat;
+    }
+
+    /**
+     * Build response for quarantined IP.
+     */
+    protected function buildQuarantinedResponse(Request $request, string $ip): Response|JsonResponse
+    {
+        $status = (int) config('security-defense.middleware.quarantine.response_status', 429);
+        $message = (string) config(
+            'security-defense.middleware.quarantine.response_message',
+            'Your IP has been temporarily quarantined due to suspicious security activity.'
+        );
+
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'error' => 'Quarantined',
+                'message' => $message,
+                'ip' => $ip,
+            ], $status);
+        }
+
+        return response(
+            sprintf(
+                '<!DOCTYPE html><html><head><title>429 Quarantined</title></head><body style="font-family:sans-serif;text-align:center;padding:50px;"><h1>Access Quarantined</h1><p>%s</p><small>IP: %s</small></body></html>',
+                htmlspecialchars($message, ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($ip, ENT_QUOTES, 'UTF-8')
+            ),
+            $status,
+            ['Content-Type' => 'text/html; charset=UTF-8']
+        );
     }
 
     /**
@@ -156,9 +238,6 @@ class RequestThreatScanner
         );
     }
 
-    /**
-     * Determine if scanner middleware is enabled.
-     */
     protected function isEnabled(): bool
     {
         $global = (bool) config('security-defense.enabled', true);
@@ -167,9 +246,6 @@ class RequestThreatScanner
         return $global && $middleware;
     }
 
-    /**
-     * Check whether current path is excluded from scanning.
-     */
     protected function isExcluded(Request $request): bool
     {
         $excludedPaths = (array) config('security-defense.middleware.payload_scanner.excluded_paths', []);

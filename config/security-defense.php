@@ -12,27 +12,63 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Cache Store
+    | Cache Store & Prefix
     |--------------------------------------------------------------------------
-    | The cache repository used to track sliding-window frequency counters
-    | and alert deduplication keys. If null, application default cache is used.
+    | Cache repository used for sliding-window counters, deduplication, and
+    | temporary IP quarantine. If null, application default cache is used.
     */
     'cache_store' => env('SECURITY_DEFENSE_CACHE_STORE', null),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Cache Prefix
-    |--------------------------------------------------------------------------
-    */
     'cache_prefix' => 'security_defense:',
 
     /*
     |--------------------------------------------------------------------------
-    | Anomaly Detection Engine
+    | Self-Defense & Hardening (Zero Vulnerability Guarantee)
+    |--------------------------------------------------------------------------
+    | Prevents the security defense package itself from becoming a denial-of-service
+    | target via ReDoS, memory exhaustion, or alert database disk flooding.
+    */
+    'hardening' => [
+        // Maximum string length to inspect per field before truncating (anti-ReDoS)
+        'max_inspection_length' => 4096,
+
+        // Maximum array recursion depth to inspect
+        'max_traversal_depth' => 5,
+
+        // Alert rate limiter to protect database disk from alert storms
+        'alert_rate_limit' => [
+            'enabled' => true,
+            'max_alerts_per_minute' => 60,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Anomaly Detection Engine & Rules
     |--------------------------------------------------------------------------
     */
     'detection' => [
         'enabled' => true,
+
+        /*
+        | Compound Threat Scoring Engine
+        | Aggregates risk scores across multiple attack vectors within a sliding
+        | window. If aggregate score exceeds threshold, triggers a critical alert.
+        */
+        'scoring' => [
+            'enabled' => true,
+            'threshold' => 100, // Aggregate score required to trigger compound threat
+            'window' => 900,    // 15 minutes accumulation window
+            'weights' => [
+                'brute_force' => 35,
+                'credential_stuffing' => 45,
+                'distributed_spray' => 30,
+                'rate_limit_bypass' => 20,
+                'payload_injection' => 50,
+                'impossible_travel' => 35,
+                'path_reconnaissance' => 30,
+                'user_agent_anomaly' => 25,
+            ],
+        ],
 
         'rules' => [
             'brute_force' => [
@@ -84,15 +120,39 @@ return [
                 'severity' => 'high',
                 'events' => ['LoginSucceeded', 'NewDeviceLoginDetected'],
             ],
+
+            'path_reconnaissance' => [
+                'enabled' => true,
+                'severity' => 'high',
+                'threshold' => 3,        // Number of probe hits in window
+                'window' => 120,         // Window in seconds
+            ],
+
+            'user_agent_anomaly' => [
+                'enabled' => true,
+                'severity' => 'medium',
+                'block_known_scanners' => true, // sqlmap, nikto, dirbuster, gobuster, etc.
+            ],
         ],
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Alert Channels
+    | Alert Channels & Background Queuing
     |--------------------------------------------------------------------------
     */
     'alerts' => [
+        /*
+        | Asynchronous Queue Dispatching
+        | Offloads Telegram, Discord, and Webhook notifications to background
+        | workers for zero request latency overhead.
+        */
+        'queue' => [
+            'enabled' => env('SECURITY_DEFENSE_QUEUE_ENABLED', false),
+            'connection' => env('SECURITY_DEFENSE_QUEUE_CONNECTION', null),
+            'queue_name' => env('SECURITY_DEFENSE_QUEUE_NAME', 'security-alerts'),
+        ],
+
         'database' => [
             'enabled' => true,
             'table' => 'security_alerts',
@@ -142,6 +202,23 @@ return [
             'response_message' => 'Suspicious request payload detected and blocked.',
             'excluded_paths' => [
                 // e.g. 'api/webhooks/*'
+            ],
+        ],
+
+        /*
+        | Active IP Quarantine (Fail2Ban-Style Defense)
+        | Automatically isolates IPs executing critical attacks or exceeding
+        | compound threat score thresholds to cut CPU load during active attacks.
+        */
+        'quarantine' => [
+            'enabled' => env('SECURITY_QUARANTINE_ENABLED', true),
+            'duration' => 900,                // Quarantine duration in seconds (15 mins)
+            'auto_jail_on_critical' => true,  // Automatically jail on critical threat block
+            'response_status' => 429,         // HTTP 429 Too Many Requests
+            'response_message' => 'Your IP has been temporarily quarantined due to suspicious security activity.',
+            'whitelist' => [
+                '127.0.0.1',
+                '::1',
             ],
         ],
     ],

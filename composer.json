@@ -1,33 +1,45 @@
 {
     "name": "mixudev/security-defense",
-    "description": "Modular, configurable Laravel security defense package for threat detection, correlation, alerting, and prevention without duplicating auth.",
+    "description": "Enterprise-grade, modular, and configurable Laravel security defense package for threat detection, correlation, IP quarantine, alerting, and prevention without duplicating auth.",
     "keywords": [
         "laravel",
         "security",
+        "security-defense",
         "threat-detection",
         "brute-force",
+        "credential-stuffing",
+        "impossible-travel",
         "siem",
         "alerting",
-        "waf"
+        "waf",
+        "fail2ban",
+        "quarantine",
+        "anti-redos"
     ],
+    "homepage": "https://github.com/mixudev/package_LaravelSecurityDefense",
     "license": "MIT",
     "authors": [
         {
             "name": "MixuDev",
+            "homepage": "https://github.com/mixudev",
             "role": "Developer"
         }
     ],
+    "support": {
+        "issues": "https://github.com/mixudev/package_LaravelSecurityDefense/issues",
+        "source": "https://github.com/mixudev/package_LaravelSecurityDefense"
+    },
     "require": {
         "php": "^8.2",
-        "illuminate/support": "^10.0|^11.0|^12.0",
-        "illuminate/database": "^10.0|^11.0|^12.0",
-        "illuminate/cache": "^10.0|^11.0|^12.0",
-        "illuminate/http": "^10.0|^11.0|^12.0",
-        "illuminate/events": "^10.0|^11.0|^12.0"
+        "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/database": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/cache": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/http": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/events": "^10.0|^11.0|^12.0|^13.0"
     },
     "require-dev": {
-        "orchestra/testbench": "^8.0|^9.0|^10.0",
-        "phpunit/phpunit": "^10.0|^11.0"
+        "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+        "phpunit/phpunit": "^10.0|^11.0|^12.0"
     },
     "autoload": {
         "psr-4": {

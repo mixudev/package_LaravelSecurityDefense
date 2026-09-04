@@ -9,6 +9,7 @@ use Mixudev\SecurityDefense\DTO\SecurityThreat;
 
 /**
  * Detects common web payload injections (SQLi, XSS, Path Traversal, OS Command Injection).
+ * Hardened with string bounds to prevent Regular Expression Denial of Service (ReDoS).
  */
 class PayloadInjectionRule extends AbstractDetectionRule
 {
@@ -48,18 +49,22 @@ class PayloadInjectionRule extends AbstractDetectionRule
         ]);
 
         $payloadsToScan = $this->extractPayloads($event);
+        $maxLength = (int) config('security-defense.hardening.max_inspection_length', 4096);
 
         foreach ($payloadsToScan as $field => $content) {
             if (!is_string($content) || trim($content) === '') {
                 continue;
             }
 
+            // Anti-ReDoS truncation
+            $safeContent = strlen($content) > $maxLength ? substr($content, 0, $maxLength) : $content;
+
             foreach ($this->signatures as $category => $pattern) {
                 if (empty($activeCategories[$category])) {
                     continue;
                 }
 
-                if (preg_match($pattern, $content, $matches)) {
+                if (preg_match($pattern, $safeContent, $matches)) {
                     $matchedSample = substr($matches[0], 0, 50);
                     $fingerprint = hash('sha256', sprintf('payload_injection:%s:%s:%s', $category, $event->ip, $matchedSample));
 
@@ -95,6 +100,7 @@ class PayloadInjectionRule extends AbstractDetectionRule
     public function inspect(array|string $input): array
     {
         $flattened = is_array($input) ? $this->flattenArray($input) : ['raw' => $input];
+        $maxLength = (int) config('security-defense.hardening.max_inspection_length', 4096);
 
         $activeCategories = (array) $this->getConfig('patterns', [
             'sqli' => true,
@@ -108,12 +114,15 @@ class PayloadInjectionRule extends AbstractDetectionRule
                 continue;
             }
 
+            // Anti-ReDoS truncation
+            $safeValue = strlen($value) > $maxLength ? substr($value, 0, $maxLength) : $value;
+
             foreach ($this->signatures as $category => $pattern) {
                 if (empty($activeCategories[$category])) {
                     continue;
                 }
 
-                if (preg_match($pattern, $value, $matches)) {
+                if (preg_match($pattern, $safeValue, $matches)) {
                     return [
                         'matched' => true,
                         'category' => $category,
@@ -166,16 +175,22 @@ class PayloadInjectionRule extends AbstractDetectionRule
      *
      * @param array<string, mixed> $array
      * @param string $prefix
+     * @param int $depth
      * @return array<string, string>
      */
-    protected function flattenArray(array $array, string $prefix = ''): array
+    protected function flattenArray(array $array, string $prefix = '', int $depth = 0): array
     {
+        $maxDepth = (int) config('security-defense.hardening.max_traversal_depth', 5);
+        if ($depth >= $maxDepth) {
+            return [];
+        }
+
         $result = [];
 
         foreach ($array as $key => $value) {
             $fullKey = $prefix . (string) $key;
             if (is_array($value)) {
-                $result = array_merge($result, $this->flattenArray($value, $fullKey . '.'));
+                $result = array_merge($result, $this->flattenArray($value, $fullKey . '.', $depth + 1));
             } elseif (is_scalar($value)) {
                 $result[$fullKey] = (string) $value;
             }
