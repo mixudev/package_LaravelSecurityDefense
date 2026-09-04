@@ -6,6 +6,27 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.4] - 2026-09-04
+
+### Email Theme Fix — always light default (no class-detectable theme)
+
+### Changed
+- **Hapus tema dark dari template email** — blok `@media (prefers-color-scheme: dark)`
+  di `emails/layouts/html.blade.php` dihapus. Sebelumnya, pembaca dengan mode
+  OS/email client gelap melihat email dirender dark (#09090b/#18181b) karena
+  media query. Sekarang template **selalu light profesional**, tanpa tema,
+  terlepas dari mode reader.
+
+### Fixed
+- Email kini render konsisten light di semua client: card `#ffffff`, bg `#f4f4f5`,
+  text `#09090b`/`#18181b` (dark text on light, bukan background dark).
+
+### Tests
+- `EmailRenderTest` diperkuat: memverifikasi TIDAK ada `prefers-color-scheme`,
+  `@media`, dan tidak ada background dark — template selalu light.
+
+---
+
 ## [1.1.3] - 2026-09-04
 
 ### Email & Messaging Template Refactor (maintainable templating)

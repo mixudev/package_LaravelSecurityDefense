@@ -36,6 +36,17 @@ class EmailRenderTest extends TestCase
         // Light professional theme (no dark navy bg)
         $this->assertStringNotContainsString('#0b0f19', $html);
         $this->assertStringNotContainsString('#111827', $html);
+        // No theme at all: no prefers-color-scheme dark override (always light)
+        $this->assertStringNotContainsString('prefers-color-scheme', $html);
+        $this->assertStringNotContainsString('@media', $html);
+        // Page/card backgrounds are light (no dark navy or near-black background pinned)
+        $this->assertStringNotContainsString('#0b0f19', $html);
+        $this->assertStringNotContainsString('#111827', $html);
+        $this->assertStringNotContainsString('background-color: #09090b', $html);
+        $this->assertStringNotContainsString('background-color: #18181b', $html);
+        // Light card background present
+        $this->assertStringContainsString('background-color: #ffffff', $html);
+        $this->assertStringContainsString('background-color: #f4f4f5', $html);
         // Severity badge renders
         $this->assertStringContainsString('CRITICAL', $html);
         // Detail row renders with sanitized metadata

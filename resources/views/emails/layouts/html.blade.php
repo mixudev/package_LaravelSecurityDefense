@@ -11,20 +11,6 @@
         table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
         img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
         body { margin: 0; padding: 0; width: 100% !important; height: 100% !important; }
-
-        /* Dark Mode Automatic Adaptation */
-        @media (prefers-color-scheme: dark) {
-            .email-bg { background-color: #09090b !important; }
-            .email-card { background-color: #18181b !important; border-color: #27272a !important; }
-            .email-header { background-color: #18181b !important; border-color: #27272a !important; }
-            .email-text-title { color: #fafafa !important; }
-            .email-text-main { color: #f4f4f5 !important; }
-            .email-text-muted { color: #a1a1aa !important; }
-            .email-border { border-color: #27272a !important; }
-            .email-table-bg { background-color: #18181b !important; }
-            .email-code-bg { background-color: #09090b !important; border-color: #27272a !important; color: #e4e4e7 !important; }
-            .email-footer { border-color: #27272a !important; color: #71717a !important; }
-        }
     </style>
 </head>
 <body class="email-bg" style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">

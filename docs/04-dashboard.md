@@ -134,11 +134,11 @@ resources/views/vendor/security-defense/
 
 > **Email template modular:** `emails/alert.blade.php` memakai
 > `@extends('security-defense::emails.layouts.html')` dan `@include`
-> komponen di `emails/components/*`. Desain **light profesional** untuk email
-> (bukan dark), dengan adaptasi otomatis `prefers-color-scheme: dark` di layout
-> untuk pembaca dengan mode gelap. Komponen memakai layout `@yield('content')` +
-> `@include` (bukan anonymous `<x->` component) agar resolusi path di namespace
-> package stabil.
+> komponen di `emails/components/*`. Desain **light profesional untuk semua
+> pembaca** (tanpa tema/ganti warna): tidak ada `prefers-color-scheme`
+> override — template konsisten light terlepas dari mode OS/email client.
+> Komponen memakai layout `@yield('content')` + `@include` (bukan anonymous
+> `<x->` component) agar resolusi path di namespace package stabil.
 
 Edit bebas sesuai kebutuhan (struktur Tailwind v4 + Inter/JetBrains Mono).
 
