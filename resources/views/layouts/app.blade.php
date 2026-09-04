@@ -28,6 +28,12 @@
     <!-- Standalone Tailwind CSS v4 Browser Runtime (Isolated to Dashboard) -->
     <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
 
+    <!-- Configure class-based dark mode (Tailwind v4 defaults to prefers-color-scheme;
+         this makes the .dark class on <html> drive all dark: variants) -->
+    <style type="text/tailwindcss">
+        @custom-variant dark (&:where(.dark, .dark *));
+    </style>
+
     <style>
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

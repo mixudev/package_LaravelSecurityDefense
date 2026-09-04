@@ -57,5 +57,7 @@ class DashboardRenderDataTest extends TestCase
         $response->assertDontSee('&#128640;'); // no emoji leaks
         $response->assertSee('Inspect (2)'); // telemetry count for 2 metadata keys
         $response->assertSee('Attack Vector Prevalence'); // distribution rendered
+        $response->assertSee('@custom-variant dark'); // class-based dark mode variant present
+        $response->assertSee('text/tailwindcss'); // tailwind v4 browser runtime config block
     }
 }

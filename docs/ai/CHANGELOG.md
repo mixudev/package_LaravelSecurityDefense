@@ -22,6 +22,12 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Test baru `DashboardRenderDataTest` — renders dashboard dengan data terisi (alerts + quarantines + distribution) dan memverifikasi bebas emoji.
 
+### Fixed
+- **Toggle dark/light mode tidak mengubah gaya** — akar masalah: Tailwind v4 browser runtime default memakai `prefers-color-scheme` (media query OS), bukan class. Ditambahkan `<style type="text/tailwindcss">` dengan `@custom-variant dark (&:where(.dark, .dark *));` di `layouts/app.blade.php` sehingga class `.dark` pada `<html>` menggerakkan semua varian `dark:`. (Alpine tidak diperlukan — toggle murni vanilla JS.)
+
+### Docs
+- Folder `docs/` modular baru untuk integrasi & kustomisasi: `README.md`, `01-installation.md`, `02-integration.md`, `03-alert-channels.md`, `04-dashboard.md`, `05-customization.md`, `06-security-hardening.md`, `07-testing.md`, `08-troubleshooting.md`.
+
 ---
 
 ## [1.1.0] - 2026-09-04
