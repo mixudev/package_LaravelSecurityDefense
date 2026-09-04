@@ -1,0 +1,186 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Mixudev\SecurityDefense\Rules;
+
+use Mixudev\SecurityDefense\DTO\SecurityEvent;
+use Mixudev\SecurityDefense\DTO\SecurityThreat;
+
+/**
+ * Detects common web payload injections (SQLi, XSS, Path Traversal, OS Command Injection).
+ */
+class PayloadInjectionRule extends AbstractDetectionRule
+{
+    public function identifier(): string
+    {
+        return 'payload_injection';
+    }
+
+    public function name(): string
+    {
+        return 'Payload Injection Detector (WAF)';
+    }
+
+    /**
+     * Common attack signatures.
+     *
+     * @var array<string, string>
+     */
+    protected array $signatures = [
+        'sqli' => '/(\b(union(\s+all)?\s+select|select\s+.*\s+from|insert\s+into|update\s+.*\s+set|delete\s+from|drop\s+(table|database)|truncate\s+table)\b|(\'|\")\s*(\b(or|and)\b)\s*(\'|\")?\d+(\'|\")?\s*=\s*(\'|\")?\d+|(\'|\")\s*--|(\bwaitfor\s+delay\b|\bsleep\(\d+\)|\bbenchmark\(\d+,))/i',
+        'xss' => '/(<script\b[^>]*>.*<\/script>|javascript\s*:\s*|on(error|load|click|mouseover|submit|focus)\s*=|document\.(cookie|location)|<img\s+[^>]*onerror\s*=|alert\(|prompt\(|confirm\()/i',
+        'traversal' => '/(\.\.[\/\\\\]|\b(etc[\/\\\\]passwd|windows[\/\\\\]win\.ini|boot\.ini)\b)/i',
+        'command_injection' => '/(;|\&|\||\`|\$\()\s*(cat\s+\/|ls\s+-|whoami|id|uname\s+-|netstat|curl\s+http|wget\s+http|cmd\.exe|powershell)\b/i',
+    ];
+
+    public function evaluate(SecurityEvent $event): ?SecurityThreat
+    {
+        if (!$this->isEnabled()) {
+            return null;
+        }
+
+        $activeCategories = (array) $this->getConfig('patterns', [
+            'sqli' => true,
+            'xss' => true,
+            'traversal' => true,
+            'command_injection' => true,
+        ]);
+
+        $payloadsToScan = $this->extractPayloads($event);
+
+        foreach ($payloadsToScan as $field => $content) {
+            if (!is_string($content) || trim($content) === '') {
+                continue;
+            }
+
+            foreach ($this->signatures as $category => $pattern) {
+                if (empty($activeCategories[$category])) {
+                    continue;
+                }
+
+                if (preg_match($pattern, $content, $matches)) {
+                    $matchedSample = substr($matches[0], 0, 50);
+                    $fingerprint = hash('sha256', sprintf('payload_injection:%s:%s:%s', $category, $event->ip, $matchedSample));
+
+                    return new SecurityThreat(
+                        severity: (string) $this->getConfig('severity', 'critical'),
+                        threatType: 'payload_injection',
+                        fingerprint: $fingerprint,
+                        metadata: [
+                            'category' => $category,
+                            'matched_field' => $field,
+                            'matched_signature' => $matchedSample,
+                            'ip' => $event->ip,
+                            'target_identifier' => $event->identifier,
+                            'user_agent' => $event->userAgent,
+                            'path' => $event->metadata['path'] ?? null,
+                            'method' => $event->metadata['method'] ?? null,
+                        ],
+                        ruleIdentifier: $this->identifier()
+                    );
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Inspect any arbitrary string or array directly (used by middleware).
+     *
+     * @param array<string, mixed>|string $input
+     * @return array{matched: bool, category: string|null, sample: string|null, field: string|null}
+     */
+    public function inspect(array|string $input): array
+    {
+        $flattened = is_array($input) ? $this->flattenArray($input) : ['raw' => $input];
+
+        $activeCategories = (array) $this->getConfig('patterns', [
+            'sqli' => true,
+            'xss' => true,
+            'traversal' => true,
+            'command_injection' => true,
+        ]);
+
+        foreach ($flattened as $field => $value) {
+            if (!is_string($value) || trim($value) === '') {
+                continue;
+            }
+
+            foreach ($this->signatures as $category => $pattern) {
+                if (empty($activeCategories[$category])) {
+                    continue;
+                }
+
+                if (preg_match($pattern, $value, $matches)) {
+                    return [
+                        'matched' => true,
+                        'category' => $category,
+                        'sample' => substr($matches[0], 0, 50),
+                        'field' => $field,
+                    ];
+                }
+            }
+        }
+
+        return [
+            'matched' => false,
+            'category' => null,
+            'sample' => null,
+            'field' => null,
+        ];
+    }
+
+    /**
+     * Extract string payloads from SecurityEvent metadata.
+     *
+     * @param SecurityEvent $event
+     * @return array<string, string>
+     */
+    protected function extractPayloads(SecurityEvent $event): array
+    {
+        $payloads = [];
+
+        if (isset($event->metadata['query']) && is_array($event->metadata['query'])) {
+            $payloads = array_merge($payloads, $this->flattenArray($event->metadata['query'], 'query.'));
+        }
+
+        if (isset($event->metadata['input']) && is_array($event->metadata['input'])) {
+            $payloads = array_merge($payloads, $this->flattenArray($event->metadata['input'], 'input.'));
+        }
+
+        if (isset($event->metadata['raw_payload']) && is_string($event->metadata['raw_payload'])) {
+            $payloads['raw_payload'] = $event->metadata['raw_payload'];
+        }
+
+        if (isset($event->metadata['path']) && is_string($event->metadata['path'])) {
+            $payloads['path'] = $event->metadata['path'];
+        }
+
+        return $payloads;
+    }
+
+    /**
+     * Recursively flatten array into dot-notated string values.
+     *
+     * @param array<string, mixed> $array
+     * @param string $prefix
+     * @return array<string, string>
+     */
+    protected function flattenArray(array $array, string $prefix = ''): array
+    {
+        $result = [];
+
+        foreach ($array as $key => $value) {
+            $fullKey = $prefix . (string) $key;
+            if (is_array($value)) {
+                $result = array_merge($result, $this->flattenArray($value, $fullKey . '.'));
+            } elseif (is_scalar($value)) {
+                $result[$fullKey] = (string) $value;
+            }
+        }
+
+        return $result;
+    }
+}

@@ -1,0 +1,9 @@
+/vendor/
+/.phpunit.cache/
+/.phpstan.cache/
+.phpunit.result.cache
+composer.lock
+.env
+.env.backup
+.DS_Store
+Thumbs.db

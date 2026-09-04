@@ -1,0 +1,57 @@
+{
+    "name": "mixudev/security-defense",
+    "description": "Modular, configurable Laravel security defense package for threat detection, correlation, alerting, and prevention without duplicating auth.",
+    "keywords": [
+        "laravel",
+        "security",
+        "threat-detection",
+        "brute-force",
+        "siem",
+        "alerting",
+        "waf"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "MixuDev",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/database": "^10.0|^11.0|^12.0",
+        "illuminate/cache": "^10.0|^11.0|^12.0",
+        "illuminate/http": "^10.0|^11.0|^12.0",
+        "illuminate/events": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Mixudev\\SecurityDefense\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Mixudev\\SecurityDefense\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Mixudev\\SecurityDefense\\Providers\\SecurityDefenseServiceProvider"
+            ],
+            "aliases": {
+                "SecurityDefense": "Mixudev\\SecurityDefense\\Support\\Facades\\SecurityDefense"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts": {
+        "test": "vendor/bin/phpunit"
+    }
+}
