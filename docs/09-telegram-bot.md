@@ -31,8 +31,8 @@ Di lingkungan hosting atau VPS yang sudah memiliki domain publik HTTPS (contoh: 
 
 ### Langkah 1: Pastikan Kredensial di `.env`
 ```env
-SECURITY_TELEGRAM_BOT_TOKEN=8788019703:AAH2OjHDKe6IWX_n0E4JgbJsOumHq__I_AY
-SECURITY_TELEGRAM_CHAT_ID=8741993336
+SECURITY_TELEGRAM_BOT_TOKEN= token kamu
+SECURITY_TELEGRAM_CHAT_ID= id telegram
 ```
 
 ### Langkah 2: Daftarkan Webhook (Cukup 1 Kali)
