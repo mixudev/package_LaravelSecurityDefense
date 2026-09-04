@@ -17,7 +17,7 @@
                                 <tr>
                                     <td>
                                         <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #38bdf8;">
-                                            🛡️ SECURITY DEFENSE SIEM
+                                            SECURITY DEFENSE SIEM
                                         </div>
                                         <div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-top: 4px;">
                                             {{ $appName }} &bull; <span style="color: #94a3b8; font-weight: 500; font-size: 14px;">{{ strtoupper($appEnv) }}</span>

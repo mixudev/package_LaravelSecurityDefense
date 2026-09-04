@@ -59,12 +59,19 @@
                             'medium' => 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800',
                             default => 'bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700',
                         };
+                        $sevDot = match($sev) {
+                            'critical' => 'bg-rose-500',
+                            'high' => 'bg-orange-500',
+                            'medium' => 'bg-amber-500',
+                            default => 'bg-zinc-400',
+                        };
                     @endphp
                     <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition">
                         <!-- Severity -->
                         <td class="px-3.5 py-2.5 whitespace-nowrap">
-                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border {{ $sevBadge }}">
-                                {{ $alert->severity }}
+                            <span class="inline-flex items-center space-x-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border {{ $sevBadge }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $sevDot }}" aria-hidden="true"></span>
+                                <span>{{ $alert->severity }}</span>
                             </span>
                         </td>
 
@@ -104,7 +111,7 @@
                         <!-- Telemetry Inspect -->
                         <td class="px-3.5 py-2.5 whitespace-nowrap">
                             <button type="button" onclick="showMetadataModal({{ $alert->id }}, '{{ e(json_encode($alert->metadata ?? [], JSON_HEX_APOS | JSON_HEX_QUOT)) }}')" class="px-2 py-1 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-mono text-[10px] transition cursor-pointer border border-zinc-200 dark:border-zinc-700">
-                                Inspect ({!! count($alert->metadata ?? []) !!})
+                                Inspect ({{ count($alert->metadata ?? []) }})
                             </button>
                         </td>
 

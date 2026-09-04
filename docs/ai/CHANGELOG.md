@@ -8,6 +8,24 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [1.1.1] - 2026-09-04
 
+### UI/UX & Accessibility Pass (dashboard views)
+
+### Changed
+- **Semua emoji diganti SVG ikon inline** (Lucide-style) — memenuhi preferensi tanpa-emoji. Berdampak: `channel-card` (ikon per-kanal), `quarantine-table` (shield-alert), `emails/alert` (header emoji dihapus).
+- **Severity badge aksesibel** — `alerts-table` kini memakai dot indikator berwarna + teks, bukan hanya warna (ramah daltonisme).
+- **Threat Distribution di-refactor jadi progress bar proporsional** — `threat-distribution` menampilkan bar + persentase, bukan sekadar chip.
+- **Card label channel proper** — `channel-card` menampilkan `Webhook`/`Discord`/`Telegram`/`Email`/`Database` (sebelumnya raw key).
+- **Timestamp lebih manusiawi** — `quarantine-table` memakai `diffForHumans()`.
+- **Aksesibilitas tombol Release** — `aria-label` ditambahkan.
+- **Hardening tamahan**: count telemetry di-escape (`count()` tetap int, tapi diganti dari `{!! !!}` ke `{{ }}`).
+
+### Added
+- Test baru `DashboardRenderDataTest` — renders dashboard dengan data terisi (alerts + quarantines + distribution) dan memverifikasi bebas emoji.
+
+---
+
+## [1.1.0] - 2026-09-04
+
 ### Security Hardening (audit-driven remediation)
 
 Semua 13 temuan dari audit keamanan telah diperbaiki.
