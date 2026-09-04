@@ -239,4 +239,43 @@ SecurityAlert::severity('critical')->get();
 
 Scope dapat di-rantai, mis. `SecurityAlert::new()->severity('critical')->get()`.
 
+---
+
+## 7. Kustomisasi Template Pesan (Discord / Telegram / Email)
+
+Format pesan alert terpusat agar mudah di-maintenance:
+
+### Discord & Telegram (Formatter PHP)
+
+- **`Mixudev\SecurityDefense\Support\DiscordAlertFormatter`** — membangun payload
+  embed Discord (title, fields, color, footer) dari `SecurityAlert`.
+  Dipakai oleh `DiscordChannel::send()`.
+- **`Mixudev\SecurityDefense\Support\TelegramAlertFormatter`** — membangun pesan
+  markdown Telegram dari `SecurityAlert`. Dipakai oleh `TelegramChannel::send()`.
+
+Contoh pakai langsung di aplikasi Anda (mis. untuk custom workflow):
+
+```php
+use Mixudev\SecurityDefense\Support\DiscordAlertFormatter;
+use Mixudev\SecurityDefense\Support\TelegramAlertFormatter;
+
+$discordPayload = DiscordAlertFormatter::payload($alert);   // array webhook embed
+$telegramText   = TelegramAlertFormatter::message($alert);  // string markdown
+```
+
+Untuk mengubah format bawaan (warna, label, layout embed), Anda dapat:
+1. Subclass / ganti isi formatter via publish (salon copy ke `App\Support`),
+2. Atau timpa binding jika formatter diregistrasi sebagai instance.
+
+> **Konsistensi:** Formatter memakai **label teks** (bukan emoji) dan memisahkan
+> kunci internal (`_is_test`, `source`) dari metadata publik yang diekspos.
+
+### Email (Template Blade)
+
+- `resources/views/vendor/security-defense/emails/alert.blade.php` = template
+  utama (extends `emails.layouts.html`).
+- Komponen di `emails/components/` = badge severity, detail-row, telemetry,
+  header, footer.
+- Edit komponen Blade untuk mengubah tampilan email. Lihat [04-dashboard.md](./04-dashboard.md).
+
 Lanjut ke [06-security-hardening.md](./06-security-hardening.md).

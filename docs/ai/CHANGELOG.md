@@ -6,7 +6,36 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.1.1] - 2026-09-04
+## [1.1.3] - 2026-09-04
+
+### Email & Messaging Template Refactor (maintainable templating)
+
+### Changed
+- **Email alert pakai layout + komponen modular** — `emails/alert.blade.php` kini
+  `@extends('security-defense::emails.layouts.html')` dan memakai komponen
+  `emails/components/*` (`badge`, `detail-row`, `telemetry`), konsisten dengan
+  layout/header/footer yang sudah ada.
+- **Email tema light profesional** — hapus background dark navy (`#0b0f19`/`#111827`);
+  email kini light (#ffffff card) dengan adaptasi otomatis `prefers-color-scheme: dark`
+  di layout untuk pembaca mode gelap.
+- **Discord templating terpusat** — payload embed dipindah ke
+  `Support\DiscordAlertFormatter` (title, fields, color, footer), `DiscordChannel`
+  tinggal transport. Hapus emoji `🛡️`, tone profesional.
+- **Telegram templating terpusat** — pesan markdown dipindah ke
+  `Support\TelegramAlertFormatter`; label severity teks (`[CRITICAL]`) ganti emoji
+  (`🚨⚠️⚡ℹ️`).
+- Internal diagnostic keys (`_is_test`, `source`) dikeluarkan dari blok metadata
+  publik pada pesan Discord/Telegram.
+
+### Added
+- Test `EmailRenderTest` — memverifikasi email memakai layout modular, tema light,
+  badge severity, telemetry ter-sanitasi, footer.
+- Test `MessageFormatterTest` — memverifikasi formatter Discord & Telegram:
+  struktur profesional, tanpa emoji, warna severity benar, kunci internal disaring.
+
+---
+
+## [1.1.2] - 2026-09-04
 
 ### UI/UX & Accessibility Pass (dashboard views)
 
@@ -30,7 +59,7 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.1.0] - 2026-09-04
+## [1.1.1] - 2026-09-04
 
 ### Security Hardening (audit-driven remediation)
 

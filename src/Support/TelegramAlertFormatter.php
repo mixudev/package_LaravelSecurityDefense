@@ -1,0 +1,72 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Mixudev\SecurityDefense\Support;
+
+use Mixudev\SecurityDefense\Models\SecurityAlert;
+
+/**
+ * Builds a maintainable, professional Telegram message (Markdown) from a
+ * SecurityAlert. Centralizes formatting so TelegramChannel only handles transport.
+ */
+final class TelegramAlertFormatter
+{
+    /**
+     * Text severity label (emoji-free) per severity.
+     *
+     * @var array<string, string>
+     */
+    protected const SEVERITY_LABELS = [
+        'critical' => '[CRITICAL]',
+        'high'     => '[HIGH]',
+        'medium'   => '[MEDIUM]',
+        'low'      => '[LOW]',
+    ];
+
+    /**
+     * Build the Telegram markdown message for an alert.
+     */
+    public static function message(SecurityAlert $alert): string
+    {
+        $isTest = !empty($alert->metadata['_is_test'] ?? null);
+
+        $title = $isTest
+            ? 'Channel Connectivity Test'
+            : 'Security Threat Detected';
+
+        $label = self::severityLabel($alert->severity);
+
+        $lines = [
+            sprintf('%s *%s*', $label, $title),
+            '',
+            sprintf('• *Threat Type:* `%s`', $alert->threat_type),
+            sprintf('• *Rule:* `%s`', $alert->rule_identifier ?: 'unknown'),
+        ];
+
+        if (filled($alert->fingerprint)) {
+            $lines[] = sprintf('• *Fingerprint:* `%s`', substr($alert->fingerprint, 0, 16) . '...');
+        }
+
+        $lines[] = sprintf('• *Timestamp:* `%s`', $alert->created_at?->toIso8601String() ?: gmdate('c'));
+
+        $metadata = $alert->metadata ?? [];
+        unset($metadata['_is_test'], $metadata['source']);
+
+        if (!empty($metadata)) {
+            $lines[] = '';
+            $lines[] = '• *Metadata Summary:*';
+            $lines[] = sprintf("```json\n%s\n```", json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Resolve the text severity label, falling back to [LOW].
+     */
+    protected static function severityLabel(string $severity): string
+    {
+        return self::SEVERITY_LABELS[strtolower($severity)] ?? self::SEVERITY_LABELS['low'];
+    }
+}

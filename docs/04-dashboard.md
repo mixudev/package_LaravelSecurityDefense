@@ -120,8 +120,25 @@ resources/views/vendor/security-defense/
 │   ├── stat-card.blade.php
 │   ├── telemetry-modal.blade.php
 │   └── threat-distribution.blade.php
-└── emails/alert.blade.php
+└── emails/
+    ├── alert.blade.php                  ← template email (extends layout)
+    ├── layouts/
+    │   └── html.blade.php               ← layout email + dark-mode adaptation
+    └── components/
+        ├── header.blade.php             ← header (brand + env badge)
+        ├── footer.blade.php             ← footer
+        ├── badge.blade.php              ← severity pill (light theme)
+        ├── detail-row.blade.php         ← baris detail (Alert ID, Fingerprint, dll)
+        └── telemetry.blade.php          ← blok metadata JSON ter-sanitasi
 ```
+
+> **Email template modular:** `emails/alert.blade.php` memakai
+> `@extends('security-defense::emails.layouts.html')` dan `@include`
+> komponen di `emails/components/*`. Desain **light profesional** untuk email
+> (bukan dark), dengan adaptasi otomatis `prefers-color-scheme: dark` di layout
+> untuk pembaca dengan mode gelap. Komponen memakai layout `@yield('content')` +
+> `@include` (bukan anonymous `<x->` component) agar resolusi path di namespace
+> package stabil.
 
 Edit bebas sesuai kebutuhan (struktur Tailwind v4 + Inter/JetBrains Mono).
 

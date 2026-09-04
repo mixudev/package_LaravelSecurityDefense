@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Mixudev\SecurityDefense\Contracts\AlertChannel;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
+use Mixudev\SecurityDefense\Support\TelegramAlertFormatter;
 use Throwable;
 
 /**
@@ -46,27 +47,7 @@ class TelegramChannel implements AlertChannel
         $chatId = (string) config('security-defense.alerts.telegram.chat_id');
         $timeout = (int) config('security-defense.alerts.telegram.timeout', 5);
 
-        $severityEmoji = match (strtolower($alert->severity)) {
-            'critical' => '🚨 [CRITICAL]',
-            'high' => '⚠️ [HIGH]',
-            'medium' => '⚡ [MEDIUM]',
-            default => 'ℹ️ [LOW]',
-        };
-
-        $message = sprintf(
-            "%s *Security Threat Detected*\n\n" .
-            "• *Threat Type:* `%s`\n" .
-            "• *Rule:* `%s`\n" .
-            "• *Fingerprint:* `%s`\n" .
-            "• *Timestamp:* `%s`\n\n" .
-            "• *Metadata Summary:*\n```json\n%s\n```",
-            $severityEmoji,
-            $alert->threat_type,
-            $alert->rule_identifier ?: 'unknown',
-            substr($alert->fingerprint, 0, 16) . '...',
-            $alert->created_at?->toIso8601String() ?: gmdate('c'),
-            json_encode($alert->metadata ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-        );
+        $message = TelegramAlertFormatter::message($alert);
 
         try {
             $response = Http::timeout($timeout)->post(
