@@ -39,6 +39,9 @@ return [
             'enabled' => true,
             'max_alerts_per_minute' => 60,
         ],
+
+        // Maximum alert metadata size (bytes) before truncation
+        'max_alert_metadata_size' => 16384,
     ],
 
     /*
@@ -132,6 +135,7 @@ return [
                 'enabled' => true,
                 'severity' => 'medium',
                 'block_known_scanners' => true, // sqlmap, nikto, dirbuster, gobuster, etc.
+                'block_empty_user_agent' => env('SECURITY_DEFENSE_BLOCK_EMPTY_UA', false), // Block requests with no User-Agent header
             ],
         ],
     ],
@@ -177,6 +181,18 @@ return [
             'secret' => env('SECURITY_WEBHOOK_SECRET'),
             'timeout' => 5,
         ],
+
+        /*
+        | Native Laravel Email Alert Notifications
+        | Dispatches security notifications via Laravel's native mail system
+        | using standard SMTP / SES / Resend / Mailgun driver configured in app.
+        */
+        'mail' => [
+            'enabled' => env('SECURITY_MAIL_ENABLED', false),
+            'to' => env('SECURITY_ALERT_EMAIL'), // String or array of recipient email addresses
+            'subject_prefix' => env('SECURITY_MAIL_SUBJECT_PREFIX', '[SECURITY DEFENSE ALERT]'),
+            'timeout' => 10,
+        ],
     ],
 
     /*
@@ -216,10 +232,31 @@ return [
             'auto_jail_on_critical' => true,  // Automatically jail on critical threat block
             'response_status' => 429,         // HTTP 429 Too Many Requests
             'response_message' => 'Your IP has been temporarily quarantined due to suspicious security activity.',
+            // Durable DB-backed quarantine — survives cache flush / restart / multi-server
+            'persist_to_database' => env('SECURITY_QUARANTINE_PERSIST_DB', false),
+            'table' => 'security_quarantines',
             'whitelist' => [
                 '127.0.0.1',
                 '::1',
             ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Security Defense Monitoring Dashboard
+    |--------------------------------------------------------------------------
+    | Dedicated real-time monitoring interface for security posture, threat stats,
+    | IP quarantines, and alert channel diagnostic testing.
+    | STRICT LOCAL ACCESS: Restricted by default to local environment and localhost.
+    */
+    'dashboard' => [
+        'enabled' => env('SECURITY_DEFENSE_DASHBOARD_ENABLED', true),
+        'path' => env('SECURITY_DEFENSE_DASHBOARD_PATH', 'security-defense'),
+        'local_only' => env('SECURITY_DEFENSE_DASHBOARD_LOCAL_ONLY', true),
+        'allowed_ips' => [
+            '127.0.0.1',
+            '::1',
         ],
     ],
 ];

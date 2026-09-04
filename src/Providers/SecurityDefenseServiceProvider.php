@@ -7,6 +7,7 @@ namespace Mixudev\SecurityDefense\Providers;
 use Illuminate\Support\ServiceProvider;
 use Mixudev\SecurityDefense\Channels\DatabaseChannel;
 use Mixudev\SecurityDefense\Channels\DiscordChannel;
+use Mixudev\SecurityDefense\Channels\MailChannel;
 use Mixudev\SecurityDefense\Channels\TelegramChannel;
 use Mixudev\SecurityDefense\Channels\WebhookChannel;
 use Mixudev\SecurityDefense\Contracts\AlertDeduplicatorInterface;
@@ -22,6 +23,7 @@ use Mixudev\SecurityDefense\Rules\RateLimitBypassRule;
 use Mixudev\SecurityDefense\Rules\UserAgentAnomalyRule;
 use Mixudev\SecurityDefense\Services\AlertDeduplicator;
 use Mixudev\SecurityDefense\Services\AlertDispatcher;
+use Mixudev\SecurityDefense\Services\ChannelTestService;
 use Mixudev\SecurityDefense\Services\IpQuarantineService;
 use Mixudev\SecurityDefense\Services\SecurityDefenseManager;
 use Mixudev\SecurityDefense\Services\ThreatScoringEngine;
@@ -74,6 +76,7 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         $this->app->singleton(TelegramChannel::class);
         $this->app->singleton(DiscordChannel::class);
         $this->app->singleton(WebhookChannel::class);
+        $this->app->singleton(MailChannel::class);
 
         // Bind Alert Dispatcher
         $this->app->singleton(AlertDispatcher::class, function ($app) {
@@ -84,9 +87,13 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                     $app->make(TelegramChannel::class),
                     $app->make(DiscordChannel::class),
                     $app->make(WebhookChannel::class),
+                    $app->make(MailChannel::class),
                 ]
             );
         });
+
+        // Bind Channel Testing & Diagnostic Service
+        $this->app->singleton(ChannelTestService::class);
 
         // Bind Primary Coordinator Manager with Enterprise Modules
         $this->app->singleton(SecurityDefenseManager::class, function ($app) {
@@ -106,6 +113,14 @@ class SecurityDefenseServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Load Blade views
+        $this->loadViewsFrom(__DIR__ . '/../../resources/views', 'security-defense');
+
+        // Load dashboard routes if dashboard is enabled
+        if (config('security-defense.dashboard.enabled', true)) {
+            $this->loadRoutesFrom(__DIR__ . '/../../routes/web.php');
+        }
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__ . '/../../config/security-defense.php' => config_path('security-defense.php'),
@@ -114,6 +129,14 @@ class SecurityDefenseServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__ . '/../../database/migrations/' => database_path('migrations'),
             ], 'security-defense-migrations');
+
+            $this->publishes([
+                __DIR__ . '/../../resources/views' => resource_path('views/vendor/security-defense'),
+            ], 'security-defense-views');
+
+            $this->commands([
+                \Mixudev\SecurityDefense\Console\Commands\TestWebhookCommand::class,
+            ]);
         }
 
         $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');

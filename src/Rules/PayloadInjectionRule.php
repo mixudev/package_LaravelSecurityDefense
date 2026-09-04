@@ -65,7 +65,8 @@ class PayloadInjectionRule extends AbstractDetectionRule
                 }
 
                 if (preg_match($pattern, $safeContent, $matches)) {
-                    $matchedSample = substr($matches[0], 0, 50);
+                    // Strip control characters to prevent log/markdown injection
+                    $matchedSample = preg_replace('/[\x00-\x1f\x7f]/', '', substr($matches[0], 0, 50));
                     $fingerprint = hash('sha256', sprintf('payload_injection:%s:%s:%s', $category, $event->ip, $matchedSample));
 
                     return new SecurityThreat(
@@ -123,10 +124,11 @@ class PayloadInjectionRule extends AbstractDetectionRule
                 }
 
                 if (preg_match($pattern, $safeValue, $matches)) {
+                    // Strip control characters to prevent log/markdown injection
                     return [
                         'matched' => true,
                         'category' => $category,
-                        'sample' => substr($matches[0], 0, 50),
+                        'sample' => preg_replace('/[\x00-\x1f\x7f]/', '', substr($matches[0], 0, 50)),
                         'field' => $field,
                     ];
                 }

@@ -6,9 +6,9 @@ namespace Mixudev\SecurityDefense\Rules;
 
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
-
 /**
  * Detects reconnaissance probing for sensitive files/directories (e.g. .env, .git, wp-login, phpinfo).
+ * Atomic counter eliminates race condition on parallel requests.
  */
 class PathReconnaissanceRule extends AbstractDetectionRule
 {
@@ -59,19 +59,19 @@ class PathReconnaissanceRule extends AbstractDetectionRule
         $severity = (string) $this->getConfig('severity', 'high');
 
         $ip = $event->ip;
-        $cacheKey = $this->getCacheKey('probes:' . md5($ip));
 
         $cache = $this->getCache();
-        $now = time();
+        $counterKey = $this->getCacheKey('probes_count:' . md5($ip));
+        $windowKey = $this->getCacheKey('probes_window:' . md5($ip));
 
-        /** @var array<int> $probes */
-        $probes = (array) $cache->get($cacheKey, []);
-        $probes = array_filter($probes, static fn (int $ts): bool => ($now - $ts) <= $window);
-        $probes[] = $now;
+        // Atomic seed: only first request sets TTL, subsequent requests increment atomically
+        if (!$cache->has($windowKey)) {
+            $cache->put($windowKey, true, $window);
+            $cache->put($counterKey, 0, $window);
+        }
+        $count = (int) $cache->increment($counterKey);
 
-        $cache->put($cacheKey, array_values($probes), $window);
-
-        if (count($probes) >= $threshold) {
+        if ($count >= $threshold) {
             $fingerprint = hash('sha256', sprintf('path_reconnaissance:%s', $ip));
 
             return new SecurityThreat(
@@ -80,7 +80,7 @@ class PathReconnaissanceRule extends AbstractDetectionRule
                 fingerprint: $fingerprint,
                 metadata: [
                     'ip' => $ip,
-                    'probe_count' => count($probes),
+                    'probe_count' => $count,
                     'threshold' => $threshold,
                     'window_seconds' => $window,
                     'last_probed_path' => $path,

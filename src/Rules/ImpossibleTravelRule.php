@@ -6,9 +6,9 @@ namespace Mixudev\SecurityDefense\Rules;
 
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
-
 /**
  * Detects impossible travel anomalies (e.g. login from two physically distant locations in an unrealistically short timeframe).
+ * Uses cache lock to prevent TOCTOU race condition on concurrent requests.
  */
 class ImpossibleTravelRule extends AbstractDetectionRule
 {
@@ -47,50 +47,89 @@ class ImpossibleTravelRule extends AbstractDetectionRule
 
         $target = strtolower($event->identifier);
         $cacheKey = $this->getCacheKey('location:' . md5($target));
+        $lockKey = $this->getCacheKey('location_lock:' . md5($target));
 
         $cache = $this->getCache();
         $now = time();
 
-        /** @var array{ip: string, lat: float|null, lon: float|null, country: string|null, timestamp: int}|null $lastLocation */
-        $lastLocation = $cache->get($cacheKey);
-
-        // Update cache with latest location
-        $cache->put($cacheKey, [
-            'ip' => $event->ip,
-            'lat' => $currentLat,
-            'lon' => $currentLon,
-            'country' => $currentCountry,
-            'timestamp' => $now,
-        ], $window);
-
-        if (!$lastLocation || ($now - $lastLocation['timestamp']) > $window) {
-            return null;
+        // Use cache lock to prevent TOCTOU race on concurrent location updates
+        $lock = null;
+        if (method_exists($cache, 'lock')) {
+            try {
+                $lock = $cache->lock($lockKey, 5);
+                $lock->block(3);
+            } catch (\Throwable) {
+                $lock = null; // Graceful fallback on non-locking drivers
+            }
         }
 
-        // Check if IP is identical (no travel)
-        if ($lastLocation['ip'] === $event->ip) {
-            return null;
-        }
+        try {
+            /** @var array{ip: string, lat: float|null, lon: float|null, country: string|null, timestamp: int}|null $lastLocation */
+            $lastLocation = $cache->get($cacheKey);
 
-        $timeDiffSeconds = max(1, $now - $lastLocation['timestamp']);
-        $timeDiffHours = $timeDiffSeconds / 3600;
+            // Update cache with latest location
+            $cache->put($cacheKey, [
+                'ip' => $event->ip,
+                'lat' => $currentLat,
+                'lon' => $currentLon,
+                'country' => $currentCountry,
+                'timestamp' => $now,
+            ], $window);
 
-        // Coordinate-based calculation if coordinates are present
-        if (
-            $currentLat !== null && $currentLon !== null &&
-            $lastLocation['lat'] !== null && $lastLocation['lon'] !== null
-        ) {
-            $distanceKm = $this->calculateDistanceKm(
-                $lastLocation['lat'],
-                $lastLocation['lon'],
-                $currentLat,
-                $currentLon
-            );
+            if (!$lastLocation || ($now - $lastLocation['timestamp']) > $window) {
+                return null;
+            }
 
-            $calculatedSpeed = $distanceKm / $timeDiffHours;
+            // Check if IP is identical (no travel)
+            if ($lastLocation['ip'] === $event->ip) {
+                return null;
+            }
 
-            if ($calculatedSpeed > $maxSpeed) {
-                $fingerprint = hash('sha256', sprintf('impossible_travel:%s:%s:%s', $target, $lastLocation['ip'], $event->ip));
+            $timeDiffSeconds = max(1, $now - $lastLocation['timestamp']);
+            $timeDiffHours = $timeDiffSeconds / 3600;
+
+            // Coordinate-based calculation if coordinates are present
+            if (
+                $currentLat !== null && $currentLon !== null &&
+                $lastLocation['lat'] !== null && $lastLocation['lon'] !== null
+            ) {
+                $distanceKm = $this->calculateDistanceKm(
+                    $lastLocation['lat'],
+                    $lastLocation['lon'],
+                    $currentLat,
+                    $currentLon
+                );
+
+                $calculatedSpeed = $distanceKm / $timeDiffHours;
+
+                if ($calculatedSpeed > $maxSpeed) {
+                    $fingerprint = hash('sha256', sprintf('impossible_travel:%s:%s:%s', $target, $lastLocation['ip'], $event->ip));
+
+                    return new SecurityThreat(
+                        severity: $severity,
+                        threatType: 'impossible_travel',
+                        fingerprint: $fingerprint,
+                        metadata: [
+                            'identifier' => $target,
+                            'previous_ip' => $lastLocation['ip'],
+                            'current_ip' => $event->ip,
+                            'distance_km' => round($distanceKm, 2),
+                            'time_elapsed_seconds' => $timeDiffSeconds,
+                            'calculated_speed_kmh' => round($calculatedSpeed, 2),
+                            'max_allowed_speed_kmh' => $maxSpeed,
+                            'previous_location' => ['lat' => $lastLocation['lat'], 'lon' => $lastLocation['lon']],
+                            'current_location' => ['lat' => $currentLat, 'lon' => $currentLon],
+                        ],
+                        ruleIdentifier: $this->identifier()
+                    );
+                }
+            } elseif (
+                $currentCountry !== null && $lastLocation['country'] !== null &&
+                strtolower($currentCountry) !== strtolower($lastLocation['country']) &&
+                $timeDiffSeconds < 600 // Different country in under 10 minutes
+            ) {
+                // Country mismatch within 10 minutes without coordinates
+                $fingerprint = hash('sha256', sprintf('impossible_travel:%s:%s:%s', $target, $lastLocation['country'], $currentCountry));
 
                 return new SecurityThreat(
                     severity: $severity,
@@ -100,39 +139,17 @@ class ImpossibleTravelRule extends AbstractDetectionRule
                         'identifier' => $target,
                         'previous_ip' => $lastLocation['ip'],
                         'current_ip' => $event->ip,
-                        'distance_km' => round($distanceKm, 2),
+                        'previous_country' => $lastLocation['country'],
+                        'current_country' => $currentCountry,
                         'time_elapsed_seconds' => $timeDiffSeconds,
-                        'calculated_speed_kmh' => round($calculatedSpeed, 2),
-                        'max_allowed_speed_kmh' => $maxSpeed,
-                        'previous_location' => ['lat' => $lastLocation['lat'], 'lon' => $lastLocation['lon']],
-                        'current_location' => ['lat' => $currentLat, 'lon' => $currentLon],
                     ],
                     ruleIdentifier: $this->identifier()
                 );
             }
-        } elseif (
-            $currentCountry !== null &&
-            $lastLocation['country'] !== null &&
-            strtolower($currentCountry) !== strtolower($lastLocation['country']) &&
-            $timeDiffSeconds < 600 // Different country in under 10 minutes
-        ) {
-            // Country mismatch within 10 minutes without coordinates
-            $fingerprint = hash('sha256', sprintf('impossible_travel:%s:%s:%s', $target, $lastLocation['country'], $currentCountry));
-
-            return new SecurityThreat(
-                severity: $severity,
-                threatType: 'impossible_travel',
-                fingerprint: $fingerprint,
-                metadata: [
-                    'identifier' => $target,
-                    'previous_ip' => $lastLocation['ip'],
-                    'current_ip' => $event->ip,
-                    'previous_country' => $lastLocation['country'],
-                    'current_country' => $currentCountry,
-                    'time_elapsed_seconds' => $timeDiffSeconds,
-                ],
-                ruleIdentifier: $this->identifier()
-            );
+        } finally {
+            if ($lock !== null) {
+                $lock->release();
+            }
         }
 
         return null;

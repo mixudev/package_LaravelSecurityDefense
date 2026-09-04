@@ -2,7 +2,7 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mixudev/security-defense.svg?style=flat-square)](https://packagist.org/packages/mixudev/security-defense)
 [![GitHub Release](https://img.shields.io/github/v/tag/mixudev/package_LaravelSecurityDefense?label=release&style=flat-square)](https://github.com/mixudev/package_LaravelSecurityDefense/releases)
-[![Tests Passing](https://img.shields.io/badge/tests-34%20passed-brightgreen.svg?style=flat-square)]()
+[![Tests Passing](https://img.shields.io/badge/tests-46%20passed-brightgreen.svg?style=flat-square)]()
 [![PHP Version](https://img.shields.io/badge/PHP-%5E8.2-blue.svg?style=flat-square)]()
 [![Laravel Compatibility](https://img.shields.io/badge/Laravel-10%20%7C%2011%20%7C%2012%20%7C%2013-red.svg?style=flat-square)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
@@ -232,6 +232,11 @@ SECURITY_DEFENSE_QUEUE_NAME=security-alerts
 
 # IP Quarantine (Fail2Ban)
 SECURITY_QUARANTINE_ENABLED=true
+# Optional: durable DB-backed quarantine (survives cache flush / restart / multi-server)
+SECURITY_QUARANTINE_PERSIST_DB=true
+
+# Optional: block clients with an empty User-Agent header
+SECURITY_DEFENSE_BLOCK_EMPTY_UA=false
 
 # Telegram Alerts
 SECURITY_TELEGRAM_ENABLED=true
@@ -327,12 +332,17 @@ Event::listen(SecurityAlertCreated::class, function (SecurityAlertCreated $event
 | `hardening.max_inspection_length` | — | `4096` | Maximum string length scanned by regex (Anti-ReDoS). |
 | `hardening.max_traversal_depth` | — | `5` | Maximum recursion depth for nested input arrays. |
 | `hardening.alert_rate_limit.max_alerts_per_minute` | — | `60` | Maximum database alert writes per minute (Anti-Disk Flood). |
+| `hardening.max_alert_metadata_size` | — | `16384` | Max alert metadata size in bytes before truncation. |
 | `detection.scoring.enabled` | — | `true` | Enables compound multi-vector threat scoring. |
 | `detection.scoring.threshold` | — | `100` | Cumulative score required to trigger a CRITICAL compound threat. |
 | `detection.scoring.window` | — | `900` | Score accumulation sliding window (15 minutes). |
 | `middleware.quarantine.enabled` | `SECURITY_QUARANTINE_ENABLED` | `true` | Enables active IP quarantine (Fail2Ban defense). |
 | `middleware.quarantine.duration` | — | `900` | Default quarantine duration in seconds (15 minutes). |
 | `middleware.quarantine.auto_jail_on_critical` | — | `true` | Automatically quarantine IPs that trigger critical payload injection. |
+| `middleware.quarantine.persist_to_database` | `SECURITY_QUARANTINE_PERSIST_DB` | `false` | Enable durable DB-backed quarantine (survives cache flush / restart / multi-server). |
+
+**Note:** For production use, configure a **Redis or Memcached** cache driver. File/array cache drivers lose all detection counters and quarantine state on restart, which resets the protection (a bypass window at boot).
+| `detection.rules.user_agent_anomaly.block_empty_user_agent` | `SECURITY_DEFENSE_BLOCK_EMPTY_UA` | `false` | Flag requests with an empty User-Agent header as anomalies. |
 | `middleware.payload_scanner.action` | — | `'block'` | Action on threat: `'block'` (HTTP 403) or `'log_only'`. |
 | `alerts.queue.enabled` | `SECURITY_DEFENSE_QUEUE_ENABLED` | `false` | Offloads Telegram/Discord/Webhook notifications to Laravel queue. |
 | `alerts.database.table` | `SECURITY_DEFENSE_TABLE` | `'security_alerts'` | Custom name for the security alerts database table. |
@@ -378,11 +388,11 @@ PHPUnit 11.5.56 by Sebastian Bergmann and contributors.
 Runtime:       PHP 8.5.4
 Configuration: phpunit.xml
 
-..................................                                34 / 34 (100%)
+..............................................                    46 / 46 (100%)
 
-Time: 00:01.298, Memory: 48.00 MB
+Time: 00:01.500, Memory: 48.00 MB
 
-OK (34 tests, 142 assertions)
+OK (46 tests, 185 assertions)
 ```
 
 ---

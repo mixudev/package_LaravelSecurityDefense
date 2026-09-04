@@ -79,14 +79,37 @@ class AlertDispatcher
         // 3. Record fingerprint in deduplicator cache window
         $this->deduplicator->record($threat);
 
-        // 4. Persist alert to database (Mandatory default)
+        // 4. Truncate metadata if too large (prevent storage exhaustion)
+        $maxMetadataSize = (int) config('security-defense.hardening.max_alert_metadata_size', 16384);
+        $metadata = $threat->metadata;
+        $metadataJson = json_encode($metadata);
+        if (strlen((string) $metadataJson) > $maxMetadataSize) {
+            // Trim oversized string values first, then bound the top-level array size
+            $trimmed = [];
+            foreach ($metadata as $key => $value) {
+                if (is_string($value) && strlen($value) > 200) {
+                    $trimmed[$key] = substr($value, 0, 200) . '...[TRUNCATED]';
+                } else {
+                    $trimmed[$key] = $value;
+                }
+            }
+            // If still too many keys, keep only the first 10
+            if (count($trimmed) > 10) {
+                $trimmed = array_slice($trimmed, 0, 10, true);
+            }
+            $trimmed['_truncated'] = true;
+            $trimmed['_original_size'] = strlen((string) $metadataJson);
+            $metadata = $trimmed;
+        }
+
+        // 5. Persist alert to database (Mandatory default)
         $alert = new SecurityAlert([
             'severity' => $threat->severity,
             'threat_type' => $threat->threatType,
             'fingerprint' => $threat->fingerprint,
             'status' => SecurityAlert::STATUS_NEW,
             'rule_identifier' => $threat->ruleIdentifier,
-            'metadata' => $threat->metadata,
+            'metadata' => $metadata,
         ]);
 
         $databaseChannel = $this->channels['database'] ?? null;
@@ -165,11 +188,10 @@ class AlertDispatcher
         }
 
         $key = config('security-defense.cache_prefix', 'security_defense:') . 'rate_limit:alerts_per_minute';
-
+        // Atomic: seed TTL only on first create, always increment
         if (!Cache::has($key)) {
-            Cache::put($key, 1, 60);
-        } else {
-            Cache::increment($key);
+            Cache::put($key, 0, 60);
         }
+        Cache::increment($key);
     }
 }

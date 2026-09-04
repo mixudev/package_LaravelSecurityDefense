@@ -43,4 +43,25 @@ class IpQuarantineServiceTest extends TestCase
         $this->assertFalse($service->jail('10.0.0.5'));
         $this->assertFalse($service->isQuarantined('10.0.0.5'));
     }
+
+    public function test_db_backed_quarantine_survives_cache_clear(): void
+    {
+        config()->set('security-defense.middleware.quarantine.persist_to_database', true);
+        config()->set('security-defense.middleware.quarantine.whitelist', []);
+
+        $service = app(IpQuarantineService::class);
+        $ip = '203.0.113.200';
+
+        $service->jail($ip, 600, 'Persistent test');
+
+        // Flush cache to simulate cache clear / multi-server environment
+        cache()->flush();
+
+        // Durable DB record must still quarantine the IP
+        $this->assertTrue($service->isQuarantined($ip));
+
+        // Pardon clears both cache and DB
+        $service->pardon($ip);
+        $this->assertFalse($service->isQuarantined($ip));
+    }
 }

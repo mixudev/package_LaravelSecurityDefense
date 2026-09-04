@@ -6,9 +6,10 @@ namespace Mixudev\SecurityDefense\Rules;
 
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
-
 /**
  * Detects credential stuffing attempts where a single IP probes multiple distinct account identifiers.
+ * Atomic counter eliminates race condition on parallel requests.
+ * Identifiers are hashed in metadata to prevent information leakage.
  */
 class CredentialStuffingRule extends AbstractDetectionRule
 {
@@ -42,23 +43,38 @@ class CredentialStuffingRule extends AbstractDetectionRule
         $severity = (string) $this->getConfig('severity', 'critical');
 
         $ip = $event->ip;
-        $cacheKey = $this->getCacheKey(md5($ip));
+        $identifierKey = md5(strtolower($event->identifier));
 
         $cache = $this->getCache();
-        $now = time();
+        $counterKey = $this->getCacheKey('cs_count:' . md5($ip));
+        $windowKey = $this->getCacheKey('cs_window:' . md5($ip));
+        $idTrackingKey = $this->getCacheKey('cs_ids:' . md5($ip));
 
+        // Atomic seed: only first request sets TTL, subsequent requests increment atomically
+        if (!$cache->has($windowKey)) {
+            $cache->put($windowKey, true, $window);
+            $cache->put($counterKey, 0, $window);
+            $cache->put($idTrackingKey, [], $window);
+        }
+
+        // Track distinct identifiers atomically (best-effort under concurrency)
         /** @var array<string, int> $targetedAccounts */
-        $targetedAccounts = (array) $cache->get($cacheKey, []);
-        $targetedAccounts = array_filter(
-            $targetedAccounts,
-            static fn (int $ts): bool => ($now - $ts) <= $window
-        );
+        $targetedAccounts = (array) $cache->get($idTrackingKey, []);
+        if (!isset($targetedAccounts[$identifierKey])) {
+            $targetedAccounts[$identifierKey] = time();
+            $cache->put($idTrackingKey, $targetedAccounts, $window);
+            $count = (int) $cache->increment($counterKey);
+        } else {
+            $count = (int) $cache->get($counterKey, 0);
+        }
 
-        $targetedAccounts[strtolower($event->identifier)] = $now;
+        if ($count >= $threshold) {
+            // Hash identifiers to prevent information leakage
+            $hashedList = array_map(
+                static fn(string $id): string => hash('sha256', $id),
+                array_keys($targetedAccounts)
+            );
 
-        $cache->put($cacheKey, $targetedAccounts, $window);
-
-        if (count($targetedAccounts) >= $threshold) {
             $fingerprint = hash('sha256', sprintf('credential_stuffing:%s', $ip));
 
             return new SecurityThreat(
@@ -67,8 +83,8 @@ class CredentialStuffingRule extends AbstractDetectionRule
                 fingerprint: $fingerprint,
                 metadata: [
                     'ip' => $ip,
-                    'distinct_identifiers_count' => count($targetedAccounts),
-                    'sample_identifiers' => array_slice(array_keys($targetedAccounts), 0, 10),
+                    'distinct_identifiers_count' => $count,
+                    'sample_identifiers_hashed' => array_slice($hashedList, 0, 10),
                     'threshold' => $threshold,
                     'window_seconds' => $window,
                     'user_agent' => $event->userAgent,

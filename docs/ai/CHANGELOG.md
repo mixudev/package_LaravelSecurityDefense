@@ -6,6 +6,35 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.1] - 2026-09-04
+
+### Security Hardening (audit-driven remediation)
+
+Semua 13 temuan dari audit keamanan telah diperbaiki.
+
+### Fixed (CRITICAL)
+- **Race condition pada detection counters** — BruteForceRule, CredentialStuffingRule, DistributedSprayRule, PathReconnaissanceRule, RateLimitBypassRule kini menggunakan atomic `cache->increment()` (sebelumnya read-modify-write `get()`→`put()` yang bisa di-bypass oleh parallel request).
+- **Race condition pada alert rate limiter** — `AlertDispatcher::incrementRateLimiter()` kini selalu `increment()` dengan TTL di-seed hanya saat penciptaan pertama (sebelumnya TOCTOU bisa membuat counter stuck di 1 → unlimited alerts).
+
+### Fixed (HIGH)
+- **Bypass IP quarantine via cache loss** — Tambahan `IpQuarantineService` mendukung persistence DB opsional (`SecurityQuarantine` model + tabel `security_quarantines`, diaktifkan via `SECURITY_QUARANTINE_PERSIST_DB=true`). Cache = fast path, DB = authoritative fallback.
+- **Information leak: payload sample** — `PayloadInjectionRule` membersihkan control characters (`/[\x00-\x1f\x7f]/`) dari `matched_sample`/`matched_signature` (mencegah log/Markdown injection & persistent XSS).
+- **Information leak: identifier & IP list** — `CredentialStuffingRule` menyimpan `sample_identifiers_hashed` (SHA-256) dan `DistributedSprayRule` menyimpan `sample_ips_hashed` (SHA-256), bukan plaintext.
+- **TOCTOU ImpossibleTravelRule** — Akses baca-tulis lokasi kini dibungkus cache lock untuk mencegah race condition pada concurrent login.
+
+### Fixed (MEDIUM)
+- **Empty User-Agent bypass** — Konfigurasi baru `user_agent_anomaly.block_empty_user_agent` (env `SECURITY_DEFENSE_BLOCK_EMPTY_UA`) mengaktifkan deteksi klien tanpa User-Agent (default off untuk menjaga perilaku existing).
+- **Header overexposure** — `RequestThreatSource` kini menyimpan hanya hash SHA-256 dari `x-forwarded-for`/`cf-connecting-ip`; `origin`/`referer` mentah tidak lagi tersimpan.
+- **Queue job arbitrary class** — `DispatchAlertChannelJob` memvalidasi `channelClass` terhadap whitelist (`VALID_CHANNELS`) sebelum instansiasi.
+- **Metadata unbounded** — `AlertDispatcher` memotong metadata saat JSON melebihi `hardening.max_alert_metadata_size` (default 16KB).
+- **Middleware tidak feed detection engine** — `RequestThreatScanner::handleDetectedAnomaly()` kini juga memanggil `processEvent()` agar telemetry request mengalir ke seluruh detection rules.
+
+### Added
+- Model `SecurityQuarantine` + migration tabel `security_quarantines`.
+- 12 test regresi keamanan baru (total 46 tests, 185 assertions).
+
+---
+
 ## [1.1.0] - 2026-09-04
 
 ### Added

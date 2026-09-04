@@ -6,9 +6,9 @@ namespace Mixudev\SecurityDefense\Rules;
 
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
-
 /**
  * Detects attempts to bypass rate limiters via header spoofing or rapid identity cycling.
+ * Atomic counter eliminates race condition on parallel requests.
  */
 class RateLimitBypassRule extends AbstractDetectionRule
 {
@@ -48,24 +48,21 @@ class RateLimitBypassRule extends AbstractDetectionRule
             }
         }
 
-        // Track rapid client-IP rotation per User-Agent/Subnet
+        // Atomic counter for rapid client-IP rotation per User-Agent/Subnet
         $uaKey = md5(sprintf('%s:%s', $event->userAgent, substr($event->ip, 0, 7)));
-        $cacheKey = $this->getCacheKey('cycling:' . $uaKey);
+        $counterKey = $this->getCacheKey('rlb_count:' . $uaKey);
+        $windowKey = $this->getCacheKey('rlb_window:' . $uaKey);
 
         $cache = $this->getCache();
-        $now = time();
 
-        /** @var array<string, int> $cycledIps */
-        $cycledIps = (array) $cache->get($cacheKey, []);
-        $cycledIps = array_filter(
-            $cycledIps,
-            static fn (int $ts): bool => ($now - $ts) <= $window
-        );
+        // Atomic seed: only first request sets TTL, subsequent requests increment atomically
+        if (!$cache->has($windowKey)) {
+            $cache->put($windowKey, true, $window);
+            $cache->put($counterKey, 0, $window);
+        }
+        $count = (int) $cache->increment($counterKey);
 
-        $cycledIps[$event->ip] = $now;
-        $cache->put($cacheKey, $cycledIps, $window);
-
-        if ($hasHeaderSpoof || count($cycledIps) >= $threshold) {
+        if ($hasHeaderSpoof || $count >= $threshold) {
             $fingerprint = hash('sha256', sprintf('rate_limit_bypass:%s:%s', $event->ip, $uaKey));
 
             return new SecurityThreat(
@@ -75,7 +72,7 @@ class RateLimitBypassRule extends AbstractDetectionRule
                 metadata: [
                     'ip' => $event->ip,
                     'user_agent' => $event->userAgent,
-                    'distinct_cycled_ips' => count($cycledIps),
+                    'distinct_cycled_ips' => $count,
                     'spoof_detected' => $hasHeaderSpoof,
                     'spoof_reason' => $spoofReason,
                     'threshold' => $threshold,

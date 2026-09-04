@@ -6,9 +6,9 @@ namespace Mixudev\SecurityDefense\Rules;
 
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
-
 /**
  * Detects brute force attempts targeting a single account identifier.
+ * Atomic counter eliminates race condition on parallel requests.
  */
 class BruteForceRule extends AbstractDetectionRule
 {
@@ -38,19 +38,19 @@ class BruteForceRule extends AbstractDetectionRule
         $severity = (string) $this->getConfig('severity', 'high');
 
         $target = $event->identifier !== 'anonymous' ? $event->identifier : $event->ip;
-        $cacheKey = $this->getCacheKey(md5($target));
 
         $cache = $this->getCache();
-        $now = time();
+        $counterKey = $this->getCacheKey(md5($target) . ':count');
+        $windowKey = $this->getCacheKey(md5($target) . ':window');
 
-        /** @var array<int> $attempts */
-        $attempts = (array) $cache->get($cacheKey, []);
-        $attempts = array_filter($attempts, static fn (int $ts): bool => ($now - $ts) <= $window);
-        $attempts[] = $now;
+        // Atomic seed: only first request sets TTL, subsequent requests increment atomically
+        if (!$cache->has($windowKey)) {
+            $cache->put($windowKey, true, $window);
+            $cache->put($counterKey, 0, $window);
+        }
+        $count = (int) $cache->increment($counterKey);
 
-        $cache->put($cacheKey, array_values($attempts), $window);
-
-        if (count($attempts) >= $threshold) {
+        if ($count >= $threshold) {
             $fingerprint = hash('sha256', sprintf('brute_force:%s', strtolower($target)));
 
             return new SecurityThreat(
@@ -61,7 +61,7 @@ class BruteForceRule extends AbstractDetectionRule
                     'target' => $target,
                     'identifier' => $event->identifier,
                     'ip' => $event->ip,
-                    'attempt_count' => count($attempts),
+                    'attempt_count' => $count,
                     'threshold' => $threshold,
                     'window_seconds' => $window,
                     'event_type' => $event->eventType,

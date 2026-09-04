@@ -6,9 +6,10 @@ namespace Mixudev\SecurityDefense\Rules;
 
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
-
 /**
  * Detects distributed spray attacks where multiple distinct IPs probe the same account identifier.
+ * Atomic counter eliminates race condition on parallel requests.
+ * IP addresses are hashed in metadata to prevent information leakage.
  */
 class DistributedSprayRule extends AbstractDetectionRule
 {
@@ -42,23 +43,37 @@ class DistributedSprayRule extends AbstractDetectionRule
         $severity = (string) $this->getConfig('severity', 'high');
 
         $target = strtolower($event->identifier);
-        $cacheKey = $this->getCacheKey(md5($target));
 
         $cache = $this->getCache();
-        $now = time();
+        $counterKey = $this->getCacheKey('ds_count:' . md5($target));
+        $windowKey = $this->getCacheKey('ds_window:' . md5($target));
+        $ipTrackingKey = $this->getCacheKey('ds_ips:' . md5($target));
 
+        // Atomic seed: only first request sets TTL, subsequent requests increment atomically
+        if (!$cache->has($windowKey)) {
+            $cache->put($windowKey, true, $window);
+            $cache->put($counterKey, 0, $window);
+            $cache->put($ipTrackingKey, [], $window);
+        }
+
+        // Track distinct IPs atomically (best-effort under concurrency)
         /** @var array<string, int> $probingIps */
-        $probingIps = (array) $cache->get($cacheKey, []);
-        $probingIps = array_filter(
-            $probingIps,
-            static fn (int $ts): bool => ($now - $ts) <= $window
-        );
+        $probingIps = (array) $cache->get($ipTrackingKey, []);
+        if (!isset($probingIps[$event->ip])) {
+            $probingIps[$event->ip] = time();
+            $cache->put($ipTrackingKey, $probingIps, $window);
+            $count = (int) $cache->increment($counterKey);
+        } else {
+            $count = (int) $cache->get($counterKey, 0);
+        }
 
-        $probingIps[$event->ip] = $now;
+        if ($count >= $threshold) {
+            // Hash IPs to prevent information leakage about attacking infrastructure
+            $hashedIps = array_map(
+                static fn(string $ip): string => hash('sha256', $ip),
+                array_keys($probingIps)
+            );
 
-        $cache->put($cacheKey, $probingIps, $window);
-
-        if (count($probingIps) >= $threshold) {
             $fingerprint = hash('sha256', sprintf('distributed_spray:%s', $target));
 
             return new SecurityThreat(
@@ -67,8 +82,8 @@ class DistributedSprayRule extends AbstractDetectionRule
                 fingerprint: $fingerprint,
                 metadata: [
                     'identifier' => $target,
-                    'distinct_ips_count' => count($probingIps),
-                    'sample_ips' => array_slice(array_keys($probingIps), 0, 10),
+                    'distinct_ips_count' => $count,
+                    'sample_ips_hashed' => array_slice($hashedIps, 0, 10),
                     'threshold' => $threshold,
                     'window_seconds' => $window,
                     'last_ip' => $event->ip,

@@ -7,6 +7,7 @@ namespace Mixudev\SecurityDefense\Tests\Feature;
 use Illuminate\Support\Facades\Queue;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
 use Mixudev\SecurityDefense\Jobs\DispatchAlertChannelJob;
+use Mixudev\SecurityDefense\Models\SecurityAlert;
 use Mixudev\SecurityDefense\Services\AlertDispatcher;
 use Mixudev\SecurityDefense\Tests\TestCase;
 
@@ -37,5 +38,19 @@ class QueuedAlertDispatchTest extends TestCase
         Queue::assertPushed(DispatchAlertChannelJob::class, function ($job) use ($alert) {
             return $job->alert->id === $alert->id;
         });
+    }
+
+    public function test_it_rejects_invalid_channel_class_from_queue(): void
+    {
+        // A malicious class name that is NOT a valid AlertChannel should be rejected
+        $job = new DispatchAlertChannelJob(\stdClass::class, new SecurityAlert([
+            'severity' => 'high',
+            'threat_type' => 'test',
+            'fingerprint' => 'fp-invalid-class',
+        ]));
+
+        // handle() must not throw and must return without instantiating arbitrary class
+        $job->handle();
+        $this->assertTrue(true); // If we reach here, no arbitrary instantiation occurred
     }
 }

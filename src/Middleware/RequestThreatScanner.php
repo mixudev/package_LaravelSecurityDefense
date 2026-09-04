@@ -56,15 +56,22 @@ class RequestThreatScanner
             return $next($request);
         }
 
-        // 2. User-Agent Scanner Tool Check
+        // 2. User-Agent Anomaly Detection (scanners + empty UA when configured)
         $userAgent = (string) ($request->userAgent() ?: '');
-        if ($userAgent !== '' && $this->uaRule->isEnabled() && (bool) config('security-defense.detection.rules.user_agent_anomaly.block_known_scanners', true)) {
-            $scannerTool = $this->uaRule->identifyScanner($userAgent);
-            if ($scannerTool !== null) {
+        if ($this->uaRule->isEnabled() && (bool) config('security-defense.detection.rules.user_agent_anomaly.block_known_scanners', true)) {
+            $uaEvent = new SecurityEvent(
+                ip: $ip,
+                identifier: $request->user()?->getAuthIdentifier() ?: ($request->input('email') ?: 'guest'),
+                eventType: 'HttpRequestTelemetry',
+                userAgent: $userAgent,
+                metadata: ['path' => $request->path()]
+            );
+            $uaThreat = $this->uaRule->evaluate($uaEvent);
+            if ($uaThreat !== null) {
                 $threat = $this->handleDetectedAnomaly(
                     $request,
                     'user_agent_anomaly',
-                    sprintf('Known scanning tool: %s', $scannerTool),
+                    $uaThreat->metadata['detected_tool'] ?? 'unknown',
                     'User-Agent',
                     'medium'
                 );
@@ -124,6 +131,7 @@ class RequestThreatScanner
 
     /**
      * Process detected threat telemetry, record alert, and emit events.
+     * Feeds SecurityEvent into detection engine for full rule evaluation.
      */
     protected function handleDetectedAnomaly(
         Request $request,
@@ -173,7 +181,9 @@ class RequestThreatScanner
             metadata: $metadata
         );
 
+        // Persist the block alert AND wire SecurityEvent into detection engine for full rule evaluation
         $this->defenseManager->dispatcher()->dispatch($threat);
+        $this->defenseManager->processEvent($event);
 
         return $threat;
     }
@@ -249,7 +259,6 @@ class RequestThreatScanner
     protected function isExcluded(Request $request): bool
     {
         $excludedPaths = (array) config('security-defense.middleware.payload_scanner.excluded_paths', []);
-
         foreach ($excludedPaths as $pattern) {
             if ($request->is($pattern)) {
                 return true;

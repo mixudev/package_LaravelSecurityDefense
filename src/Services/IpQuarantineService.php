@@ -6,10 +6,12 @@ namespace Mixudev\SecurityDefense\Services;
 
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Support\Facades\Cache;
+use Mixudev\SecurityDefense\Models\SecurityQuarantine;
 
 /**
  * Enterprise IP quarantine service (Fail2Ban-style active defense).
  * Temporarily isolates malicious IPs to stop attacks at the network boundary.
+ * Supports optional durable DB-backed quarantine for multi-server / cache-flush resilience.
  */
 class IpQuarantineService
 {
@@ -35,6 +37,14 @@ class IpQuarantineService
         return sprintf('%squarantine:%s', $prefix, md5($ip));
     }
 
+    /**
+     * Whether durable DB-backed quarantine persistence is enabled.
+     */
+    protected function persistToDatabase(): bool
+    {
+        return (bool) config('security-defense.middleware.quarantine.persist_to_database', false);
+    }
+
     public function isEnabled(): bool
     {
         $global = (bool) config('security-defense.enabled', true);
@@ -56,7 +66,25 @@ class IpQuarantineService
             return false;
         }
 
-        return $this->getCache()->has($this->getCacheKey($ip));
+        // Fast path: cache
+        if ($this->getCache()->has($this->getCacheKey($ip))) {
+            return true;
+        }
+
+        // Durable path: DB-backed quarantine survives cache flush / restart
+        if ($this->persistToDatabase()) {
+            try {
+                return SecurityQuarantine::query()
+                    ->forIp($ip)
+                    ->active()
+                    ->exists();
+            } catch (\Throwable) {
+                // Fail open if DB unavailable in a non-critical path
+                return false;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -70,13 +98,31 @@ class IpQuarantineService
 
         $quarantineDuration = $duration ?? (int) config('security-defense.middleware.quarantine.duration', 900);
         $cacheKey = $this->getCacheKey($ip);
+        $expiresAt = time() + $quarantineDuration;
 
         $this->getCache()->put($cacheKey, [
             'ip' => $ip,
             'jailed_at' => time(),
-            'expires_at' => time() + $quarantineDuration,
+            'expires_at' => $expiresAt,
             'reason' => $reason,
         ], $quarantineDuration);
+
+        // Durable path: upsert DB record when enabled
+        if ($this->persistToDatabase()) {
+            try {
+                SecurityQuarantine::query()
+                    ->updateOrCreate(
+                        ['ip' => $ip],
+                        [
+                            'jailed_at' => now(),
+                            'expires_at' => now()->addSeconds($quarantineDuration),
+                            'reason' => $reason,
+                        ]
+                    );
+            } catch (\Throwable) {
+                // Cache-only fallback if DB write fails; cache still protects for the window
+            }
+        }
 
         return true;
     }
@@ -87,6 +133,14 @@ class IpQuarantineService
     public function pardon(string $ip): void
     {
         $this->getCache()->forget($this->getCacheKey($ip));
+
+        if ($this->persistToDatabase()) {
+            try {
+                SecurityQuarantine::query()->forIp($ip)->delete();
+            } catch (\Throwable) {
+                // Ignore; cache already cleared
+            }
+        }
     }
 
     /**
@@ -96,7 +150,30 @@ class IpQuarantineService
      */
     public function getDetails(string $ip): ?array
     {
-        return $this->getCache()->get($this->getCacheKey($ip));
+        // Check cache first
+        $cached = $this->getCache()->get($this->getCacheKey($ip));
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        // Fallback to DB-backed record
+        if ($this->persistToDatabase()) {
+            try {
+                $record = SecurityQuarantine::query()->forIp($ip)->active()->first();
+                if ($record !== null) {
+                    return [
+                        'ip' => $record->ip,
+                        'jailed_at' => $record->jailed_at?->getTimestamp() ?? time(),
+                        'expires_at' => $record->expires_at->getTimestamp(),
+                        'reason' => $record->reason ?? '',
+                    ];
+                }
+            } catch (\Throwable) {
+                // return null below
+            }
+        }
+
+        return null;
     }
 
     /**

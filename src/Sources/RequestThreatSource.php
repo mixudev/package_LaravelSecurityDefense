@@ -38,17 +38,18 @@ class RequestThreatSource implements ThreatSource
             ?: $this->request->input('username')
             ?: 'guest';
 
+        // Sanitize headers: only store non-sensitive values, hash potentially sensitive ones
+        $headers = [
+            'x_forwarded_for_hash' => hash('sha256', (string) $this->request->header('x-forwarded-for')),
+            'cf_connecting_ip_hash' => hash('sha256', (string) $this->request->header('cf-connecting-ip')),
+        ];
+
         $metadata = array_merge([
             'method' => $this->request->method(),
             'url' => $this->request->fullUrl(),
             'path' => $this->request->path(),
             'route' => $this->request->route()?->getName(),
-            'headers' => [
-                'x-forwarded-for' => $this->request->header('x-forwarded-for'),
-                'cf-connecting-ip' => $this->request->header('cf-connecting-ip'),
-                'origin' => $this->request->header('origin'),
-                'referer' => $this->request->header('referer'),
-            ],
+            'headers' => $headers,
             'query' => $this->request->query(),
         ], $this->extraMetadata);
 

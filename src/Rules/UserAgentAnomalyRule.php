@@ -6,9 +6,9 @@ namespace Mixudev\SecurityDefense\Rules;
 
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
-
 /**
  * Detects automated security scanners and hostile bot user-agents.
+ * Empty User-Agent is flagged as anomaly — legitimate browsers always send one.
  */
 class UserAgentAnomalyRule extends AbstractDetectionRule
 {
@@ -49,6 +49,26 @@ class UserAgentAnomalyRule extends AbstractDetectionRule
         }
 
         $ua = $event->userAgent;
+        $blockEmptyUa = (bool) config('security-defense.detection.rules.user_agent_anomaly.block_empty_user_agent', false);
+
+        // Flag empty User-Agent as anomaly when configured
+        if (trim($ua) === '' && $blockEmptyUa) {
+            $fingerprint = hash('sha256', sprintf('user_agent_anomaly:empty_ua:%s', $event->ip));
+
+            return new SecurityThreat(
+                severity: (string) $this->getConfig('severity', 'medium'),
+                threatType: 'user_agent_anomaly',
+                fingerprint: $fingerprint,
+                metadata: [
+                    'ip' => $event->ip,
+                    'detected_tool' => 'empty_ua',
+                    'user_agent' => '',
+                    'path' => $event->metadata['path'] ?? null,
+                ],
+                ruleIdentifier: $this->identifier()
+            );
+        }
+
         if (trim($ua) === '') {
             return null;
         }
