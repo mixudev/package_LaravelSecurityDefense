@@ -42,8 +42,11 @@ class TelegramPollCommand extends Command
         $sleep = (int) $this->option('sleep');
         $once = (bool) $this->option('once');
 
+        // Automatically register commands list with Telegram API so the native "Menu" button appears
+        $botService->registerBotCommands();
+
         $this->info('Security Defense Telegram Bot Poller active.');
-        $this->line('Listening for updates (/start, /health, /metrics, button clicks)...');
+        $this->line('Native Telegram commands registered. Listening for updates (/start, /health, button clicks)...');
         $this->line('Press Ctrl+C to terminate.');
 
         $offset = 0;

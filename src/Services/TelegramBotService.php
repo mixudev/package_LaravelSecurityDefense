@@ -60,6 +60,39 @@ class TelegramBotService
     }
 
     /**
+     * Register bot commands with Telegram API so the native "Menu" button
+     * appears at the bottom left of the chat in Telegram apps.
+     */
+    public function registerBotCommands(): bool
+    {
+        $botToken = $this->getBotToken();
+        if (!$botToken) {
+            return false;
+        }
+
+        $commands = [
+            ['command' => 'menu', 'description' => 'Interactive security dashboard'],
+            ['command' => 'health', 'description' => 'System health & diagnostics'],
+            ['command' => 'metrics', 'description' => 'Security threats & defense metrics'],
+            ['command' => 'incidents', 'description' => 'Latest security alert logs'],
+            ['command' => 'quarantine', 'description' => 'Active quarantined IP addresses'],
+            ['command' => 'help', 'description' => 'Command reference & usage guide'],
+        ];
+
+        try {
+            $response = Http::timeout(5)->post(
+                sprintf('https://api.telegram.org/bot%s/setMyCommands', $botToken),
+                ['commands' => $commands]
+            );
+
+            return $response->successful();
+        } catch (Throwable $e) {
+            Log::warning('SecurityDefense: Failed to register Telegram bot commands.', ['error' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    /**
      * Determine whether the given chat ID is authorized to interact with the bot.
      */
     public function isAuthorized(string|int $chatId): bool

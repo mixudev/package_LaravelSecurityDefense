@@ -68,6 +68,9 @@ SECURITY_TELEGRAM_CHAT_ID=-1001234567890
 - `bot_token`: token bot dari @BotFather
 - `chat_id`: ID chat/grup tujuan (bisa negatif untuk grup / channel)
 
+> **Fitur Interactive Control Panel & Monitoring Bot:**
+> Selain notifikasi satu arah, bot juga mendukung menu interaktif untuk health check website, metrik keamanan, log insiden, dan karantina IP. Panduan lengkap arsitektur Webhook (produksi) vs Long-Polling (lokal) tersedia di [09-telegram-bot.md](./09-telegram-bot.md).
+
 ---
 
 ## 4. Discord

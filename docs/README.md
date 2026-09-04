@@ -20,6 +20,7 @@ desain tingkat dalam, lihat folder [`docs/ai/`](./ai/README.md) (AI living docs)
 | 6 | [`06-security-hardening.md`](./06-security-hardening.md) | Hardening produksi: Redis cache, quarantine DB, block empty UA, best practice |
 | 7 | [`07-testing.md`](./07-testing.md) | Menjalankan test suite + diagnostic channel via artisan |
 | 8 | [`08-troubleshooting.md`](./08-troubleshooting.md) | FAQ & penyelesaian masalah umum |
+| 9 | [`09-telegram-bot.md`](./09-telegram-bot.md) | Interactive Telegram Bot: Webhook produksi vs polling lokal, monitoring kesehatan & metrik |
 
 ---
 
