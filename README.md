@@ -176,6 +176,7 @@ Untuk panduan konfigurasi mendalam, detail arsitektur, dan operasional tingkat l
 
 ### 2. Fitur Keamanan (Features)
 - [docs/features/detection-rules.md](./docs/features/detection-rules.md) — Penjelasan cara kerja 8 aturan deteksi modular (Brute force, Stuffing, Spray, Injection, Travel, Recon, Scanner UA).
+- [docs/features/dashboard.md](./docs/features/dashboard.md) — Fitur dashboard monitoring: KPI, quick-action toggle, IP quarantine management, live WAF events, date range filter.
 - [docs/features/waf-middleware.md](./docs/features/waf-middleware.md) — Penjelasan pipeline inspeksi middleware `RequestThreatScanner`, proteksi request flood, dan Fail2Ban auto-jailing.
 - [docs/features/threat-scoring.md](./docs/features/threat-scoring.md) — Mekanisme kalkulasi skor risiko kumulatif multi-vektor dan eskalasi otomatis ke status compound threat.
 - [docs/features/alert-channels.md](./docs/features/alert-channels.md) — Konfigurasi 5 saluran alert (Database, Telegram, Discord, Webhook HMAC, Email), deduplikasi fingerprint, dan antrean asinkron (queue).

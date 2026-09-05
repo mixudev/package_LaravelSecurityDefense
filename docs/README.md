@@ -13,6 +13,7 @@ Dokumentasi lengkap untuk integrasi, konfigurasi, operasional, dan arsitektur pa
 
 ### 2. Fitur Utama (Features)
 - [Aturan Deteksi Ancaman](./features/detection-rules.md) - Penjelasan 11 aturan deteksi modular (Brute force, Stuffing, Spray, Injection, Travel, Recon, Scanner UA, Session Hijack, Velocity, Header Consistency).
+- [Dashboard Monitoring & Quick Actions](./features/dashboard.md) - KPI, toggle live (persist overrides), IP quarantine management, live WAF events, date range filter.
 - [Middleware WAF & Karantina IP](./features/waf-middleware.md) - Cara kerja `RequestThreatScanner`, mitigasi ReDoS, proteksi request flood, dan Fail2Ban auto-jailing.
 - [Compound Threat Scoring](./features/threat-scoring.md) - Engine korelasi risiko multi-vektor dan eskalasi otomatis ke alert kritis.
 - [Notifikasi Multi-Channel & Deduplikasi](./features/alert-channels.md) - Pengaturan channel Database, Telegram, Discord, Webhook (HMAC), Mail, serta deduplikasi alert.
