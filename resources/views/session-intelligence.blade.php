@@ -41,6 +41,11 @@
         ])
     </div>
 
+    <!-- Date Range Filter -->
+    <div class="flex items-center justify-between gap-3 mb-3">
+        @include('security-defense::components.date-range-filter', ['current' => $dateRange['preset']])
+    </div>
+
     <!-- Session Filter Bar Component -->
     @include('security-defense::components.sessions.session-filter-bar', ['filters' => $filters])
 

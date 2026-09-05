@@ -7,6 +7,7 @@ namespace Mixudev\SecurityDefense\Services;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Mixudev\SecurityDefense\Models\SecurityDataAudit;
+use Mixudev\SecurityDefense\Support\DateRangeFilter;
 
 /**
  * Service for querying, filtering, and aggregating database mutation audits.
@@ -30,6 +31,13 @@ class DataAuditQueryService
     public function getAudits(array $filters, int $perPage = 20): LengthAwarePaginator
     {
         $query = SecurityDataAudit::query()->latest();
+
+        if (!empty($filters['from']) || !empty($filters['to'])) {
+            DateRangeFilter::apply($query, [
+                'from' => $filters['from'] ?? null,
+                'to' => $filters['to'] ?? null,
+            ]);
+        }
 
         if (!empty($filters['event'])) {
             $query->where('event', (string) $filters['event']);

@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
 use Mixudev\SecurityDefense\Models\SecurityQuarantine;
+use Mixudev\SecurityDefense\Support\DateRangeFilter;
 use Throwable;
 
 /**
@@ -203,6 +204,13 @@ class DashboardAnalyticsService
     public function getFilteredAlerts(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = SecurityAlert::query()->latest();
+
+        if (!empty($filters['from']) || !empty($filters['to'])) {
+            DateRangeFilter::apply($query, [
+                'from' => $filters['from'] ?? null,
+                'to' => $filters['to'] ?? null,
+            ]);
+        }
 
         if (!empty($filters['status'])) {
             $query->where('status', (string) $filters['status']);

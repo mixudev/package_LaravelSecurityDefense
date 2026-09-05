@@ -16,6 +16,7 @@ use Mixudev\SecurityDefense\Services\DashboardAnalyticsService;
 use Mixudev\SecurityDefense\Services\DataAuditQueryService;
 use Mixudev\SecurityDefense\Services\IpQuarantineService;
 use Mixudev\SecurityDefense\Services\SessionIntelligenceQueryService;
+use Mixudev\SecurityDefense\Support\DateRangeFilter;
 use Throwable;
 
 /**
@@ -50,7 +51,10 @@ class DashboardController extends Controller
         $channelsStatus = ($testService ?? $this->channelTestService)->getChannelsStatus();
         $postureScore = $this->analyticsService->calculatePostureScore($stats);
 
-        $filters = $request->only(['status', 'severity', 'threat_type']);
+        $filters = $request->only(['status', 'severity', 'threat_type', 'range']);
+        $dateRange = DateRangeFilter::resolve($request);
+        $filters['from'] = $dateRange['from'];
+        $filters['to'] = $dateRange['to'];
         $alerts = $this->analyticsService->getFilteredAlerts($filters, 15);
         $liveEvents = $this->analyticsService->getLiveBlockedEvents(10);
 
@@ -58,6 +62,7 @@ class DashboardController extends Controller
             'stats' => $stats,
             'alerts' => $alerts,
             'liveEvents' => $liveEvents,
+            'dateRange' => $dateRange,
             'quickActions' => [
                 'blockHeadless' => (bool) config('security-defense.middleware.user_agent_anomaly.block_headless_clients', false),
                 'cspArmor' => (bool) config('security-defense.csp_armor.enabled', true),
@@ -191,7 +196,10 @@ class DashboardController extends Controller
      */
     public function dataAudits(Request $request)
     {
-        $filters = $request->only(['event', 'auditable_type', 'tampered', 'search']);
+        $filters = $request->only(['event', 'auditable_type', 'tampered', 'search', 'range']);
+        $dateRange = DateRangeFilter::resolve($request);
+        $filters['from'] = $dateRange['from'];
+        $filters['to'] = $dateRange['to'];
         $audits = $this->auditQueryService->getAudits($filters, 20);
         $stats = $this->auditQueryService->getStats($request->boolean('refresh'));
 
@@ -199,6 +207,7 @@ class DashboardController extends Controller
             'audits' => $audits,
             'stats' => $stats,
             'filters' => $filters,
+            'dateRange' => $dateRange,
         ]);
     }
 
@@ -258,7 +267,10 @@ class DashboardController extends Controller
      */
     public function sessionIntelligence(Request $request)
     {
-        $filters = $request->only(['threat_type', 'severity']);
+        $filters = $request->only(['threat_type', 'severity', 'range']);
+        $dateRange = DateRangeFilter::resolve($request);
+        $filters['from'] = $dateRange['from'];
+        $filters['to'] = $dateRange['to'];
         $alerts = $this->sessionQueryService->getThreats($filters, 20);
         $stats = $this->sessionQueryService->getStats($request->boolean('refresh'));
 
@@ -266,6 +278,7 @@ class DashboardController extends Controller
             'alerts' => $alerts,
             'stats' => $stats,
             'filters' => $filters,
+            'dateRange' => $dateRange,
         ]);
     }
 }

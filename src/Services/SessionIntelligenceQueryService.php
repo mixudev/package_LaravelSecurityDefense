@@ -7,6 +7,7 @@ namespace Mixudev\SecurityDefense\Services;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
+use Mixudev\SecurityDefense\Support\DateRangeFilter;
 
 /**
  * Service for querying, filtering, and aggregating session intelligence threats.
@@ -39,6 +40,13 @@ class SessionIntelligenceQueryService
         $query = SecurityAlert::query()
             ->whereIn('threat_type', self::SESSION_THREAT_TYPES)
             ->latest();
+
+        if (!empty($filters['from']) || !empty($filters['to'])) {
+            DateRangeFilter::apply($query, [
+                'from' => $filters['from'] ?? null,
+                'to' => $filters['to'] ?? null,
+            ]);
+        }
 
         if (!empty($filters['threat_type'])) {
             $query->where('threat_type', (string) $filters['threat_type']);
