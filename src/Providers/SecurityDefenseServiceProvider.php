@@ -111,6 +111,20 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         // Bind Interactive Telegram Bot Service
         $this->app->singleton(\Mixudev\SecurityDefense\Services\TelegramBotService::class);
 
+        // Bind Telegram transport + composer (auto-resolved dependencies)
+        $this->app->singleton(\Mixudev\SecurityDefense\Services\TelegramApiClient::class);
+        $this->app->singleton(\Mixudev\SecurityDefense\Services\TelegramMessageComposer::class);
+
+        // Bind WAF helper services (request flood limiter + payload decoder)
+        $this->app->singleton(\Mixudev\SecurityDefense\Services\RequestFloodLimiter::class);
+        $this->app->singleton(\Mixudev\SecurityDefense\Services\PayloadDecoder::class);
+
+        // Bind Data Audit sanitizer helper
+        $this->app->singleton(\Mixudev\SecurityDefense\Services\AuditPayloadSanitizer::class);
+
+        // Bind WAF threat telemetry recorder
+        $this->app->singleton(\Mixudev\SecurityDefense\Services\ThreatTelemetryRecorder::class);
+
         // Bind Primary Coordinator Manager with Enterprise Modules
         $this->app->singleton(SecurityDefenseManager::class, function ($app) {
             return new SecurityDefenseManager(
