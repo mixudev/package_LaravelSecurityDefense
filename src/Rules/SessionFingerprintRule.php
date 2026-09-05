@@ -74,20 +74,30 @@ class SessionFingerprintRule extends AbstractDetectionRule
             $severity = count($mismatches) > 1 ? 'critical' : (string) $this->getConfig('severity', 'high');
             $fingerprint = hash('sha256', sprintf('session_hijack:%s:%s', $sessionHash, implode('+', $mismatches)));
 
+            $metadata = [
+                'session_hash' => $sessionHash,
+                'identifier' => $event->identifier,
+                'current_ip' => $event->ip,
+                'initial_ip' => $stored['initial_ip'] ?? null,
+                'current_ua' => $event->userAgent,
+                'initial_ua' => $stored['user_agent'] ?? null,
+                'mismatches' => $mismatches,
+                'reasons' => 'Session cookie was presented with contradictory network subnet or client signature',
+            ];
+
+            // Fire official event for application-level action (e.g. revoke tokens, force re-auth)
+            event(new \Mixudev\SecurityDefense\Events\SecuritySessionCompromised(
+                userId: (string) $event->identifier,
+                ip: $event->ip,
+                reason: implode(', ', $mismatches),
+                context: $metadata
+            ));
+
             return new SecurityThreat(
                 severity: $severity,
                 threatType: 'session_hijack_suspected',
                 fingerprint: $fingerprint,
-                metadata: [
-                    'session_hash' => $sessionHash,
-                    'identifier' => $event->identifier,
-                    'current_ip' => $event->ip,
-                    'initial_ip' => $stored['initial_ip'] ?? null,
-                    'current_ua' => $event->userAgent,
-                    'initial_ua' => $stored['user_agent'] ?? null,
-                    'mismatches' => $mismatches,
-                    'reasons' => 'Session cookie was presented with contradictory network subnet or client signature',
-                ],
+                metadata: $metadata,
                 ruleIdentifier: $this->identifier()
             );
         }

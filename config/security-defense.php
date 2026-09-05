@@ -349,6 +349,13 @@ return [
         // Max byte size of request payload snapshot before truncation (Anti-DoS)
         'max_payload_snapshot_bytes' => 8192,
 
+        // Asynchronous queue configuration for zero latency on high-throughput apps
+        'queue' => [
+            'enabled' => false, // Set to true to process audit logs in background worker
+            'connection' => null,
+            'queue' => 'security-audit',
+        ],
+
         // Retention in days for security data
         'retention_days' => 30,
         'tampered_retention_days' => 90,
@@ -387,16 +394,16 @@ return [
     | strictness. All settings can be adjusted directly or via .env variables.
     */
     'dashboard' => [
-        'enabled' => env('SECURITY_DEFENSE_DASHBOARD_ENABLED', true),
-        'local_only' => env('SECURITY_DEFENSE_DASHBOARD_LOCAL_ONLY', true),
+        'enabled' => true,
+        'local_only' => true,
         'allowed_ips' => ['127.0.0.1', '::1'],
         'cache' => [
-            'enabled' => env('SECURITY_DEFENSE_DASHBOARD_CACHE_ENABLED', true),
-            'ttl' => (int) env('SECURITY_DEFENSE_DASHBOARD_CACHE_TTL', 30),
+            'enabled' => true,
+            'ttl' => 30,
         ],
         'rate_limit' => [
-            'enabled' => env('SECURITY_DEFENSE_DASHBOARD_RATE_LIMIT_ENABLED', true),
-            'max_probes_per_minute' => (int) env('SECURITY_DEFENSE_DASHBOARD_MAX_PROBES', 30),
+            'enabled' => true,
+            'max_probes_per_minute' => 30,
         ],
     ],
 ];

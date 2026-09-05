@@ -21,6 +21,7 @@ Dokumentasi lengkap untuk integrasi, konfigurasi, operasional, dan arsitektur pa
 - [Audit Perubahan Database & Deteksi Tamper](./integrations/data-audit.md) - Panduan penggunaan Trait `HasSecurityAudit`, masking kredensial, proteksi Mass Assignment, dan deteksi manipulasi parameter Burp Suite.
 - [Session Intelligence & Pertahanan Klien](./integrations/session-intelligence.md) - Mitigasi pencurian cookie akibat malware infostealer (RedLine/Lumma), deteksi pembajakan sesi, dan post-auth scraping velocity.
 - [CSP Armor & Data Hygiene](./integrations/csp-armor-and-pruning.md) - Proteksi Content Security Policy (CSP) transparan penangkal XSS dan pruning database skala jutaan user.
+- [Security Events & Graduated Response](./integrations/security-events.md) - Panduan mendengarkan event resmi (Session Compromised, Parameter Tampered, IP Quarantined) dan async queueing.
 - [Ingesti Telemetri Autentikasi](./integrations/telemetry-ingestion.md) - Menghubungkan telemetri dari Laravel Breeze, Fortify, Sanctum, Passport, atau sistem kustom.
 - [Bot Telegram Interaktif](./integrations/telegram-bot.md) - Setup Webhook produksi vs Polling lokal, menu kontrol panel, health check, dan remote pardon.
 - [Integrasi Package mixudev/laravel-authentication](./integrations/laravel-auth-package.md) - Panduan subscriber event bridge dengan package autentikasi enterprise.

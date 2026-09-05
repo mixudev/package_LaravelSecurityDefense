@@ -120,9 +120,12 @@ class IpQuarantineService
                         ]
                     );
             } catch (\Throwable) {
-                // Cache-only fallback if DB write fails; cache still protects for the window
+                // Cache jail is already active; DB fail does not prevent mitigation
             }
         }
+
+        // Fire official event for host application listeners
+        event(new \Mixudev\SecurityDefense\Events\IpQuarantined($ip, $quarantineDuration, $reason));
 
         return true;
     }

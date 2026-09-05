@@ -90,8 +90,7 @@ class DataAuditService
             $actor = $this->resolveActor();
             $payloadSnapshot = $this->resolvePayloadSnapshot($request);
 
-            /** @var SecurityDataAudit $audit */
-            $audit = SecurityDataAudit::query()->create([
+            $auditData = [
                 'event' => $event,
                 'auditable_type' => get_class($model),
                 'auditable_id' => (string) $model->getKey(),
@@ -108,11 +107,36 @@ class DataAuditService
                 'payload_snapshot' => $payloadSnapshot,
                 'is_tampered' => $tamperAnalysis['is_tampered'],
                 'tamper_reasons' => $tamperAnalysis['reasons'],
-            ]);
+            ];
 
-            // If tampering detected and alerts enabled, notify Security SIEM
-            if ($tamperAnalysis['is_tampered'] && config('security-defense.data_audit.alert_on_tampering', true)) {
-                $this->dispatchTamperAlert($audit, $tamperAnalysis['reasons']);
+            // If queue is enabled, push to background worker for zero HTTP latency impact
+            if ((bool) config('security-defense.data_audit.queue.enabled', false)) {
+                $job = new \Mixudev\SecurityDefense\Jobs\ProcessSecurityDataAuditJob($auditData);
+                $connection = config('security-defense.data_audit.queue.connection');
+                $queue = config('security-defense.data_audit.queue.queue', 'security-audit');
+
+                if ($connection) {
+                    $job->onConnection((string) $connection);
+                }
+                if ($queue) {
+                    $job->onQueue((string) $queue);
+                }
+
+                dispatch($job);
+
+                return null;
+            }
+
+            /** @var SecurityDataAudit $audit */
+            $audit = SecurityDataAudit::query()->create($auditData);
+
+            // Fire event if parameter tampering is detected
+            if ($tamperAnalysis['is_tampered']) {
+                event(new \Mixudev\SecurityDefense\Events\SecurityParameterTampered($audit, $tamperAnalysis['reasons']));
+
+                if (config('security-defense.data_audit.alert_on_tampering', true)) {
+                    $this->dispatchTamperAlert($audit, $tamperAnalysis['reasons']);
+                }
             }
 
             return $audit;
