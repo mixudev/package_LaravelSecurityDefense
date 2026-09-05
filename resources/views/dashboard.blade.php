@@ -53,6 +53,11 @@
         'channelsStatus' => $channelsStatus,
     ])
 
+    <!-- Live WAF Blocked Events Meter -->
+    @include('security-defense::components.live-events-table', [
+        'events' => $liveEvents,
+    ])
+
     <!-- Active IP Quarantine Management Table -->
     @include('security-defense::components.quarantine-table', [
         'quarantinedIps' => $quarantinedIps,

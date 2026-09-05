@@ -48,18 +48,29 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-right">
-                                <form action="{{ route('security-defense.quarantine.pardon') }}" method="POST" class="inline">
-                                    @csrf
-                                    <input type="hidden" name="ip" value="{{ $jail->ip }}">
-                                    <button type="submit" aria-label="Release IP {{ $jail->ip }} from quarantine" title="Release {{ $jail->ip }}"
-                                        class="inline-flex items-center px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-emerald-100 text-zinc-700 hover:text-emerald-800 dark:bg-[#202024] dark:hover:bg-emerald-950 dark:text-zinc-200 dark:hover:text-emerald-400 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer text-xs font-semibold shadow-xs">
-                                        <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                                        </svg>
-                                        Release IP
-                                    </button>
-                                </form>
-                            </td>
+                                                            <form action="{{ route('security-defense.quarantine.whitelist') }}" method="POST" class="inline">
+                                                                @csrf
+                                                                <input type="hidden" name="ip" value="{{ $jail->ip }}">
+                                                                <button type="submit" aria-label="Whitelist IP {{ $jail->ip }}" title="Whitelist {{ $jail->ip }} permanently"
+                                                                    class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 hover:text-zinc-800 dark:bg-[#202024] dark:hover:bg-zinc-700 dark:text-zinc-300 dark:hover:text-zinc-100 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer text-xs font-semibold shadow-xs">
+                                                                    <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                                                                    </svg>
+                                                                    Whitelist
+                                                                </button>
+                                                            </form>
+                                                            <form action="{{ route('security-defense.quarantine.pardon') }}" method="POST" class="inline">
+                                                                @csrf
+                                                                <input type="hidden" name="ip" value="{{ $jail->ip }}">
+                                                                <button type="submit" aria-label="Release IP {{ $jail->ip }} from quarantine" title="Release {{ $jail->ip }}"
+                                                                    class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-emerald-100 text-zinc-700 hover:text-emerald-800 dark:bg-[#202024] dark:hover:bg-emerald-950 dark:text-zinc-200 dark:hover:text-emerald-400 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer text-xs font-semibold shadow-xs">
+                                                                    <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                                                                    </svg>
+                                                                    Release
+                                                                </button>
+                                                            </form>
+                                                        </td>
                         </tr>
                     @endforeach
                 </tbody>

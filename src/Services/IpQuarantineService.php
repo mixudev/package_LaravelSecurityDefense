@@ -184,8 +184,42 @@ class IpQuarantineService
      */
     public function isWhitelisted(string $ip): bool
     {
-        $whitelist = (array) config('security-defense.middleware.quarantine.whitelist', ['127.0.0.1', '::1']);
+        $whitelist = $this->whitelist();
 
         return in_array($ip, $whitelist, true);
+    }
+
+    /**
+     * Retrieve the current whitelist entries.
+     *
+     * @return array<int, string>
+     */
+    public function whitelist(): array
+    {
+        return array_values(array_unique(array_map('strval', (array) config('security-defense.middleware.quarantine.whitelist', ['127.0.0.1', '::1']))));
+    }
+
+    /**
+     * Permanently whitelist an IP (survives restarts) and pardon it immediately.
+     * Persists into the published config file when writable, otherwise runtime-only.
+     */
+    public function whitelistIp(string $ip): bool
+    {
+        if ($this->isWhitelisted($ip)) {
+            return true;
+        }
+
+        $whitelist = $this->whitelist();
+        $whitelist[] = $ip;
+        $whitelist = array_values(array_unique($whitelist));
+
+        $persisted = app(ConfigWriterService::class)->write([
+            'middleware.quarantine.whitelist' => $whitelist,
+        ]);
+
+        // Always release the IP from quarantine so the exemption applies instantly.
+        $this->pardon($ip);
+
+        return $persisted;
     }
 }

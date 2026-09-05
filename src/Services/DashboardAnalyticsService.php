@@ -218,4 +218,36 @@ class DashboardAnalyticsService
 
         return $query->paginate($perPage)->withQueryString();
     }
+
+    /**
+     * Retrieve the most recent blocked-request events for the live WAF meter.
+     *
+     * @return array<int, array{id: int, severity: string, threat_type: string, ip: string, url: string, method: string, user_agent: string, created_at: string}>
+     */
+    public function getLiveBlockedEvents(int $limit = 10): array
+    {
+        try {
+            return SecurityAlert::query()
+                ->latest()
+                ->limit($limit)
+                ->get()
+                ->map(function (SecurityAlert $alert): array {
+                    $metadata = is_array($alert->metadata) ? $alert->metadata : [];
+
+                    return [
+                        'id' => (int) $alert->id,
+                        'severity' => (string) $alert->severity,
+                        'threat_type' => (string) $alert->threat_type,
+                        'ip' => (string) ($metadata['ip'] ?? $metadata['source_ip'] ?? 'N/A'),
+                        'url' => (string) ($metadata['url'] ?? $metadata['request_url'] ?? 'N/A'),
+                        'method' => (string) ($metadata['method'] ?? $metadata['request_method'] ?? 'GET'),
+                        'user_agent' => (string) ($metadata['user_agent'] ?? 'N/A'),
+                        'created_at' => $alert->created_at->toIso8601String(),
+                    ];
+                })
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
+    }
 }

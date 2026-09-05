@@ -51,10 +51,12 @@ class DashboardController extends Controller
 
         $filters = $request->only(['status', 'severity', 'threat_type']);
         $alerts = $this->analyticsService->getFilteredAlerts($filters, 15);
+        $liveEvents = $this->analyticsService->getLiveBlockedEvents(10);
 
         return view('security-defense::dashboard', [
             'stats' => $stats,
             'alerts' => $alerts,
+            'liveEvents' => $liveEvents,
             'hourlyData' => $hourlyData,
             'postureScore' => $postureScore,
             'threatDistribution' => $threatDistribution,
@@ -159,6 +161,26 @@ class DashboardController extends Controller
     }
 
     /**
+     * Permanently whitelist an IP so it is never quarantined again.
+     * Persists into the published config file when writable.
+     */
+    public function whitelistIp(Request $request, ?IpQuarantineService $quarantineService = null): RedirectResponse
+    {
+        $request->validate([
+            'ip' => 'required|ip',
+        ]);
+
+        $ip = (string) $request->input('ip');
+        $persisted = ($quarantineService ?? $this->quarantineService)->whitelistIp($ip);
+
+        if ($persisted) {
+            return back()->with('status_message', "IP [{$ip}] whitelisted permanently and removed from quarantine.");
+        }
+
+        return back()->with('error_message', "IP [{$ip}] whitelisted for this session only - config file not writable, changes lost on cache flush.");
+    }
+
+    /**
      * Display Database Change Monitoring & Burp Suite Tamper Intelligence.
      */
     public function dataAudits(Request $request)
@@ -171,6 +193,19 @@ class DashboardController extends Controller
             'audits' => $audits,
             'stats' => $stats,
             'filters' => $filters,
+        ]);
+    }
+
+    /**
+     * JSON endpoint for the live blocked-request feed (WAF activity meter).
+     */
+    public function liveEvents(Request $request): JsonResponse
+    {
+        $limit = min(max((int) $request->query('limit', 10), 1), 25);
+
+        return response()->json([
+            'events' => $this->analyticsService->getLiveBlockedEvents($limit),
+            'generated_at' => now()->toIso8601String(),
         ]);
     }
 
