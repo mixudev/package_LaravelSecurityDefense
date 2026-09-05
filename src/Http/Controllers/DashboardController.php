@@ -175,4 +175,94 @@ class DashboardController extends Controller
 
         return back()->with('status_message', "IP [{$ip}] successfully pardoned and removed from quarantine.");
     }
+
+    /**
+     * Display Database Change Monitoring & Burp Suite Tamper Intelligence.
+     */
+    public function dataAudits(Request $request)
+    {
+        $query = \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->latest();
+
+        if ($request->filled('event')) {
+            $query->where('event', (string) $request->input('event'));
+        }
+
+        if ($request->filled('auditable_type')) {
+            $query->where('auditable_type', 'like', '%' . (string) $request->input('auditable_type') . '%');
+        }
+
+        if ($request->filled('tampered')) {
+            $tampered = $request->input('tampered');
+            if ($tampered === '1' || $tampered === 'true') {
+                $query->where('is_tampered', true);
+            } elseif ($tampered === '0' || $tampered === 'false') {
+                $query->where('is_tampered', false);
+            }
+        }
+
+        if ($request->filled('search')) {
+            $search = (string) $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('auditable_id', 'like', "%{$search}%")
+                    ->orWhere('actor_id', 'like', "%{$search}%")
+                    ->orWhere('ip_address', 'like', "%{$search}%")
+                    ->orWhere('request_url', 'like', "%{$search}%");
+            });
+        }
+
+        $audits = $query->paginate(20)->withQueryString();
+
+        $stats = [
+            'total' => \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->count(),
+            'tampered' => \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->where('is_tampered', true)->count(),
+            'today' => \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->whereDate('created_at', now()->toDateString())->count(),
+            'unique_actors' => \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->whereNotNull('actor_id')->distinct('actor_id')->count('actor_id'),
+        ];
+
+        return view('security-defense::data-audits', [
+            'audits' => $audits,
+            'stats' => $stats,
+            'filters' => $request->only(['event', 'auditable_type', 'tampered', 'search']),
+        ]);
+    }
+
+    /**
+     * Display Session Intelligence & Client-Side Compromise Detection.
+     */
+    public function sessionIntelligence(Request $request)
+    {
+        $sessionThreatTypes = [
+            'session_hijack_suspected',
+            'suspicious_velocity_scraping',
+            'header_inconsistency_bot',
+            'impossible_travel',
+        ];
+
+        $threatsQuery = SecurityAlert::query()
+            ->whereIn('threat_type', $sessionThreatTypes)
+            ->latest();
+
+        if ($request->filled('threat_type')) {
+            $threatsQuery->where('threat_type', (string) $request->input('threat_type'));
+        }
+
+        if ($request->filled('severity')) {
+            $threatsQuery->where('severity', (string) $request->input('severity'));
+        }
+
+        $alerts = $threatsQuery->paginate(20)->withQueryString();
+
+        $stats = [
+            'total_session_threats' => SecurityAlert::query()->whereIn('threat_type', $sessionThreatTypes)->count(),
+            'hijacks_detected' => SecurityAlert::query()->where('threat_type', 'session_hijack_suspected')->count(),
+            'velocity_spikes' => SecurityAlert::query()->where('threat_type', 'suspicious_velocity_scraping')->count(),
+            'header_anomalies' => SecurityAlert::query()->where('threat_type', 'header_inconsistency_bot')->count(),
+        ];
+
+        return view('security-defense::session-intelligence', [
+            'alerts' => $alerts,
+            'stats' => $stats,
+            'filters' => $request->only(['threat_type', 'severity']),
+        ]);
+    }
 }

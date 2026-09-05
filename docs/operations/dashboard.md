@@ -36,13 +36,26 @@ Dengan Gate ini, hanya administrator terautentikasi yang dapat membuka halaman d
 
 ---
 
-## 3. Fitur Utama Tampilan
+## 3. Fitur Utama & Navigasi Multi-Tab
 
+Dashboard dilengkapi sistem navigasi tab responsif di bagian navbar atas untuk berpindah antar modul monitoring:
+
+### Tab 1: Threat Telemetry SIEM (`/security-defense`)
 - **Kartu Ringkasan Metrik**: Menampilkan Total Ancaman, IP Terkarantina, Alert Belum Ditinjau, dan Insiden Kritis.
 - **Distribusi Vektor Ancaman**: Progress bar proporsional persentase jenis serangan.
 - **Hub Saluran Notifikasi**: Indikator status Database, Telegram, Discord, Webhook, dan Mail beserta tombol *Test Probe* instan.
 - **Tabel Karantina IP**: Memantau IP yang sedang diblokir beserta tombol pembebasan (*pardon*).
 - **Log Security Alerts**: Tabel insiden yang dapat difilter berdasarkan status (new/resolved) dan severity, lengkap dengan modal inspeksi telemetri.
+
+### Tab 2: Database Mutations & Tamper Audit (`/security-defense/data-audits`)
+- **Indikator BURP TAMPER DETECTED**: Label merah berkedip untuk mutasi data yang terindikasi manipulasi parameter via proxy (Burp Suite/ZAP) atau Mass Assignment.
+- **Side-by-Side Diff Inspector**: Modal interaktif yang menampilkan perbandingan nilai lama (*old values*) vs nilai baru (*new values*) dengan highlight warna dan penyensoran data sensitif.
+- **Request Payload Inspector**: Menampilkan snapshot JSON body request asli saat data diubah.
+- **Filter Cepat**: Berdasarkan event (created, updated, deleted), model class, tamper status, dan kata kunci IP/URL/Actor.
+
+### Tab 3: Session Intelligence Telemetry (`/security-defense/sessions`)
+- **Pemantauan Risiko Sesi Klien**: Menampilkan log anomali post-authentication seperti kecurigaan pembajakan sesi akibat malware infostealer (*subnet drift* & *UA mismatch*), lonjakan kecepatan bot (*velocity spikes*), serta inkonsistensi header browser.
+- **Tindakan Cepat**: Acknowledge dan Resolve langsung dari tampilan tabel.
 
 ---
 

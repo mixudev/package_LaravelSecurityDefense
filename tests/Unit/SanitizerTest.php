@@ -56,4 +56,35 @@ class SanitizerTest extends TestCase
         $this->assertStringNotContainsString('abc123secrettokenfromclient==', $cleaned);
         $this->assertStringContainsString('Bearer [REDACTED]', $cleaned);
     }
+
+    public function test_it_defangs_dangerous_payloads_without_breaking_readability(): void
+    {
+        $payloads = [
+            'xss_script' => '<script>alert("pwned")</script>',
+            'xss_event' => '<img src=x onerror=alert(1)>',
+            'xss_proto' => 'javascript:document.location="http://evil.com"',
+            'vbscript' => 'vbscript:msgbox("hello")',
+            'svg_tag' => '<svg onload=alert(1)>',
+            'iframe_tag' => '<iframe src="http://evil.com"></iframe>',
+            'crlf_chars' => "Normal text\x00with null and \x07bell",
+            'markdown_breakout' => "```json\nattacker breakout```",
+        ];
+
+        $cleaned = Sanitizer::clean($payloads);
+
+        // Scripts neutralized
+        $this->assertSame('[script]alert("pwned")[/script]', $cleaned['xss_script']);
+        $this->assertSame('<img src=x onerror_neutralized=alert(1)>', $cleaned['xss_event']);
+        $this->assertSame('java_script:document.location="http://evil.com"', $cleaned['xss_proto']);
+        $this->assertSame('vb_script:msgbox("hello")', $cleaned['vbscript']);
+        $this->assertSame('[svg onload_neutralized=alert(1)]', $cleaned['svg_tag']);
+        $this->assertSame('[iframe src="http://evil.com"][/iframe]', $cleaned['iframe_tag']);
+
+        // Control characters stripped
+        $this->assertSame('Normal textwith null and bell', $cleaned['crlf_chars']);
+
+        // Markdown backticks defanged
+        $this->assertSame("'''json\nattacker breakout'''", $cleaned['markdown_breakout']);
+    }
 }
+

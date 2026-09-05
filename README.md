@@ -2,24 +2,27 @@
 
 [![Versi Terbaru di Packagist](https://img.shields.io/packagist/v/mixudev/security-defense.svg?style=flat-square)](https://packagist.org/packages/mixudev/security-defense)
 [![Release GitHub](https://img.shields.io/github/v/tag/mixudev/package_LaravelSecurityDefense?label=release&style=flat-square)](https://github.com/mixudev/package_LaravelSecurityDefense/releases)
-[![Hasil Pengujian](https://img.shields.io/badge/tests-96%20passed-brightgreen.svg?style=flat-square)]()
+[![Hasil Pengujian](https://img.shields.io/badge/tests-103%20passed-brightgreen.svg?style=flat-square)]()
 [![Versi PHP](https://img.shields.io/badge/PHP-%5E8.2-blue.svg?style=flat-square)]()
 [![Kompatibilitas Laravel](https://img.shields.io/badge/Laravel-10%20%7C%2011%20%7C%2012%20%7C%2013-red.svg?style=flat-square)]()
 [![Lisensi: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-**`mixudev/security-defense`** adalah package pertahanan keamanan tingkat enterprise untuk aplikasi Laravel. Bertindak sebagai **"kamera pengawas dan perisai proaktif"** yang mendeteksi ancaman secara real-time, mengorelasikan pola serangan multi-vektor, mengisolasi penyerang (Fail2Ban IP Quarantine), mengirimkan alert ter-deduplikasi ke berbagai saluran, dan memblokir muatan berbahaya lewat WAF middleware tanpa mencampuri urusan autentikasi.
+**`mixudev/security-defense`** adalah package pertahanan keamanan tingkat enterprise untuk aplikasi Laravel. Bertindak sebagai **"kamera pengawas, perisai proaktif, dan integritas data"** yang mendeteksi ancaman secara real-time, mengorelasikan pola serangan multi-vektor, mengisolasi penyerang (Fail2Ban IP Quarantine), memantau mutasi data & mendeteksi manipulasi parameter Burp Suite, melindungi sesi terautentikasi dari pencurian cookie malware, serta mengirimkan alert ter-deduplikasi ke berbagai saluran.
 
 ---
 
 ## Ringkasan Teknologi & Sistem
 
 - **Decoupled Architecture**: Tidak menggantikan auth (user, session, hashing, atau token). Package murni mengonsumsi telemetri keamanan dari aplikasi.
-- **8 Aturan Deteksi Modular**: Brute Force, Credential Stuffing, Distributed Spray, Rate Limit Bypass, Injeksi Payload (SQLi, XSS, RCE, LFI), Impossible Travel (rumus Haversine), Path Reconnaissance (.env, .git), dan Scanner User-Agent bot.
+- **11 Aturan Deteksi Modular**: Brute Force, Credential Stuffing, Distributed Spray, Rate Limit Bypass, Injeksi Payload (SQLi, XSS, RCE, LFI), Impossible Travel, Path Reconnaissance, Scanner User-Agent, **Session Fingerprint & Hijack**, **Behavioral Velocity**, dan **HTTP Header Consistency**.
+- **Database Change Monitoring & Burp Tamper Detection**: Melacak mutasi database (`created`, `updated`, `deleted`), old vs new values, URL, method, actor, snapshot payload, dan mendeteksi injeksi parameter sensitif / mass assignment via Burp Suite dengan garansi *zero-leakage redaction* (password disamarkan).
+- **Session Intelligence Layer**: Mendeteksi pencurian session cookie oleh malware di device korban (*infostealer*) serta scraping cepat pada akun yang sudah login.
+- **Multi-Tab Security Dashboard**: Navigasi lengkap untuk Threat Telemetry SIEM, Database Mutations, dan Session Intelligence.
 - **Compound Threat Scoring**: Menghitung akumulasi risiko antar jenis serangan pada entitas yang sama sepanjang waktu dan otomatis mengelevasi status ke ancaman kritis jika melampaui ambang batas.
 - **Karantina IP Fail2Ban**: Memutus koneksi IP penyerang secara instan di awal middleware dengan HTTP 429, menghemat CPU hingga 99% saat diserang.
 - **Fast-Path & Self-Defense Bounded**: Request GET/HEAD bersih tanpa body/query melewati scan regex secara instan. Dilengkapi proteksi Anti-ReDoS, batas memori rekursi, dan pembatas penulisan database.
 - **Notifikasi Multi-Channel**: Database, Telegram, Discord, Webhook (tanda tangan HMAC-SHA256), dan Email native Laravel dengan dukungan antrean asinkron (queue).
-- **Interactive Telegram Bot**: Kontrol panel interaktif via bot Telegram untuk health check, review insiden, dan unban IP (mendukung mode Webhook untuk server produksi/cPanel dan Polling untuk localhost).
+- **Interactive Telegram Bot**: Kontrol panel interaktif via bot Telegram untuk health check, review insiden, dan unban IP.
 
 ---
 
@@ -178,6 +181,9 @@ Untuk panduan konfigurasi mendalam, detail arsitektur, dan operasional tingkat l
 - [docs/features/alert-channels.md](./docs/features/alert-channels.md) — Konfigurasi 5 saluran alert (Database, Telegram, Discord, Webhook HMAC, Email), deduplikasi fingerprint, dan antrean asinkron (queue).
 
 ### 3. Integrasi Sistem (Integrations)
+- [docs/integrations/data-audit.md](./docs/integrations/data-audit.md) — Panduan audit mutasi database, masking kredensial, dan deteksi manipulasi parameter Burp Suite.
+- [docs/integrations/session-intelligence.md](./docs/integrations/session-intelligence.md) — Perlindungan session cookie dari infostealer malware, deteksi pembajakan sesi, dan scraping velocity.
+- [docs/integrations/csp-armor-and-pruning.md](./docs/integrations/csp-armor-and-pruning.md) — Proteksi Content Security Policy (CSP) transparan penangkal XSS dan pruning log database untuk skala jutaan pengguna.
 - [docs/integrations/telemetry-ingestion.md](./docs/integrations/telemetry-ingestion.md) — Cara menghubungkan event login dari Breeze, Fortify, Sanctum, Jetstream, atau custom JWT ke method `record()`.
 - [docs/integrations/telegram-bot.md](./docs/integrations/telegram-bot.md) — Panduan lengkap kontrol panel bot Telegram: setup Webhook (server/cPanel tanpa daemon) vs Polling (localhost), menu health check, dan remote pardon.
 - [docs/integrations/laravel-auth-package.md](./docs/integrations/laravel-auth-package.md) — Panduan integrasi khusus via Event Subscriber dengan package `mixudev/laravel-authentication`.

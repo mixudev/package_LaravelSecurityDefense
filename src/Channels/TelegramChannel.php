@@ -61,6 +61,23 @@ class TelegramChannel implements AlertChannel
             );
 
             if (!$response->successful()) {
+                // If Telegram rejected markdown parsing (400 Bad Request), fallback to plain text
+                if ($response->status() === 400) {
+                    $plainText = strip_tags(str_replace(['*', '`'], '', $message));
+                    $fallback = Http::timeout($timeout)->post(
+                        sprintf('https://api.telegram.org/bot%s/sendMessage', $botToken),
+                        [
+                            'chat_id' => $chatId,
+                            'text' => $plainText,
+                            'disable_web_page_preview' => true,
+                        ]
+                    );
+
+                    if ($fallback->successful()) {
+                        return true;
+                    }
+                }
+
                 Log::warning('SecurityDefense: Failed to send Telegram alert.', [
                     'status' => $response->status(),
                     'response' => $response->body(),

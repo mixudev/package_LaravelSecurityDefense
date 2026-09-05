@@ -95,9 +95,10 @@ final class DiscordAlertFormatter
         unset($metadata['_is_test'], $metadata['source']);
 
         if (!empty($metadata)) {
-            $json = json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-            if (strlen((string) $json) > 1000) {
-                $json = substr((string) $json, 0, 990) . '...';
+            $json = (string) json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $json = str_replace('```', "'''", $json);
+            if (strlen($json) > 1000) {
+                $json = substr($json, 0, 980) . '...[TRUNCATED]';
             }
 
             $fields[] = [

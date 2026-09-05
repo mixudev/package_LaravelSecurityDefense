@@ -56,10 +56,23 @@ final class TelegramAlertFormatter
         if (!empty($metadata)) {
             $lines[] = '';
             $lines[] = '• *Metadata Summary:*';
-            $lines[] = sprintf("```json\n%s\n```", json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $json = (string) json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            // Defang triple backticks to prevent Telegram markdown parsing crash
+            $json = str_replace('```', "'''", $json);
+            if (strlen($json) > 2500) {
+                $json = substr($json, 0, 2400) . "\n... [TRUNCATED FOR TELEGRAM LIMIT]";
+            }
+            $lines[] = sprintf("```json\n%s\n```", $json);
         }
 
-        return implode("\n", $lines);
+        $result = implode("\n", $lines);
+
+        // Telegram maximum message limit is 4096 characters
+        if (strlen($result) > 4000) {
+            $result = substr($result, 0, 3950) . "\n... [TRUNCATED]";
+        }
+
+        return $result;
     }
 
     /**

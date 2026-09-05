@@ -107,15 +107,49 @@ class Sanitizer
     }
 
     /**
-     * Scrub sensitive patterns that might appear within string values (e.g., Bearer tokens).
+     * Scrub sensitive patterns that might appear within string values (e.g., Bearer tokens)
+     * and defang active executable payloads (XSS, shell injection, markdown breakouts).
      */
     public static function cleanString(string $value): string
     {
-        // Redact Bearer tokens in headers/strings
+        // 1. Redact Bearer tokens in headers/strings
         $value = (string) preg_replace('/Bearer\s+[A-Za-z0-9\-\._~\+\/]+=*/i', 'Bearer [REDACTED]', $value);
 
-        // Redact basic auth in URLs
+        // 2. Redact basic auth in URLs
         $value = (string) preg_replace('/:\/\/[^:]+:[^@]+@/', '://[REDACTED]:[REDACTED]@', $value);
+
+        // 3. Defang dangerous executable payloads (XSS, script injection, control characters)
+        return static::defangString($value);
+    }
+
+    /**
+     * Neutralize and defang active payloads so they cannot execute if rendered or transmitted,
+     * while preserving the exact semantic structure so security analysts and auditors can inspect it.
+     */
+    public static function defangString(string $value): string
+    {
+        // Strip ASCII null bytes and non-printable control characters (anti-CRLF & anti-log poisoning)
+        $value = (string) preg_replace('/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/', '', $value);
+
+        // Defang dangerous HTML tags (<script ...> -> [script ...], </script> -> [/script])
+        $tagsRegex = 'script|iframe|object|embed|applet|svg|meta|link|style|base';
+        $value = (string) preg_replace("/<(\/?)\s*({$tagsRegex})([^>]*)>/i", '[$1$2$3]', $value);
+        // Also catch unclosed opening tags (<script ...)
+        $value = (string) preg_replace("/<(\/?)\s*({$tagsRegex})\b/i", '[$1$2', $value);
+
+        // Defang any remaining closing tags
+        $value = (string) preg_replace('/<\s*\/\s*([a-zA-Z0-9]+)\s*>/', '[/$1]', $value);
+
+        // Defang DOM event handlers (onerror= -> on_error=, onload= -> on_load=)
+        $value = (string) preg_replace('/\b(on(?:error|load|click|mouseover|focus|blur|change|submit|input))\s*=/i', '$1_neutralized=', $value);
+
+        // Defang dangerous pseudo-schemes (javascript: -> java_script:, data:text/html -> d_ata:text/html)
+        $value = (string) preg_replace('/javascript\s*:/i', 'java_script:', $value);
+        $value = (string) preg_replace('/vbscript\s*:/i', 'vb_script:', $value);
+        $value = (string) preg_replace('/data\s*:\s*text\/html/i', 'd_ata:text/html', $value);
+
+        // Defang triple backticks to prevent Telegram/Discord markdown code block breakouts
+        $value = str_replace('```', "'''", $value);
 
         return $value;
     }

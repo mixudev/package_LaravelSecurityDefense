@@ -16,6 +16,8 @@ if (config('security-defense.dashboard.enabled', true)) {
         ->name('security-defense.')
         ->group(function () {
             Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+            Route::get('/data-audits', [DashboardController::class, 'dataAudits'])->name('data-audits');
+            Route::get('/sessions', [DashboardController::class, 'sessionIntelligence'])->name('sessions');
             Route::post('/test-channel', [DashboardController::class, 'testChannel'])->name('test-channel');
             Route::post('/alerts/{alert}/acknowledge', [DashboardController::class, 'acknowledge'])->name('alerts.acknowledge');
             Route::post('/alerts/{alert}/resolve', [DashboardController::class, 'resolve'])->name('alerts.resolve');

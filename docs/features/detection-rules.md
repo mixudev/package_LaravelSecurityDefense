@@ -1,6 +1,6 @@
 # Aturan Deteksi Ancaman (Detection Rules)
 
-Package ini menyediakan 8 aturan deteksi modular yang beroperasi tanpa menyimpan state di database (*stateless sliding window* melalui cache).
+Package ini menyediakan 11 aturan deteksi modular yang beroperasi tanpa menyimpan state di database (*stateless sliding window* melalui cache).
 
 ---
 
@@ -80,3 +80,27 @@ Package ini menyediakan 8 aturan deteksi modular yang beroperasi tanpa menyimpan
 - **Tujuan**: Mengidentifikasi tool scanning otomatis dan bot penyerang populer.
 - **Daftar Signature**: `sqlmap`, `nikto`, `dirbuster`, `gobuster`, `wpscan`, `masscan`, `nmap`, `ffuf`, `dirsearch`, `zmap`, `cadaver`, `wfuzz`, `testssl`, `whatweb`, `sublist3r`, `katana`, `jaeles`, `dalfox`, `xsstrike`, `commix`, `tplmap`, `arachni`, `wapiti`.
 - **Tingkat Keparahan**: `high`.
+
+---
+
+## 9. Session Fingerprint & Hijack (`SessionFingerprintRule`)
+
+- **Tujuan**: Mendeteksi sesi yang dibajak akibat pencurian cookie oleh malware (infostealer) pada device korban.
+- **Mekanisme**: Membandingkan IP subnet (/24) dan hash User-Agent dengan baseline awal saat sesi dibuat. Jika replayed dari subnet atau User-Agent yang berbeda drastis, mentrigger alert kritis.
+- **Tingkat Keparahan**: `critical` / `high`.
+
+---
+
+## 10. Behavioral Velocity (`BehavioralVelocityRule`)
+
+- **Tujuan**: Mendeteksi scraping bot atau otomasi abnormal pasca-login yang mengeksploitasi hak akses akun terautentikasi.
+- **Ambang Default**: > 120 request per menit per user ID.
+- **Tingkat Keparahan**: `high`.
+
+---
+
+## 11. HTTP Header Consistency (`HttpHeaderConsistencyRule`)
+
+- **Tujuan**: Mendeteksi bot dan headless browser yang memalsukan User-Agent browser asli namun memiliki kontradiksi header (misal tanpa `Accept-Language`, atau tanpa `Sec-Fetch-*`).
+- **Tingkat Keparahan**: `medium`.
+

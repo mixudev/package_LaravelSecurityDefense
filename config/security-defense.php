@@ -71,6 +71,9 @@ return [
                 'impossible_travel' => 35,
                 'path_reconnaissance' => 30,
                 'user_agent_anomaly' => 25,
+                'session_fingerprint' => 45,
+                'behavioral_velocity' => 35,
+                'header_consistency' => 25,
             ],
         ],
 
@@ -137,6 +140,24 @@ return [
                 'severity' => 'medium',
                 'block_known_scanners' => true, // sqlmap, nikto, dirbuster, gobuster, etc.
                 'block_empty_user_agent' => false, // Block requests with no User-Agent header
+            ],
+
+            'session_fingerprint' => [
+                'enabled' => true,
+                'severity' => 'high',
+                'session_ttl' => 7200,    // 2 hours window
+            ],
+
+            'behavioral_velocity' => [
+                'enabled' => true,
+                'threshold' => 120,       // Max requests per minute per authenticated user
+                'window' => 60,           // 1 minute window
+                'severity' => 'high',
+            ],
+
+            'header_consistency' => [
+                'enabled' => true,
+                'severity' => 'medium',
             ],
         ],
     ],
@@ -274,4 +295,88 @@ return [
             '::1',
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Database Change Monitoring & Tamper Intelligence (Audit Trail)
+    |--------------------------------------------------------------------------
+    | Tracks what data changed, when, by whom, originating URL, method, and
+    | request payload snapshot. Detects parameter tampering via Burp Suite.
+    */
+    'data_audit' => [
+        'enabled' => true,
+        'table' => 'security_data_audits',
+        'alert_on_tampering' => true,
+
+        // Models to automatically watch via service provider without trait
+        'auto_watch_models' => [
+            // App\Models\User::class,
+        ],
+
+        // Columns whose values must be redacted to prevent sensitive data leakage
+        'default_masked_fields' => [
+            'password',
+            'password_hash',
+            'remember_token',
+            'api_token',
+            'secret',
+            'two_factor_secret',
+            'credit_card',
+            'cvv',
+        ],
+
+        // Columns excluded from audit recording
+        'default_excluded_fields' => [
+            'updated_at',
+            'created_at',
+        ],
+
+        // Critical columns that trigger "TAMPER DETECTED" if modified directly via HTTP payload
+        'sensitive_watch_fields' => [
+            'is_admin',
+            'role',
+            'role_id',
+            'permissions',
+            'balance',
+            'credit',
+            'status',
+            'email_verified_at',
+        ],
+
+        // Trap field name for automated form-grabbers / bots (Honeypot)
+        'honeypot_field' => '_system_sync_token',
+
+        // Max byte size of request payload snapshot before truncation (Anti-DoS)
+        'max_payload_snapshot_bytes' => 8192,
+
+        // Retention in days for security data
+        'retention_days' => 30,
+        'tampered_retention_days' => 90,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Transparent CSP Armor (XSS Defense Behind the Scenes)
+    |--------------------------------------------------------------------------
+    | Injects strict Content-Security-Policy headers into HTML responses to
+    | prevent malicious payload execution even if rendered unescaped.
+    */
+    'csp_armor' => [
+        'enabled' => true,
+        'report_only' => false,
+        'policy' => null, // null uses default secure policy with nonce
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Intelligence (Post-Authentication Defense)
+    |--------------------------------------------------------------------------
+    | Protects authenticated sessions against malware infostealers, cookie theft,
+    | abnormal post-login velocity, and client header anomalies.
+    */
+    'session_intelligence' => [
+        'enabled' => true,
+        'block_on_hijack' => false, // Set to true to immediately abort 403 on critical hijack
+    ],
 ];
+

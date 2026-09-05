@@ -13,21 +13,24 @@ use Mixudev\SecurityDefense\Channels\WebhookChannel;
 use Mixudev\SecurityDefense\Contracts\AlertDeduplicatorInterface;
 use Mixudev\SecurityDefense\Contracts\ThreatDetector;
 use Mixudev\SecurityDefense\Detection\AnomalyDetector;
+use Mixudev\SecurityDefense\Rules\BehavioralVelocityRule;
 use Mixudev\SecurityDefense\Rules\BruteForceRule;
 use Mixudev\SecurityDefense\Rules\CredentialStuffingRule;
 use Mixudev\SecurityDefense\Rules\DistributedSprayRule;
+use Mixudev\SecurityDefense\Rules\HttpHeaderConsistencyRule;
 use Mixudev\SecurityDefense\Rules\ImpossibleTravelRule;
 use Mixudev\SecurityDefense\Rules\PathReconnaissanceRule;
 use Mixudev\SecurityDefense\Rules\PayloadInjectionRule;
 use Mixudev\SecurityDefense\Rules\RateLimitBypassRule;
+use Mixudev\SecurityDefense\Rules\SessionFingerprintRule;
 use Mixudev\SecurityDefense\Rules\UserAgentAnomalyRule;
 use Mixudev\SecurityDefense\Services\AlertDeduplicator;
 use Mixudev\SecurityDefense\Services\AlertDispatcher;
 use Mixudev\SecurityDefense\Services\ChannelTestService;
+use Mixudev\SecurityDefense\Services\DataAuditService;
 use Mixudev\SecurityDefense\Services\IpQuarantineService;
 use Mixudev\SecurityDefense\Services\SecurityDefenseManager;
 use Mixudev\SecurityDefense\Services\ThreatScoringEngine;
-
 
 /**
  * Service provider for registering mixudev/security-defense enterprise components in Laravel container.
@@ -53,6 +56,12 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         $this->app->singleton(ImpossibleTravelRule::class);
         $this->app->singleton(PathReconnaissanceRule::class);
         $this->app->singleton(UserAgentAnomalyRule::class);
+        $this->app->singleton(SessionFingerprintRule::class);
+        $this->app->singleton(BehavioralVelocityRule::class);
+        $this->app->singleton(HttpHeaderConsistencyRule::class);
+
+        // Bind Data Audit & Tamper Detection Service
+        $this->app->singleton(DataAuditService::class);
 
         // Bind Detection Engine with all active rules
         $this->app->singleton(ThreatDetector::class, function ($app) {
@@ -65,6 +74,9 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                 $app->make(ImpossibleTravelRule::class),
                 $app->make(PathReconnaissanceRule::class),
                 $app->make(UserAgentAnomalyRule::class),
+                $app->make(SessionFingerprintRule::class),
+                $app->make(BehavioralVelocityRule::class),
+                $app->make(HttpHeaderConsistencyRule::class),
             ]);
         });
 
@@ -140,7 +152,23 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                 \Mixudev\SecurityDefense\Console\Commands\TestWebhookCommand::class,
                 \Mixudev\SecurityDefense\Console\Commands\TelegramPollCommand::class,
                 \Mixudev\SecurityDefense\Console\Commands\TelegramWebhookCommand::class,
+                \Mixudev\SecurityDefense\Console\Commands\PruneSecurityDataCommand::class,
             ]);
+        }
+
+        // Auto-watch models for data audit if configured
+        if (config('security-defense.data_audit.enabled', true)) {
+            $autoWatch = (array) config('security-defense.data_audit.auto_watch_models', []);
+            if (! empty($autoWatch)) {
+                $auditService = $this->app->make(DataAuditService::class);
+                foreach ($autoWatch as $modelClass) {
+                    if (is_string($modelClass) && class_exists($modelClass)) {
+                        $modelClass::created(fn ($model) => $auditService->recordMutation($model, 'created'));
+                        $modelClass::updated(fn ($model) => $auditService->recordMutation($model, 'updated'));
+                        $modelClass::deleted(fn ($model) => $auditService->recordMutation($model, 'deleted'));
+                    }
+                }
+            }
         }
 
         $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
