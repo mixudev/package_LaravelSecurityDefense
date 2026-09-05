@@ -117,6 +117,9 @@ return [
                     'xss' => true,
                     'traversal' => true,
                     'command_injection' => true,
+                    'eval_based' => true,
+                    'php_code_execution' => true,
+                    'template_injection' => true,
                 ],
             ],
 

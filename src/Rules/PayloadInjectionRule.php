@@ -29,10 +29,12 @@ class PayloadInjectionRule extends AbstractDetectionRule
      * @var array<string, string>
      */
     protected array $signatures = [
-        'sqli' => '/(\b(union(\s+all)?\s+select|select\s+.*\s+from|insert\s+into|update\s+.*\s+set|delete\s+from|drop\s+(table|database)|truncate\s+table)\b|(\'|\")\s*(\b(or|and)\b)\s*(\'|\")?\d+(\'|\")?\s*=\s*(\'|\")?\d+|(\'|\")\s*--|(\bwaitfor\s+delay\b|\bsleep\(\d+\)|\bbenchmark\(\d+,))/i',
-        'xss' => '/(<script\b[^>]*>.*<\/script>|javascript\s*:\s*|on(error|load|click|mouseover|submit|focus)\s*=|document\.(cookie|location)|<img\s+[^>]*onerror\s*=|alert\(|prompt\(|confirm\()/i',
-        'traversal' => '/(\.\.[\/\\\\]|\b(etc[\/\\\\]passwd|windows[\/\\\\]win\.ini|boot\.ini)\b)/i',
-        'command_injection' => '/(;|\&|\||\`|\$\()\s*(cat\s+\/|ls\s+-|whoami|id|uname\s+-|netstat|curl\s+http|wget\s+http|cmd\.exe|powershell)\b/i',
+        'sqli' => '/(\b(union(\s+all)?\s+select|select\s+[\s\S]*?\s+from|insert\s+into|update\s+[\s\S]*?\s+set|delete\s+from|drop\s+(table|database)|truncate\s+table)\b|(\'|\")\s*(\b(or|and)\b)\s*(\'|\")?[^\s\']+?(\'|\")?\s*=\s*(\'|\")?[^\s\']+?|(\'|\")\s*--|(\bwaitfor\s+delay\b|\bsleep\(\d+\)|\bbenchmark\(\d+,))/is',
+        'xss' => '/(<script\b[^>]*>[\s\S]*?<\/script>|<script\b[^>]*>|<\/script>|javascript\s*:|on(error|load|click|mouseover|submit|focus)\s*=|document\.(cookie|location)|<[a-z0-9]+\b[^>]*?(onerror|onload|onclick)\s*=|alert\(|prompt\(|confirm\()/is',
+        'traversal' => '/(\.\.[\/\\\\]|\.\.%2f|\.\.%5c|\b(etc[\/\\\\]passwd|windows[\/\\\\]win\.ini|boot\.ini)\b)/is',
+        'command_injection' => '/(;|\&|\||\`|\$\()\s*(cat\s+[\/.]|ls\s+-|whoami|id|uname\s+-|netstat|curl\s+https?|wget\s+https?|cmd\.exe|powershell)\b/is',
+        'eval_based' => '/(\beval\s*\(|\bbase64_decode\s*\(|\bpassthru\s*\(|\bshell_exec\s*\(|\bsystem\s*\()/is',
+        'template_injection' => '/(\{\{\s*[\s\S]*?\b(system|exec|passthru|shell_exec|phpinfo)\b[\s\S]*?\}\}|\$\{\s*[\s\S]*?\b(env|cmd|exec)\b[\s\S]*?\})/is',
     ];
 
     public function evaluate(SecurityEvent $event): ?SecurityThreat
@@ -108,6 +110,9 @@ class PayloadInjectionRule extends AbstractDetectionRule
             'xss' => true,
             'traversal' => true,
             'command_injection' => true,
+            'eval_based' => true,
+            'php_code_execution' => true,
+            'template_injection' => true,
         ]);
 
         foreach ($flattened as $field => $value) {
@@ -182,7 +187,7 @@ class PayloadInjectionRule extends AbstractDetectionRule
      */
     protected function flattenArray(array $array, string $prefix = '', int $depth = 0): array
     {
-        $maxDepth = (int) config('security-defense.hardening.max_traversal_depth', 5);
+        $maxDepth = (int) config('security-defense.hardening.max_traversal_depth', 10);
         if ($depth >= $maxDepth) {
             return [];
         }

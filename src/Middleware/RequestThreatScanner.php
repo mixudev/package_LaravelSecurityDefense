@@ -128,6 +128,7 @@ class RequestThreatScanner
                 'path' => $path,
                 'query' => $query,
                 'body' => $request->all(),
+                'raw_content' => $request->getContent(),
             ];
 
             $inspection = $this->payloadRule->inspect($inputsToScan);
