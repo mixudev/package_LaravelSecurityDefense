@@ -1,22 +1,18 @@
-@props([
-    'audits',
-])
-
 <!-- Mutations Table Component -->
-<div class="bg-white dark:bg-[#0f172a] border border-slate-200/90 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-    <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/60">
+<div class="bg-white dark:bg-[#121214] border border-zinc-200/90 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs">
+    <div class="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-[#18181b]">
         <div class="flex items-center space-x-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-            <h3 class="text-sm font-bold text-slate-900 dark:text-white">Database Mutation Log</h3>
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Database Mutation Log</h3>
         </div>
-        <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">
+        <span class="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
             Showing {{ $audits->firstItem() ?? 0 }}-{{ $audits->lastItem() ?? 0 }} of {{ $audits->total() }} records
         </span>
     </div>
 
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
-            <thead class="bg-slate-50 dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold text-[10px]">
+        <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800 text-left text-xs">
+            <thead class="bg-zinc-50 dark:bg-[#18181b] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold text-[10px]">
                 <tr>
                     <th class="px-4 py-3">Time / Event</th>
                     <th class="px-4 py-3">Auditable Entity</th>
@@ -27,12 +23,12 @@
                     <th class="px-4 py-3 text-right">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-200 dark:divide-slate-800 font-sans">
+            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800 font-sans">
                 @forelse($audits as $audit)
-                    <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition {{ $audit->is_tampered ? 'bg-rose-50/30 dark:bg-rose-950/20' : '' }}">
+                    <tr class="hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30 transition {{ $audit->is_tampered ? 'bg-rose-50/30 dark:bg-rose-950/20' : '' }}">
                         <!-- Timestamp & Event -->
                         <td class="px-4 py-3 whitespace-nowrap">
-                            <div class="font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                            <div class="font-mono text-[11px] text-zinc-600 dark:text-zinc-300">
                                 {{ $audit->created_at->format('Y-m-d H:i:s') }}
                             </div>
                             @php
@@ -41,7 +37,7 @@
                                     'updated' => 'sky',
                                     'deleted' => 'rose',
                                     'restored' => 'purple',
-                                    default => 'slate',
+                                    default => 'zinc',
                                 };
                             @endphp
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold font-mono bg-{{ $eventColor }}-50 dark:bg-{{ $eventColor }}-950 text-{{ $eventColor }}-700 dark:text-{{ $eventColor }}-300 border border-{{ $eventColor }}-300 dark:border-{{ $eventColor }}-800 mt-1 uppercase">
@@ -51,10 +47,10 @@
 
                         <!-- Auditable Entity -->
                         <td class="px-4 py-3">
-                            <div class="font-bold text-slate-900 dark:text-white truncate max-w-xs" title="{{ $audit->auditable_type }}">
+                            <div class="font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-xs" title="{{ $audit->auditable_type }}">
                                 {{ class_basename($audit->auditable_type) }}
                             </div>
-                            <div class="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                            <div class="font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
                                 ID: #{{ $audit->auditable_id }}
                             </div>
                         </td>
@@ -62,14 +58,14 @@
                         <!-- Actor / IP -->
                         <td class="px-4 py-3">
                             @if($audit->actor_id)
-                                <div class="font-medium text-slate-900 dark:text-white flex items-center space-x-1">
+                                <div class="font-medium text-zinc-900 dark:text-zinc-100 flex items-center space-x-1">
                                     <span>User #{{ $audit->actor_id }}</span>
                                 </div>
-                                <div class="text-[10px] text-slate-500 font-mono">{{ class_basename($audit->actor_type ?? 'User') }}</div>
+                                <div class="text-[10px] text-zinc-500 font-mono">{{ class_basename($audit->actor_type ?? 'User') }}</div>
                             @else
-                                <span class="text-slate-400 dark:text-slate-500 italic text-[11px]">System / CLI / Guest</span>
+                                <span class="text-zinc-400 dark:text-zinc-500 italic text-[11px]">System / CLI / Guest</span>
                             @endif
-                            <div class="font-mono text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            <div class="font-mono text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                                 {{ $audit->ip_address }}
                             </div>
                         </td>
@@ -77,15 +73,15 @@
                         <!-- Request URL & Method -->
                         <td class="px-4 py-3 max-w-xs truncate">
                             <div class="flex items-center space-x-1">
-                                <span class="font-mono text-[10px] font-bold px-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                <span class="font-mono text-[10px] font-bold px-1 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                                     {{ $audit->request_method }}
                                 </span>
-                                <span class="font-mono text-[11px] text-slate-700 dark:text-slate-300 truncate" title="{{ $audit->request_url }}">
+                                <span class="font-mono text-[11px] text-zinc-700 dark:text-zinc-300 truncate" title="{{ $audit->request_url }}">
                                     {{ Str::limit($audit->request_url, 40) }}
                                 </span>
                             </div>
                             @if($audit->request_route)
-                                <div class="font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                                <div class="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 truncate mt-0.5">
                                     Route: {{ $audit->request_route }}
                                 </div>
                             @endif
@@ -96,16 +92,16 @@
                             @if(!empty($audit->modified_fields))
                                 <div class="flex flex-wrap gap-1 max-w-xs">
                                     @foreach(array_slice($audit->modified_fields, 0, 4) as $field)
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                                             {{ $field }}
                                         </span>
                                     @endforeach
                                     @if(count($audit->modified_fields) > 4)
-                                        <span class="text-[10px] text-slate-400 self-center font-mono">+{{ count($audit->modified_fields) - 4 }} more</span>
+                                        <span class="text-[10px] text-zinc-400 self-center font-mono">+{{ count($audit->modified_fields) - 4 }} more</span>
                                     @endif
                                 </div>
                             @else
-                                <span class="text-slate-400 dark:text-slate-500 text-[11px]">&mdash;</span>
+                                <span class="text-zinc-400 dark:text-zinc-500 text-[11px]">&mdash;</span>
                             @endif
                         </td>
 
@@ -134,18 +130,18 @@
                         <!-- Actions -->
                         <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
                             <button type="button" onclick="inspectDiff('{{ e(json_encode($audit, JSON_HEX_APOS | JSON_HEX_QUOT)) }}')"
-                                    class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition cursor-pointer shadow-xs">
+                                    class="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold transition cursor-pointer shadow-xs">
                                 View Diff
                             </button>
                             <button type="button" onclick="inspectPayload('{{ e(json_encode($audit, JSON_HEX_APOS | JSON_HEX_QUOT)) }}')"
-                                    class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition cursor-pointer shadow-xs">
+                                    class="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold transition cursor-pointer shadow-xs">
                                 Payload
                             </button>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
+                        <td colspan="7" class="px-4 py-12 text-center text-zinc-500 dark:text-zinc-400">
                             <svg class="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
@@ -158,7 +154,7 @@
     </div>
 
     @if($audits->hasPages())
-        <div class="px-4 py-3 border-t border-slate-200 dark:border-slate-800">
+        <div class="px-4 py-3 border-t border-zinc-200 dark:border-zinc-800">
             {{ $audits->links() }}
         </div>
     @endif

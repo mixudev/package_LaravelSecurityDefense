@@ -97,6 +97,7 @@
                             borderColor: isDark ? '#27272a' : '#3f3f46',
                             borderWidth: 1,
                             padding: 10,
+                            cornerRadius: 8,
                             boxPadding: 4,
                             usePointStyle: true,
                         }

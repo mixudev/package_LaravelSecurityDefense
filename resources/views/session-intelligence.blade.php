@@ -13,7 +13,7 @@
             'value' => number_format($stats['total_session_threats']),
             'subtitle' => 'Client & Post-Auth SIEM',
             'badge' => 'Sessions',
-            'badgeColor' => 'slate',
+            'badgeColor' => 'zinc',
         ])
 
         @include('security-defense::components.stat-card', [
@@ -29,7 +29,7 @@
             'value' => number_format($stats['velocity_spikes']),
             'subtitle' => 'Post-login scraping bots',
             'badge' => 'Behavioral',
-            'badgeColor' => $stats['velocity_spikes'] > 0 ? 'orange' : 'slate',
+            'badgeColor' => $stats['velocity_spikes'] > 0 ? 'orange' : 'zinc',
         ])
 
         @include('security-defense::components.stat-card', [
@@ -37,7 +37,7 @@
             'value' => number_format($stats['header_anomalies']),
             'subtitle' => 'Contradictory client UA/headers',
             'badge' => 'Client',
-            'badgeColor' => $stats['header_anomalies'] > 0 ? 'orange' : 'slate',
+            'badgeColor' => $stats['header_anomalies'] > 0 ? 'orange' : 'zinc',
         ])
     </div>
 

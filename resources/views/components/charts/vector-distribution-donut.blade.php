@@ -94,9 +94,9 @@
                                 '#84cc16', // Lime
                                 '#71717a', // Zinc
                             ],
-                            borderWidth: isDark ? 2 : 1.5,
+                            borderWidth: isDark ? 2 : 3,
                             borderColor: isDark ? '#121214' : '#ffffff',
-                            hoverOffset: 4,
+                            hoverOffset: 6,
                         }]
                     },
                     options: {
@@ -109,10 +109,35 @@
                                 backgroundColor: isDark ? '#18181b' : '#27272a',
                                 titleColor: '#ffffff',
                                 bodyColor: '#e4e4e7',
-                                padding: 8,
+                                padding: 10,
+                                cornerRadius: 8,
+                                displayColors: true,
+                                boxWidth: 8,
+                                boxHeight: 8,
                             }
                         }
-                    }
+                    },
+                    plugins: [{
+                        id: 'centerText',
+                        afterDraw(chart) {
+                            const { ctx } = chart;
+                            const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                            if (!total) return;
+                            const meta = chart.getDatasetMeta(0);
+                            const x = meta.data[0] ? meta.data[0].x : chart.width / 2;
+                            const y = meta.data[0] ? meta.data[0].y : chart.height / 2;
+                            ctx.save();
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.font = 'bold 18px ui-sans-serif, system-ui, sans-serif';
+                            ctx.fillStyle = isDark ? '#fafafa' : '#18181b';
+                            ctx.fillText(total.toLocaleString(), x, y - 7);
+                            ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
+                            ctx.fillStyle = isDark ? '#a1a1aa' : '#71717a';
+                            ctx.fillText('TOTAL', x, y + 12);
+                            ctx.restore();
+                        }
+                    }]
                 });
             }
         }

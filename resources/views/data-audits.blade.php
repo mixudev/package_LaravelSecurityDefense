@@ -13,7 +13,7 @@
             'value' => number_format($stats['total']),
             'subtitle' => 'Recorded in Audit Trail',
             'badge' => 'Database',
-            'badgeColor' => 'slate',
+            'badgeColor' => 'zinc',
         ])
 
         @include('security-defense::components.stat-card', [
@@ -37,7 +37,7 @@
             'value' => number_format($stats['unique_actors']),
             'subtitle' => 'Authenticated Users / Admins',
             'badge' => 'Actors',
-            'badgeColor' => 'slate',
+            'badgeColor' => 'zinc',
         ])
     </div>
 

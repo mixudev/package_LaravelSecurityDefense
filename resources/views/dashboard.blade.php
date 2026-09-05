@@ -13,7 +13,7 @@
             'value' => number_format($stats['total']),
             'subtitle' => 'Recorded in SIEM DB',
             'badge' => 'Database',
-            'badgeColor' => 'slate',
+            'badgeColor' => 'zinc',
         ])
 
         @include('security-defense::components.stat-card', [
@@ -29,7 +29,7 @@
             'value' => number_format($stats['critical']) . ' / ' . number_format($stats['high']),
             'subtitle' => 'High severity vectors',
             'badge' => 'Severe',
-            'badgeColor' => ($stats['critical'] + $stats['high']) > 0 ? 'orange' : 'slate',
+            'badgeColor' => ($stats['critical'] + $stats['high']) > 0 ? 'orange' : 'zinc',
         ])
 
         @include('security-defense::components.stat-card', [
@@ -37,7 +37,7 @@
             'value' => count($quarantinedIps),
             'subtitle' => 'Active Fail2Ban Jails',
             'badge' => 'Firewall',
-            'badgeColor' => count($quarantinedIps) > 0 ? 'rose' : 'slate',
+            'badgeColor' => count($quarantinedIps) > 0 ? 'rose' : 'zinc',
         ])
     </div>
 
