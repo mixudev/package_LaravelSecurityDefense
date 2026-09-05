@@ -1,45 +1,33 @@
-# Laravel Security Defense — Dokumentasi Integrasi & Kustomisasi
+# Dokumentasi Laravel Security Defense
 
-Dokumentasi modular untuk mengintegrasikan, mengonfigurasi, dan mengkustomisasi
-package **`mixudev/security-defense`** ke dalam aplikasi Laravel Anda.
-
-Dokumen ini adalah panduan praktis (how-to). Untuk detail arsitektur & keputusan
-desain tingkat dalam, lihat folder [`docs/ai/`](./ai/README.md) (AI living docs).
+Dokumentasi lengkap untuk integrasi, konfigurasi, operasional, dan arsitektur package `mixudev/security-defense`.
 
 ---
 
-## Daftar Modul
+## Struktur Dokumentasi
 
-| # | File | Isi |
-|---|------|-----|
-| 1 | [`01-installation.md`](./01-installation.md) | Prasyarat, install via Composer, publish, migrate, auto-discovery |
-| 2 | [`02-integration.md`](./02-integration.md) | Cara PANGIL package: WAF middleware, telemetry auth, facade programatik, domain events |
-| 3 | [`03-alert-channels.md`](./03-alert-channels.md) | Konfigurasi channel alert: Database, Telegram, Discord, Webhook, Email + cara test |
-| 4 | [`04-dashboard.md`](./04-dashboard.md) | Dashboard SIEM: akses, routing, theming (dark/light), publish views |
-| 5 | [`05-customization.md`](./05-customization.md) | Customisasi lanjutan: rule kustom, channel kustom, threat source kustom, config tuning |
-| 6 | [`06-security-hardening.md`](./06-security-hardening.md) | Hardening produksi: Redis cache, quarantine DB, block empty UA, best practice |
-| 7 | [`07-testing.md`](./07-testing.md) | Menjalankan test suite + diagnostic channel via artisan |
-| 8 | [`08-troubleshooting.md`](./08-troubleshooting.md) | FAQ & penyelesaian masalah umum |
-| 9 | [`09-telegram-bot.md`](./09-telegram-bot.md) | Interactive Telegram Bot: Webhook produksi vs polling lokal, monitoring kesehatan & metrik |
+### 1. Memulai (Getting Started)
+- [Instalasi](./getting-started/installation.md) - Persyaratan sistem, instalasi via Composer, publish file config/migrasi, dan kredensial `.env`.
+- [Quickstart](./getting-started/quickstart.md) - Panduan integrasi 5 menit (pendaftaran middleware WAF, listener telemetri auth, dan pengujian).
+- [Referensi Konfigurasi](./getting-started/configuration.md) - Panduan lengkap setiap opsi pada `config/security-defense.php`.
 
----
+### 2. Fitur Utama (Features)
+- [Aturan Deteksi Ancaman](./features/detection-rules.md) - Penjelasan 8 aturan deteksi modular (Brute force, Stuffing, Spray, Injection, Travel, Recon, Scanner UA).
+- [Middleware WAF & Karantina IP](./features/waf-middleware.md) - Cara kerja `RequestThreatScanner`, mitigasi ReDoS, proteksi request flood, dan Fail2Ban auto-jailing.
+- [Compound Threat Scoring](./features/threat-scoring.md) - Engine korelasi risiko multi-vektor dan eskalasi otomatis ke alert kritis.
+- [Notifikasi Multi-Channel & Deduplikasi](./features/alert-channels.md) - Pengaturan channel Database, Telegram, Discord, Webhook (HMAC), Mail, serta deduplikasi alert.
 
-## Ringkasan Alur Integrasi
+### 3. Integrasi (Integrations)
+- [Ingesti Telemetri Autentikasi](./integrations/telemetry-ingestion.md) - Menghubungkan telemetri dari Laravel Breeze, Fortify, Sanctum, Passport, atau sistem kustom.
+- [Bot Telegram Interaktif](./integrations/telegram-bot.md) - Setup Webhook produksi vs Polling lokal, menu kontrol panel, health check, dan remote pardon.
+- [Integrasi Package mixudev/laravel-authentication](./integrations/laravel-auth-package.md) - Panduan subscriber event bridge dengan package autentikasi enterprise.
 
-```text
-1. Install & publish  →  composer require + vendor:publish + migrate
-2. Aktifkan WAF       →  register RequestThreatScanner middleware
-3. Kirim telemetry    →  Event::listen auth (Failed/Login/Lockout) -> SecurityDefense::record()
-4. Konfigurasi alert  →  .env channel + (opsional) queue
-5. (Opsional) UI      →  dashboard SIEM otomatis di /security-defense (local-only)
-```
+### 4. Operasional & Pemeliharaan (Operations)
+- [Dashboard SIEM](./operations/dashboard.md) - Cara membuka dan mengamankan web dashboard pemantauan keamanan lokal, metrik, dan toggle tema.
+- [Hardening Produksi](./operations/hardening.md) - Rekomendasi setup Redis, durabilitas karantina database, fast-path scanning, dan parameter self-defense.
+- [Pengujian & Diagnostik](./operations/testing-and-diagnostics.md) - Menjalankan suite PHPUnit dan testing konektivitas channel via Artisan CLI.
+- [Troubleshooting & FAQ](./operations/troubleshooting.md) - Solusi masalah umum (HTTP 403, tema Tailwind, antrean notifikasi, bypass karantina).
 
-Mulai dari [01-installation.md](./01-installation.md).
-
----
-
-## Persyaratan
-
-- PHP `^8.2`
-- Laravel `^10.0 | ^11.0 | ^12.0 | ^13.0`
-- Komponen Illuminate: support, database, cache, http, events
+### 5. Arsitektur & Spesifikasi
+- [Arsitektur & Prinsip Desain](./architecture/overview.md) - Pemisahan tanggung jawab (Auth vs Defense), alur pipeline data, dan privasi data.
+- [Living Docs Internal Tim](./ai/README.md) - Catatan ADR (Architecture Decision Records), rincian implementasi class, dan changelog internal.

@@ -1,0 +1,92 @@
+# Instalasi
+
+Panduan instalasi dan konfigurasi dasar package `mixudev/security-defense`.
+
+---
+
+## Persyaratan Sistem
+
+- PHP `^8.2`
+- Laravel `10.x`, `11.x`, `12.x`, atau `13.x`
+- Composer 2.x
+- Cache store yang disarankan: **Redis** atau **Memcached** (driver file/array akan kehilangan state sliding window dan karantina saat restart).
+
+---
+
+## 1. Instalasi via Composer
+
+Jalankan perintah berikut di root proyek Laravel:
+
+```bash
+composer require mixudev/security-defense
+```
+
+Package mendukung auto-discovery Laravel. Service provider dan Facade akan didaftarkan otomatis.
+
+---
+
+## 2. Publish File Konfigurasi, Migrasi, dan Views
+
+Jalankan perintah publish aset:
+
+```bash
+# Publish semua aset sekaligus
+php artisan vendor:publish --provider="Mixudev\SecurityDefense\Providers\SecurityDefenseServiceProvider"
+
+# Atau publish spesifik konfigurasi saja
+php artisan vendor:publish --tag=security-defense-config
+
+# Atau publish migrasi database saja
+php artisan vendor:publish --tag=security-defense-migrations
+
+# Atau publish views dashboard/email saja
+php artisan vendor:publish --tag=security-defense-views
+```
+
+---
+
+## 3. Jalankan Migrasi Database
+
+Jalankan migrasi untuk membuat tabel yang dibutuhkan:
+
+```bash
+php artisan migrate
+```
+
+Tabel yang dibuat:
+1. `security_alerts`: Menyimpan catatan insiden keamanan, tingkat keparahan, fingerprint, status resolusi, dan metadata telemetri yang telah disanitasi.
+2. `security_quarantines`: Tabel opsional untuk menyimpan status karantina IP yang persisten (aktif jika opsi `persist_to_database` bernilai `true` pada config).
+
+---
+
+## 4. Pengaturan Kredensial Environment (`.env`)
+
+Sesuai arsitektur package, pengaturan switch enable/disable utama berada di file `config/security-defense.php`. File `.env` hanya digunakan untuk menyimpan kredensial pihak ketiga:
+
+```env
+# Kredensial Telegram Bot Alerting
+SECURITY_TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
+SECURITY_TELEGRAM_CHAT_ID=-1001234567890
+
+# Kredensial Discord Webhook
+SECURITY_DISCORD_WEBHOOK=https://discord.com/api/webhooks/123456789/token_here
+
+# Kredensial Webhook Eksternal / SIEM
+SECURITY_WEBHOOK_URL=https://siem.internal/api/v1/ingest
+SECURITY_WEBHOOK_SECRET=your-hmac-sha256-signing-secret
+
+# Email Tujuan Notifikasi Alert
+SECURITY_ALERT_EMAIL=security@example.com
+```
+
+---
+
+## 5. Verifikasi Instalasi
+
+Jalankan uji diagnostik konektivitas channel melalui Artisan CLI:
+
+```bash
+php artisan security:test-webhook --all
+```
+
+Langkah berikutnya: Lihat panduan [Quickstart](./quickstart.md) untuk menyambungkan WAF dan event telemetri.
