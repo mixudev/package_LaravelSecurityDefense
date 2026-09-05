@@ -1,22 +1,22 @@
-<header class="sticky top-0 z-30 border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md">
+<header class="sticky top-0 z-30 border-b border-slate-200/90 dark:border-slate-800/80 bg-white/95 dark:bg-[#0e1420]/95 backdrop-blur-md shadow-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
             <!-- Left: Brand -->
             <div class="flex items-center space-x-3">
                 <a href="{{ route('security-defense.dashboard') }}" class="flex items-center space-x-3 group">
-                    <div class="w-9 h-9 rounded-md bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center text-white dark:text-zinc-950 font-bold group-hover:scale-105 transition">
+                    <div class="w-9 h-9 rounded-lg bg-slate-900 dark:bg-slate-100 flex items-center justify-center text-white dark:text-slate-950 font-bold group-hover:scale-105 transition shadow-xs">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                         </svg>
                     </div>
                     <div>
                         <div class="flex items-center space-x-2">
-                            <span class="text-sm font-bold tracking-tight text-zinc-900 dark:text-white">Security Defense</span>
-                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 font-mono">
+                            <span class="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Security Defense</span>
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 font-mono">
                                 SIEM
                             </span>
                         </div>
-                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Proactive Threat Telemetry & Monitoring</p>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Proactive Threat Telemetry & Monitoring</p>
                     </div>
                 </a>
             </div>

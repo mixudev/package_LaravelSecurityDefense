@@ -10,80 +10,57 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\RateLimiter;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
-use Mixudev\SecurityDefense\Models\SecurityQuarantine;
 use Mixudev\SecurityDefense\Services\ChannelTestService;
+use Mixudev\SecurityDefense\Services\DashboardAnalyticsService;
+use Mixudev\SecurityDefense\Services\DataAuditQueryService;
 use Mixudev\SecurityDefense\Services\IpQuarantineService;
+use Mixudev\SecurityDefense\Services\SessionIntelligenceQueryService;
 use Throwable;
 
 /**
  * Enterprise Monitoring Dashboard controller.
- * Restricted strictly to authorized local environments.
+ * Restricted strictly to authorized environments and authenticated security personnel.
  */
 class DashboardController extends Controller
 {
+    public function __construct(
+        protected DashboardAnalyticsService $analyticsService,
+        protected ChannelTestService $channelTestService,
+        protected IpQuarantineService $quarantineService,
+        protected DataAuditQueryService $auditQueryService,
+        protected SessionIntelligenceQueryService $sessionQueryService,
+    ) {
+    }
+
     /**
      * Display the Security Defense monitoring dashboard.
      */
-    public function index(Request $request, ChannelTestService $testService)
+    public function index(Request $request, ?ChannelTestService $testService = null)
     {
-        // 1. Metric counters
-        $stats = [
-            'total' => SecurityAlert::query()->count(),
-            'new' => SecurityAlert::query()->new()->count(),
-            'acknowledged' => SecurityAlert::query()->acknowledged()->count(),
-            'resolved' => SecurityAlert::query()->resolved()->count(),
-            'critical' => SecurityAlert::query()->severity('critical')->count(),
-            'high' => SecurityAlert::query()->severity('high')->count(),
-            'medium' => SecurityAlert::query()->severity('medium')->count(),
-            'low' => SecurityAlert::query()->severity('low')->count(),
-        ];
-
-        // 2. Filterable recent alerts
-        $alertsQuery = SecurityAlert::query()->latest();
-
-        if ($request->filled('status')) {
-            $alertsQuery->where('status', (string) $request->input('status'));
+        $refresh = $request->boolean('refresh');
+        if ($refresh) {
+            $this->analyticsService->clearCache();
         }
 
-        if ($request->filled('severity')) {
-            $alertsQuery->where('severity', (string) $request->input('severity'));
-        }
+        $stats = $this->analyticsService->getStats($refresh);
+        $hourlyData = $this->analyticsService->getHourlyTimeline($refresh);
+        $threatDistribution = $this->analyticsService->getThreatDistribution($refresh);
+        $quarantinedIps = $this->analyticsService->getActiveQuarantines($refresh);
+        $channelsStatus = ($testService ?? $this->channelTestService)->getChannelsStatus();
+        $postureScore = $this->analyticsService->calculatePostureScore($stats);
 
-        if ($request->filled('threat_type')) {
-            $alertsQuery->where('threat_type', (string) $request->input('threat_type'));
-        }
-
-        $alerts = $alertsQuery->paginate(15)->withQueryString();
-
-        // 3. Threat distribution by type
-        $threatDistribution = SecurityAlert::query()
-            ->selectRaw('threat_type, count(*) as count')
-            ->groupBy('threat_type')
-            ->orderByDesc('count')
-            ->limit(8)
-            ->pluck('count', 'threat_type')
-            ->all();
-
-        // 4. Active IP Quarantines (DB-backed or cache fallback)
-        $quarantinedIps = [];
-        try {
-            if (class_exists(SecurityQuarantine::class)) {
-                $quarantinedIps = SecurityQuarantine::query()->active()->latest()->limit(20)->get();
-            }
-        } catch (Throwable) {
-            $quarantinedIps = collect([]);
-        }
-
-        // 5. Alert channels status
-        $channelsStatus = $testService->getChannelsStatus();
+        $filters = $request->only(['status', 'severity', 'threat_type']);
+        $alerts = $this->analyticsService->getFilteredAlerts($filters, 15);
 
         return view('security-defense::dashboard', [
             'stats' => $stats,
             'alerts' => $alerts,
+            'hourlyData' => $hourlyData,
+            'postureScore' => $postureScore,
             'threatDistribution' => $threatDistribution,
             'quarantinedIps' => $quarantinedIps,
             'channelsStatus' => $channelsStatus,
-            'filters' => $request->only(['status', 'severity', 'threat_type']),
+            'filters' => $filters,
         ]);
     }
 
@@ -91,9 +68,8 @@ class DashboardController extends Controller
      * Safely test a single webhook channel or all channels.
      * Protected by rate limiting and strict whitelist.
      */
-    public function testChannel(Request $request, ChannelTestService $testService): JsonResponse|RedirectResponse
+    public function testChannel(Request $request, ?ChannelTestService $testService = null): JsonResponse|RedirectResponse
     {
-        // Rate limit: max 10 tests per minute per IP
         $rateLimitKey = 'sec_defense_test_channel:' . ($request->ip() ?? '127.0.0.1');
         if (RateLimiter::tooManyAttempts($rateLimitKey, 10)) {
             $seconds = RateLimiter::availableIn($rateLimitKey);
@@ -113,12 +89,13 @@ class DashboardController extends Controller
         ]);
 
         $channel = (string) $request->input('channel');
+        $service = $testService ?? $this->channelTestService;
 
         try {
             if ($channel === 'all') {
-                $results = $testService->testAll();
+                $results = $service->testAll();
             } else {
-                $results = [$channel => $testService->testChannel($channel)];
+                $results = [$channel => $service->testChannel($channel)];
             }
 
             if ($request->wantsJson()) {
@@ -164,14 +141,14 @@ class DashboardController extends Controller
     /**
      * Release an IP from active quarantine.
      */
-    public function pardonIp(Request $request, IpQuarantineService $quarantineService): RedirectResponse
+    public function pardonIp(Request $request, ?IpQuarantineService $quarantineService = null): RedirectResponse
     {
         $request->validate([
             'ip' => 'required|ip',
         ]);
 
         $ip = (string) $request->input('ip');
-        $quarantineService->pardon($ip);
+        ($quarantineService ?? $this->quarantineService)->pardon($ip);
 
         return back()->with('status_message', "IP [{$ip}] successfully pardoned and removed from quarantine.");
     }
@@ -181,48 +158,14 @@ class DashboardController extends Controller
      */
     public function dataAudits(Request $request)
     {
-        $query = \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->latest();
-
-        if ($request->filled('event')) {
-            $query->where('event', (string) $request->input('event'));
-        }
-
-        if ($request->filled('auditable_type')) {
-            $query->where('auditable_type', 'like', '%' . (string) $request->input('auditable_type') . '%');
-        }
-
-        if ($request->filled('tampered')) {
-            $tampered = $request->input('tampered');
-            if ($tampered === '1' || $tampered === 'true') {
-                $query->where('is_tampered', true);
-            } elseif ($tampered === '0' || $tampered === 'false') {
-                $query->where('is_tampered', false);
-            }
-        }
-
-        if ($request->filled('search')) {
-            $search = (string) $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('auditable_id', 'like', "%{$search}%")
-                    ->orWhere('actor_id', 'like', "%{$search}%")
-                    ->orWhere('ip_address', 'like', "%{$search}%")
-                    ->orWhere('request_url', 'like', "%{$search}%");
-            });
-        }
-
-        $audits = $query->paginate(20)->withQueryString();
-
-        $stats = [
-            'total' => \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->count(),
-            'tampered' => \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->where('is_tampered', true)->count(),
-            'today' => \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->whereDate('created_at', now()->toDateString())->count(),
-            'unique_actors' => \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->whereNotNull('actor_id')->distinct('actor_id')->count('actor_id'),
-        ];
+        $filters = $request->only(['event', 'auditable_type', 'tampered', 'search']);
+        $audits = $this->auditQueryService->getAudits($filters, 20);
+        $stats = $this->auditQueryService->getStats($request->boolean('refresh'));
 
         return view('security-defense::data-audits', [
             'audits' => $audits,
             'stats' => $stats,
-            'filters' => $request->only(['event', 'auditable_type', 'tampered', 'search']),
+            'filters' => $filters,
         ]);
     }
 
@@ -231,38 +174,14 @@ class DashboardController extends Controller
      */
     public function sessionIntelligence(Request $request)
     {
-        $sessionThreatTypes = [
-            'session_hijack_suspected',
-            'suspicious_velocity_scraping',
-            'header_inconsistency_bot',
-            'impossible_travel',
-        ];
-
-        $threatsQuery = SecurityAlert::query()
-            ->whereIn('threat_type', $sessionThreatTypes)
-            ->latest();
-
-        if ($request->filled('threat_type')) {
-            $threatsQuery->where('threat_type', (string) $request->input('threat_type'));
-        }
-
-        if ($request->filled('severity')) {
-            $threatsQuery->where('severity', (string) $request->input('severity'));
-        }
-
-        $alerts = $threatsQuery->paginate(20)->withQueryString();
-
-        $stats = [
-            'total_session_threats' => SecurityAlert::query()->whereIn('threat_type', $sessionThreatTypes)->count(),
-            'hijacks_detected' => SecurityAlert::query()->where('threat_type', 'session_hijack_suspected')->count(),
-            'velocity_spikes' => SecurityAlert::query()->where('threat_type', 'suspicious_velocity_scraping')->count(),
-            'header_anomalies' => SecurityAlert::query()->where('threat_type', 'header_inconsistency_bot')->count(),
-        ];
+        $filters = $request->only(['threat_type', 'severity']);
+        $alerts = $this->sessionQueryService->getThreats($filters, 20);
+        $stats = $this->sessionQueryService->getStats($request->boolean('refresh'));
 
         return view('security-defense::session-intelligence', [
             'alerts' => $alerts,
             'stats' => $stats,
-            'filters' => $request->only(['threat_type', 'severity']),
+            'filters' => $filters,
         ]);
     }
 }
