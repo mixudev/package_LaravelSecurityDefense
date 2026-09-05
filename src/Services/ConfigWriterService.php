@@ -10,42 +10,58 @@ use Throwable;
 /**
  * Runtime configuration writer for security-defense dashboard toggles.
  *
- * Persists quick-action changes directly into the published
- * config/security-defense.php file so they survive cache flushes and restarts.
- * Supports scalar leaves (e.g. 'block_headless_clients') and flat-array leaves
- * (e.g. 'middleware.quarantine.whitelist').
- *
- * ponytail: only scalar + flat-array keys are supported; nested-array values
- * beyond one level are not rewritten (falls back to runtime override). Extend
- * the literal formatter when a nested quick-action toggle is needed.
+ * Persists quick-action changes into a dedicated overrides file
+ * (config/security-defense-overrides.php) that the service provider merges on
+ * top of the published config. This keeps the published config file pristine,
+ * supports arbitrarily nested dot-notation keys via Laravel's config merge,
+ * and survives cache flushes by clearing the config cache after each write.
  */
 class ConfigWriterService
 {
-    public function __construct(protected ?string $configPath = null)
+    public function __construct(protected ?string $overridesPath = null)
     {
-        $this->configPath ??= config_path('security-defense.php');
+        $this->overridesPath ??= config_path('security-defense-overrides.php');
     }
 
     /**
-     * Persist nested key => value pairs into the published config file.
-     * Always applies the runtime override so behaviour changes immediately,
-     * even when the file is not writable.
+     * Retrieve the currently persisted overrides (empty when none yet).
+     *
+     * @return array<string, mixed> dot-notation key => value pairs
+     */
+    public function read(): array
+    {
+        if (!is_file($this->overridesPath)) {
+            return [];
+        }
+
+        $loaded = @require $this->overridesPath;
+
+        return is_array($loaded) ? $loaded : [];
+    }
+
+    /**
+     * Persist nested key => value pairs into the overrides file and apply them
+     * to the runtime config immediately.
      *
      * @param  array<string, mixed>  $values  dot-notation key => value pairs
      */
     public function write(array $values): bool
     {
+        $current = $this->read();
+        foreach ($values as $key => $value) {
+            $current[$key] = $value;
+        }
+
         $persisted = false;
 
-        if (is_file($this->configPath) && is_writable($this->configPath)) {
-            $persisted = $this->writeToFile($this->configPath, $values);
+        if (is_writable(config_path()) || !is_file($this->overridesPath)) {
+            $persisted = $this->writeFile($this->overridesPath, $current);
         }
 
         foreach ($values as $key => $value) {
             config(["security-defense.{$key}" => $value]);
         }
 
-        // A cached config would ignore the on-disk edit until cleared.
         if ($persisted && $this->configurationIsCached()) {
             try {
                 Artisan::call('config:clear');
@@ -64,53 +80,20 @@ class ConfigWriterService
         return method_exists($app, 'configurationIsCached') && $app->configurationIsCached();
     }
 
-    protected function writeToFile(string $path, array $values): bool
-    {
-        $contents = file_get_contents($path);
-        if ($contents === false) {
-            return false;
-        }
-
-        $updated = $contents;
-        foreach ($values as $key => $value) {
-            $leaf = $this->leaf($key);
-
-            if (is_array($value)) {
-                $replacement = $this->arrayLiteral($value);
-                $pattern = sprintf("/('%s'\s*=>\s*)\[[^\]]*\]/s", preg_quote($leaf, '/'));
-            } else {
-                $replacement = var_export($value, true);
-                $pattern = sprintf("/('%s'\s*=>\s*)[^,\n]+/", preg_quote($leaf, '/'));
-            }
-
-            if (preg_match($pattern, $updated) !== 1) {
-                return false;
-            }
-            $updated = preg_replace($pattern, '$1' . str_replace('$', '\\$', $replacement), $updated, 1);
-        }
-
-        return @file_put_contents($path, $updated, LOCK_EX) !== false;
-    }
-
-    protected function leaf(string $key): string
-    {
-        $segments = explode('.', $key);
-
-        return (string) end($segments);
-    }
-
     /**
-     * Render a flat array as a PHP literal preserving config-file style.
+     * Serialize the overrides as a PHP config array file.
      *
-     * @param  array<int|string, mixed>  $value
+     * @param  array<string, mixed>  $overrides
      */
-    protected function arrayLiteral(array $value): string
+    protected function writeFile(string $path, array $overrides): bool
     {
-        $items = [];
-        foreach ($value as $item) {
-            $items[] = '            ' . var_export($item, true) . ',';
+        $lines = ["<?php", '', 'return [', ''];
+        foreach ($overrides as $key => $value) {
+            $lines[] = sprintf("    '%s' => %s,", $key, var_export($value, true));
         }
+        $lines[] = '];';
+        $lines[] = '';
 
-        return "[\n" . implode("\n", $items) . "\n        ]";
+        return @file_put_contents($path, implode("\n", $lines), LOCK_EX) !== false;
     }
 }

@@ -41,6 +41,13 @@
         ])
     </div>
 
+    <!-- Quick Actions Toggles -->
+    @include('security-defense::components.quick-actions', [
+        'blockHeadless' => $quickActions['blockHeadless'],
+        'cspArmor' => $quickActions['cspArmor'],
+        'asyncQueue' => $quickActions['asyncQueue'],
+    ])
+
     <!-- Threat Velocity Timeline & Attack Vector Analytics Charts -->
     @include('security-defense::components.threat-analytics-charts', [
         'hourlyData' => $hourlyData,

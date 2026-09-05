@@ -24,6 +24,7 @@ if (config('security-defense.dashboard.enabled', true)) {
             Route::post('/quarantine/pardon', [DashboardController::class, 'pardonIp'])->name('quarantine.pardon');
             Route::post('/quarantine/whitelist', [DashboardController::class, 'whitelistIp'])->name('quarantine.whitelist');
             Route::get('/live-events', [DashboardController::class, 'liveEvents'])->name('live-events');
+            Route::post('/toggle-setting', [DashboardController::class, 'toggleSetting'])->name('toggle-setting');
         });
 }
 

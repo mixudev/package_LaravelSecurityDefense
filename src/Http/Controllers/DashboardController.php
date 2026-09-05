@@ -11,6 +11,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\RateLimiter;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
 use Mixudev\SecurityDefense\Services\ChannelTestService;
+use Mixudev\SecurityDefense\Services\ConfigWriterService;
 use Mixudev\SecurityDefense\Services\DashboardAnalyticsService;
 use Mixudev\SecurityDefense\Services\DataAuditQueryService;
 use Mixudev\SecurityDefense\Services\IpQuarantineService;
@@ -57,6 +58,11 @@ class DashboardController extends Controller
             'stats' => $stats,
             'alerts' => $alerts,
             'liveEvents' => $liveEvents,
+            'quickActions' => [
+                'blockHeadless' => (bool) config('security-defense.middleware.user_agent_anomaly.block_headless_clients', false),
+                'cspArmor' => (bool) config('security-defense.csp_armor.enabled', true),
+                'asyncQueue' => (bool) config('security-defense.data_audit.queue.enabled', false),
+            ],
             'hourlyData' => $hourlyData,
             'postureScore' => $postureScore,
             'threatDistribution' => $threatDistribution,
@@ -207,6 +213,44 @@ class DashboardController extends Controller
             'events' => $this->analyticsService->getLiveBlockedEvents($limit),
             'generated_at' => now()->toIso8601String(),
         ]);
+    }
+
+    /**
+     * Toggle a dashboard quick-action setting, persisted to the published config.
+     * Only whitelisted keys can be toggled (no arbitrary config writes).
+     */
+    public function toggleSetting(Request $request, ?ConfigWriterService $configWriter = null): RedirectResponse
+    {
+        $request->validate([
+            'key' => 'required|string',
+            'value' => 'required|boolean',
+        ]);
+
+        $key = (string) $request->input('key');
+        $value = (bool) $request->input('value');
+
+        $toggles = [
+            'block_headless_clients' => 'middleware.user_agent_anomaly.block_headless_clients',
+            'csp_armor' => 'csp_armor.enabled',
+            'async_queue' => 'data_audit.queue.enabled',
+        ];
+
+        if (!isset($toggles[$key])) {
+            return back()->with('error_message', "Unknown quick-action toggle [{$key}].");
+        }
+
+        $configKey = $toggles[$key];
+        $persisted = ($configWriter ?? app(ConfigWriterService::class))->write([
+            $configKey => $value,
+        ]);
+
+        $state = $value ? 'enabled' : 'disabled';
+
+        if ($persisted) {
+            return back()->with('status_message', "Quick-action [{$key}] {$state} and saved permanently.");
+        }
+
+        return back()->with('error_message', "Quick-action [{$key}] {$state} for this session only - config file not writable.");
     }
 
     /**

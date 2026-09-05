@@ -44,6 +44,16 @@ class SecurityDefenseServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../../config/security-defense.php', 'security-defense');
 
+        // Merge dashboard quick-action overrides (written by ConfigWriterService)
+        // on top of the published config so persisted toggles take effect.
+        $overridesPath = config_path('security-defense-overrides.php');
+        if (is_file($overridesPath)) {
+            $overrides = require $overridesPath;
+            if (is_array($overrides)) {
+                $this->mergeConfigFrom($overridesPath, 'security-defense');
+            }
+        }
+
         // Bind Alert Deduplicator
         $this->app->singleton(AlertDeduplicatorInterface::class, AlertDeduplicator::class);
 

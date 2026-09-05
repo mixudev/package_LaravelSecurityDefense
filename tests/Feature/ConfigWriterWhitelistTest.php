@@ -11,87 +11,80 @@ use Mixudev\SecurityDefense\Tests\TestCase;
 
 class ConfigWriterWhitelistTest extends TestCase
 {
-    protected string $tempConfig;
+    protected string $tempOverrides;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Create a temp published-style config file mirroring the quarantine block.
-        $this->tempConfig = tempnam(sys_get_temp_dir(), 'seccfg') . '.php';
-        file_put_contents($this->tempConfig, <<<'PHP'
-<?php
-
-return [
-
-    'middleware' => [
-        'quarantine' => [
-            'enabled' => true,
-            'duration' => 900,
-            'persist_to_database' => false,
-            'whitelist' => [
-                '127.0.0.1',
-                '::1',
-            ],
-        ],
-    ],
-
-];
-PHP);
+        // Isolated overrides file path that never touches the real config dir.
+        $this->tempOverrides = tempnam(sys_get_temp_dir(), 'secover') . '.php';
+        if (file_exists($this->tempOverrides)) {
+            @unlink($this->tempOverrides);
+        }
     }
 
     protected function tearDown(): void
     {
-        if (file_exists($this->tempConfig)) {
-            @unlink($this->tempConfig);
+        if (file_exists($this->tempOverrides)) {
+            @unlink($this->tempOverrides);
         }
         parent::tearDown();
     }
 
-    public function test_config_writer_persists_whitelist_to_file(): void
+    private function writer(): ConfigWriterService
+    {
+        return new ConfigWriterService($this->tempOverrides);
+    }
+
+    public function test_config_writer_persists_whitelist_override(): void
     {
         Config::set('security-defense.middleware.quarantine.whitelist', ['127.0.0.1', '::1']);
 
-        $writer = new ConfigWriterService($this->tempConfig);
+        $writer = $this->writer();
         $result = $writer->write([
             'middleware.quarantine.whitelist' => ['127.0.0.1', '::1', '203.0.113.50'],
         ]);
 
         $this->assertTrue($result);
 
-        $contents = file_get_contents($this->tempConfig);
+        $contents = file_get_contents($this->tempOverrides);
+        $this->assertStringContainsString("'middleware.quarantine.whitelist'", $contents);
         $this->assertStringContainsString("'203.0.113.50'", $contents);
 
-        // The written file must remain valid PHP.
-        $loaded = require $this->tempConfig;
+        // Written file must be valid PHP returning the dot-key array.
+        $loaded = require $this->tempOverrides;
         $this->assertSame(
             ['127.0.0.1', '::1', '203.0.113.50'],
-            $loaded['middleware']['quarantine']['whitelist']
+            $loaded['middleware.quarantine.whitelist']
         );
+
+        // Runtime config must reflect the new value immediately.
+        $this->assertSame(['127.0.0.1', '::1', '203.0.113.50'], config('security-defense.middleware.quarantine.whitelist'));
     }
 
-    public function test_config_writer_writes_scalar_value(): void
+    public function test_config_writer_writes_scalar_override(): void
     {
         Config::set('security-defense.middleware.quarantine.persist_to_database', false);
 
-        $writer = new ConfigWriterService($this->tempConfig);
-        $result = $writer->write([
+        $result = $this->writer()->write([
             'middleware.quarantine.persist_to_database' => true,
         ]);
 
         $this->assertTrue($result);
 
-        $loaded = require $this->tempConfig;
-        $this->assertTrue($loaded['middleware']['quarantine']['persist_to_database']);
+        $loaded = require $this->tempOverrides;
+        $this->assertTrue($loaded['middleware.quarantine.persist_to_database']);
+        $this->assertTrue(config('security-defense.middleware.quarantine.persist_to_database'));
     }
 
-    public function test_ip_whitelist_service_updates_config_and_pardons(): void
+    public function test_ip_whitelist_service_updates_override_and_pardons(): void
     {
         Config::set('security-defense.middleware.quarantine.whitelist', ['127.0.0.1', '::1']);
 
         $service = new IpQuarantineService();
-        // Bind the temp config path into the container so whitelistIp writes there.
-        $this->app->instance(ConfigWriterService::class, new ConfigWriterService($this->tempConfig));
+        // Bind the isolated overrides writer into the container.
+        $this->app->instance(ConfigWriterService::class, $this->writer());
 
         // Jail an IP first.
         $service->jail('203.0.113.77', 9999, 'Test attack');
@@ -104,8 +97,8 @@ PHP);
         $this->assertTrue($service->isWhitelisted('203.0.113.77'));
         $this->assertFalse($service->isQuarantined('203.0.113.77'));
 
-        // Whitelist persisted to the temp file.
-        $loaded = require $this->tempConfig;
-        $this->assertContains('203.0.113.77', $loaded['middleware']['quarantine']['whitelist']);
+        // Whitelist persisted to overrides temp file.
+        $loaded = require $this->tempOverrides;
+        $this->assertContains('203.0.113.77', $loaded['middleware.quarantine.whitelist']);
     }
 }
