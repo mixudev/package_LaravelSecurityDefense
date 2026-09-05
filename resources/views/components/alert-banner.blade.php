@@ -46,28 +46,28 @@
         $successful = count(array_filter($results, fn($r) => $r['success'] ?? false));
         $total = count($results);
     @endphp
-    <div id="diagnosticResultsPanel" class="rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200/90 dark:border-slate-800 p-5 space-y-4 shadow-sm">
-        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
+    <div id="diagnosticResultsPanel" class="rounded-xl bg-white dark:bg-[#121214] border border-zinc-300/80 dark:border-zinc-800 p-5 space-y-4 shadow-sm">
+        <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
             <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
+                <div class="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
                 <div>
                     <div class="flex items-center space-x-2">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">Channel Diagnostic Test Summary</h3>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Channel Diagnostic Test Summary</h3>
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ $successful === $total ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' }}">
                             {{ $successful }}/{{ $total }} Delivered
                         </span>
                     </div>
-                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Real-time gateway connectivity status and payload delivery latency.</p>
+                    <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Real-time gateway connectivity status and payload delivery latency.</p>
                 </div>
             </div>
 
             <div class="flex items-center space-x-2">
-                <span class="text-[11px] text-slate-400 font-mono hidden sm:inline">{{ now()->toTimeString() }}</span>
-                <button type="button" onclick="document.getElementById('diagnosticResultsPanel').remove()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer">
+                <span class="text-[11px] text-zinc-400 font-mono hidden sm:inline">{{ now()->toTimeString() }}</span>
+                <button type="button" onclick="document.getElementById('diagnosticResultsPanel').remove()" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -77,15 +77,15 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             @foreach($results as $res)
-                <div class="p-3.5 rounded-xl border text-xs transition-all {{ $res['success'] ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/60' : ($res['enabled'] ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800/60' : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800') }}">
+                <div class="p-3.5 rounded-xl border text-xs transition-all {{ $res['success'] ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/60' : ($res['enabled'] ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800/60' : 'bg-zinc-50 dark:bg-[#18181b] border-zinc-200 dark:border-zinc-800') }}">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 text-xs">{{ $res['channel'] }}</span>
+                        <span class="font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 text-xs">{{ $res['channel'] }}</span>
                         @if($res['success'])
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
                                 DELIVERED
                             </span>
                         @elseif(!$res['enabled'])
-                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
                                 DISABLED
                             </span>
                         @elseif(!$res['configured'])
@@ -98,11 +98,11 @@
                             </span>
                         @endif
                     </div>
-                    <p class="text-slate-600 dark:text-slate-300 text-xs leading-relaxed">{{ $res['message'] }}</p>
+                    <p class="text-zinc-600 dark:text-zinc-300 text-xs leading-relaxed">{{ $res['message'] }}</p>
                     @if(isset($res['latency_ms']))
-                        <div class="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                        <div class="mt-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
                             <span>Network Latency:</span>
-                            <span class="font-bold text-slate-700 dark:text-slate-300">{{ $res['latency_ms'] }} ms</span>
+                            <span class="font-bold text-zinc-700 dark:text-zinc-300">{{ $res['latency_ms'] }} ms</span>
                         </div>
                     @endif
                 </div>

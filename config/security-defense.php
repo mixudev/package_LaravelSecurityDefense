@@ -378,5 +378,26 @@ return [
         'enabled' => true,
         'block_on_hijack' => false, // Set to true to immediately abort 403 on critical hijack
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SIEM Monitoring Dashboard Configuration
+    |--------------------------------------------------------------------------
+    | Fine-tune dashboard accessibility, caching behavior, rate limiting, and
+    | strictness. All settings can be adjusted directly or via .env variables.
+    */
+    'dashboard' => [
+        'enabled' => env('SECURITY_DEFENSE_DASHBOARD_ENABLED', true),
+        'local_only' => env('SECURITY_DEFENSE_DASHBOARD_LOCAL_ONLY', true),
+        'allowed_ips' => ['127.0.0.1', '::1'],
+        'cache' => [
+            'enabled' => env('SECURITY_DEFENSE_DASHBOARD_CACHE_ENABLED', true),
+            'ttl' => (int) env('SECURITY_DEFENSE_DASHBOARD_CACHE_TTL', 30),
+        ],
+        'rate_limit' => [
+            'enabled' => env('SECURITY_DEFENSE_DASHBOARD_RATE_LIMIT_ENABLED', true),
+            'max_probes_per_minute' => (int) env('SECURITY_DEFENSE_DASHBOARD_MAX_PROBES', 30),
+        ],
+    ],
 ];
 

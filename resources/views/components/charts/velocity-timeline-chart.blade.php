@@ -3,17 +3,18 @@
 ])
 
 <!-- 24-Hour Incident Velocity Timeline Component -->
-<div class="rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-xs">
-    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3 mb-3">
+<div class="h-full w-full flex flex-col justify-between rounded-xl bg-white dark:bg-[#121214] border border-zinc-300/80 dark:border-zinc-800 p-4 sm:p-5 shadow-xs">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800/80 pb-3 mb-3">
         <div>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center space-x-2">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center space-x-2">
                 <span>24-Hour Incident Velocity Timeline</span>
             </h3>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Hourly attack distribution comparing general telemetry vs critical breaches.</p>
+            <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Hourly attack distribution comparing general telemetry vs critical breaches.</p>
         </div>
         <div class="flex items-center space-x-3 text-[11px] font-mono">
-            <div class="flex items-center space-x-1.5 text-indigo-600 dark:text-indigo-400">
-                <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+            <div class="flex items-center space-x-1.5 text-emerald-600 dark:text-emerald-400">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                 <span class="font-medium">All Threats</span>
             </div>
             <div class="flex items-center space-x-1.5 text-rose-600 dark:text-rose-400">
@@ -23,13 +24,14 @@
         </div>
     </div>
 
-    <!-- Canvas Container -->
-    <div class="relative w-full h-64">
+    <!-- Canvas Container (Flex child matching height) -->
+    <div class="relative w-full h-52 sm:h-56 my-auto">
         <canvas id="threatVelocityChart"></canvas>
     </div>
 
-    <div class="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-        <span>Peak Frequency: <strong class="font-mono text-slate-800 dark:text-slate-200">{{ $hourlyData['peak'] }} incidents/hr</strong></span>
+    <!-- Footer -->
+    <div class="pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+        <span>Peak Frequency: <strong class="font-mono text-zinc-800 dark:text-zinc-200">{{ $hourlyData['peak'] }} incidents/hr</strong></span>
         <span class="font-mono">Adaptive Window: 24h</span>
     </div>
 </div>
@@ -39,8 +41,8 @@
         if (typeof Chart === 'undefined') return;
 
         const isDark = document.documentElement.classList.contains('dark');
-        const gridColor = isDark ? 'rgba(51, 65, 85, 0.35)' : 'rgba(226, 232, 240, 0.8)';
-        const textColor = isDark ? '#94a3b8' : '#64748b';
+        const gridColor = isDark ? 'rgba(39, 39, 42, 0.7)' : 'rgba(228, 228, 231, 0.8)';
+        const textColor = isDark ? '#a1a1aa' : '#71717a';
 
         const velocityCtx = document.getElementById('threatVelocityChart');
         if (velocityCtx) {
@@ -56,20 +58,20 @@
                         {
                             label: 'Total Incidents',
                             data: totals,
-                            borderColor: '#6366f1',
-                            backgroundColor: isDark ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.10)',
+                            borderColor: '#10b981',
+                            backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.08)',
                             fill: true,
                             tension: 0.35,
                             borderWidth: 2,
                             pointRadius: 2,
                             pointHoverRadius: 5,
-                            pointBackgroundColor: '#6366f1',
+                            pointBackgroundColor: '#10b981',
                         },
                         {
                             label: 'Critical / High',
                             data: criticals,
                             borderColor: '#f43f5e',
-                            backgroundColor: isDark ? 'rgba(244, 63, 94, 0.15)' : 'rgba(244, 63, 94, 0.10)',
+                            backgroundColor: isDark ? 'rgba(244, 63, 94, 0.12)' : 'rgba(244, 63, 94, 0.08)',
                             fill: true,
                             tension: 0.35,
                             borderWidth: 2,
@@ -89,10 +91,10 @@
                     plugins: {
                         legend: { display: false },
                         tooltip: {
-                            backgroundColor: isDark ? '#0f172a' : '#1e293b',
+                            backgroundColor: isDark ? '#18181b' : '#27272a',
                             titleColor: '#ffffff',
-                            bodyColor: '#e2e8f0',
-                            borderColor: isDark ? '#334155' : '#475569',
+                            bodyColor: '#e4e4e7',
+                            borderColor: isDark ? '#27272a' : '#3f3f46',
                             borderWidth: 1,
                             padding: 10,
                             boxPadding: 4,

@@ -61,16 +61,16 @@
         }
         /* Smooth transitions for interactive elements */
         .glass-panel {
-            background-color: rgba(255, 255, 255, 0.92);
+            background-color: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(8px);
         }
         .dark .glass-panel {
-            background-color: rgba(15, 23, 42, 0.85);
+            background-color: rgba(18, 18, 20, 0.92);
             backdrop-filter: blur(8px);
         }
     </style>
 </head>
-<body class="min-h-full flex flex-col bg-slate-100/90 dark:bg-[#0b0f17] text-slate-900 dark:text-slate-100 antialiased transition-colors duration-150">
+<body class="min-h-full flex flex-col bg-[#f8f9fa] dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 antialiased transition-colors duration-150">
 
     <!-- Navigation Header -->
     @include('security-defense::components.navbar')
@@ -81,14 +81,14 @@
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#0e1420] py-4 mt-auto">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+    <footer class="border-t border-zinc-300/80 dark:border-zinc-800/90 bg-white dark:bg-[#121214] py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <div class="flex items-center space-x-2">
                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                 <span>Laravel Security Defense SIEM &bull; Active Anomaly Correlation Engine</span>
             </div>
             <div class="font-mono text-[11px]">
-                Environment: <span class="text-slate-800 dark:text-slate-200 font-semibold">{{ strtoupper(app()->environment()) }}</span>
+                Environment: <span class="text-zinc-800 dark:text-zinc-200 font-semibold">{{ strtoupper(app()->environment()) }}</span>
             </div>
         </div>
     </footer>

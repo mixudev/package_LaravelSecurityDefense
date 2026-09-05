@@ -70,8 +70,11 @@ class DashboardController extends Controller
      */
     public function testChannel(Request $request, ?ChannelTestService $testService = null): JsonResponse|RedirectResponse
     {
+        $rateLimitEnabled = (bool) config('security-defense.dashboard.rate_limit.enabled', true);
+        $maxProbes = (int) config('security-defense.dashboard.rate_limit.max_probes_per_minute', 30);
         $rateLimitKey = 'sec_defense_test_channel:' . ($request->ip() ?? '127.0.0.1');
-        if (RateLimiter::tooManyAttempts($rateLimitKey, 10)) {
+
+        if ($rateLimitEnabled && RateLimiter::tooManyAttempts($rateLimitKey, $maxProbes)) {
             $seconds = RateLimiter::availableIn($rateLimitKey);
             $message = "Too many channel test requests. Please wait {$seconds} seconds before probing again.";
 
@@ -82,7 +85,9 @@ class DashboardController extends Controller
             return back()->with('error_message', $message);
         }
 
-        RateLimiter::hit($rateLimitKey, 60);
+        if ($rateLimitEnabled) {
+            RateLimiter::hit($rateLimitKey, 60);
+        }
 
         $request->validate([
             'channel' => 'required|string|in:all,webhook,discord,telegram,mail,database',

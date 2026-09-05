@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Services;
 
+use Closure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -18,12 +19,12 @@ use Throwable;
 class DashboardAnalyticsService
 {
     protected string $cachePrefix;
-    protected int $cacheTtl;
+    protected int $defaultTtl;
 
     public function __construct()
     {
         $this->cachePrefix = (string) config('security-defense.cache_prefix', 'security_defense:');
-        $this->cacheTtl = 30; // 30s TTL for high-throughput resilience
+        $this->defaultTtl = (int) config('security-defense.dashboard.cache.ttl', 30);
     }
 
     /**
@@ -39,17 +40,48 @@ class DashboardAnalyticsService
     }
 
     /**
+     * Safely read or compute cache without risk of __PHP_Incomplete_Class.
+     */
+    protected function rememberSafe(string $key, int $ttl, Closure $callback): mixed
+    {
+        if (!(bool) config('security-defense.dashboard.cache.enabled', true)) {
+            return $callback();
+        }
+
+        try {
+            $cached = Cache::get($key);
+            if ($cached !== null && !($cached instanceof \__PHP_Incomplete_Class)) {
+                return $cached;
+            }
+            if ($cached instanceof \__PHP_Incomplete_Class) {
+                Cache::forget($key);
+            }
+        } catch (Throwable) {
+            Cache::forget($key);
+        }
+
+        $fresh = $callback();
+        try {
+            Cache::put($key, $fresh, $ttl);
+        } catch (Throwable) {
+        }
+
+        return $fresh;
+    }
+
+    /**
      * Retrieve aggregated KPI metrics with micro-caching.
      *
      * @return array<string, int>
      */
     public function getStats(bool $refresh = false): array
     {
+        $key = $this->cachePrefix . 'dash_stats';
         if ($refresh) {
-            Cache::forget($this->cachePrefix . 'dash_stats');
+            Cache::forget($key);
         }
 
-        return Cache::remember($this->cachePrefix . 'dash_stats', $this->cacheTtl, function () {
+        return $this->rememberSafe($key, $this->defaultTtl, function () {
             return [
                 'total' => SecurityAlert::query()->count(),
                 'new' => SecurityAlert::query()->new()->count(),
@@ -70,11 +102,12 @@ class DashboardAnalyticsService
      */
     public function getHourlyTimeline(bool $refresh = false): array
     {
+        $key = $this->cachePrefix . 'dash_hourly';
         if ($refresh) {
-            Cache::forget($this->cachePrefix . 'dash_hourly');
+            Cache::forget($key);
         }
 
-        return Cache::remember($this->cachePrefix . 'dash_hourly', $this->cacheTtl, function () {
+        return $this->rememberSafe($key, $this->defaultTtl, function () {
             $start = now()->subHours(23)->startOfHour();
             $alerts = SecurityAlert::query()
                 ->where('created_at', '>=', $start)
@@ -89,11 +122,11 @@ class DashboardAnalyticsService
 
             foreach ($alerts as $item) {
                 if ($item->created_at !== null) {
-                    $key = $item->created_at->format('H:00');
-                    if (isset($buckets[$key])) {
-                        $buckets[$key]['total']++;
+                    $itemHour = $item->created_at->format('H:00');
+                    if (isset($buckets[$itemHour])) {
+                        $buckets[$itemHour]['total']++;
                         if ($item->severity === 'critical' || $item->severity === 'high') {
-                            $buckets[$key]['critical']++;
+                            $buckets[$itemHour]['critical']++;
                         }
                     }
                 }
@@ -115,11 +148,12 @@ class DashboardAnalyticsService
      */
     public function getThreatDistribution(bool $refresh = false): array
     {
+        $key = $this->cachePrefix . 'dash_threat_dist';
         if ($refresh) {
-            Cache::forget($this->cachePrefix . 'dash_threat_dist');
+            Cache::forget($key);
         }
 
-        return Cache::remember($this->cachePrefix . 'dash_threat_dist', $this->cacheTtl, function () {
+        return $this->rememberSafe($key, $this->defaultTtl, function () {
             return SecurityAlert::query()
                 ->selectRaw('threat_type, count(*) as count')
                 ->groupBy('threat_type')
@@ -132,22 +166,18 @@ class DashboardAnalyticsService
 
     /**
      * Retrieve active IP quarantines currently jailed.
+     * Guaranteed safe from __PHP_Incomplete_Class deserialization.
      */
     public function getActiveQuarantines(bool $refresh = false): Collection
     {
-        if ($refresh) {
-            Cache::forget($this->cachePrefix . 'dash_quarantines');
+        try {
+            if (class_exists(SecurityQuarantine::class)) {
+                return SecurityQuarantine::query()->active()->latest()->limit(20)->get();
+            }
+        } catch (Throwable) {
         }
 
-        return Cache::remember($this->cachePrefix . 'dash_quarantines', 15, function () {
-            try {
-                if (class_exists(SecurityQuarantine::class)) {
-                    return SecurityQuarantine::query()->active()->latest()->limit(20)->get();
-                }
-            } catch (Throwable) {
-            }
-            return collect([]);
-        });
+        return collect([]);
     }
 
     /**
