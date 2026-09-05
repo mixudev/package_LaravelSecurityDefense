@@ -51,6 +51,13 @@ class SecurityDefenseServiceProvider extends ServiceProvider
             $overrides = require $overridesPath;
             if (is_array($overrides)) {
                 $this->mergeConfigFrom($overridesPath, 'security-defense');
+                // Expand dot-notation keys into nested arrays so Laravel's
+                // flat config accessor (config('a.b.c')) reads them correctly.
+                foreach ($overrides as $key => $value) {
+                    if (str_contains((string) $key, '.')) {
+                        data_set($this->app['config']->get('security-defense'), $key, $value);
+                    }
+                }
             }
         }
 

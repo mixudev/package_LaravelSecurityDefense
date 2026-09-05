@@ -31,7 +31,7 @@
             </div>
             <button type="submit" role="switch" aria-checked="{{ $blockHeadless ? 'true' : 'false' }}" title="Toggle block headless clients"
                 class="relative inline-flex flex-shrink-0 w-9 h-5 rounded-full transition cursor-pointer {{ $blockHeadless ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700' }}">
-                <span class="inline-block w-3.5 h-3.5 rounded-full bg-white shadow transform transition mt-0.5 {{ $blockHeadless ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5' }}"></span>
+                <span class="inline-block w-3.5 h-3.5 rounded-full bg-white shadow transform transition" style="{{ $blockHeadless ? 'transform: translateX(16px);' : 'transform: translateX(2px);' }}"></span>
             </button>
         </form>
 
