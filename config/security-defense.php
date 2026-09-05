@@ -120,6 +120,9 @@ return [
                     'eval_based' => true,
                     'php_code_execution' => true,
                     'template_injection' => true,
+                    'crlf_injection' => true,
+                    'ssrf' => true,
+                    'xxe' => true,
                 ],
             ],
 
@@ -143,6 +146,7 @@ return [
                 'severity' => 'medium',
                 'block_known_scanners' => true, // sqlmap, nikto, dirbuster, gobuster, etc.
                 'block_empty_user_agent' => false, // Block requests with no User-Agent header
+                'block_headless_clients' => false, // curl, python-requests, Go-http-client, headless Chrome, etc. (opt-in: may block CI/monitoring)
             ],
 
             'session_fingerprint' => [

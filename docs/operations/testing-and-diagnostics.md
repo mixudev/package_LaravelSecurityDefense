@@ -26,6 +26,8 @@ Cakupan pengujian mencakup:
 - Pengujian saluran notifikasi Telegram, Discord, Webhook, dan Mail.
 - Pengujian WAF middleware (pemblokiran SQLi, XSS, fast-path empty GET, HTTP 429 flood protection).
 - Pengujian hak akses dashboard SIEM dan rendering data.
+- **Red-Team adversarial suite** (`AdversarialBypassEvasionTest`, `ExtremeRedTeamAgilityTest`): nested JSON SQLi, double-encoding, unicode escape `\u0027`, fullwidth Unicode NFKC, SQL comment obfuscation, XSS char-code/base64, CRLF injection, path traversal, RCE chained operators, SSRF (metadata AWS/localhost/gopher), XXE, PHP code execution, null-byte, serta anti-false-positive untuk input pengguna normal.
+- **Bot & scanner defense**: 30+ scanner UA diblokir (sqlmap, nuclei, nikto, wpscan, masscan, dll.), opsi `block_headless_clients` untuk blokir curl/python-requests/Go-http-client/HeadlessChrome/Postman, dan bukti browser asli (Chrome/Firefox/Safari/Edge) tidak terblokir salah.
 
 ---
 

@@ -131,6 +131,10 @@ class RequestThreatScanner
                 'raw_content' => $request->getContent(),
             ];
 
+            // Defense-in-depth: scan URL-decoded + CRLF-normalized copies to catch
+            // Burp Suite / encoded payloads that bypass raw pattern matching.
+            $inputsToScan = $this->addDecodedTargets($inputsToScan);
+
             $inspection = $this->payloadRule->inspect($inputsToScan);
 
             if ($inspection['matched']) {
@@ -366,5 +370,57 @@ class RequestThreatScanner
         $store = config('security-defense.cache_store');
 
         return \Illuminate\Support\Facades\Cache::store($store);
+    }
+
+    /**
+     * Add URL-decoded and CRLF-normalized copies of all string values so the
+     * payload scanner can match against the semantic content even if the raw
+     * request uses percent-encoding, double-encoding, or CRLF obfuscation.
+     *
+     * ponytail: per-field depth limit keeps cost linear; nested arrays use
+     * Fluent::flatten(); add recursive walker when input trees exceed 10K nodes.
+     */
+    protected function addDecodedTargets(array $inputs): array
+    {
+        $decoded = [];
+        $rawContent = $inputs['raw_content'] ?? '';
+        if (is_string($rawContent) && $rawContent !== '') {
+            $decoded['raw_decoded'] = rawurldecode($rawContent);
+            // Normalize CRLF/CR/LF to spaces so CRLF injection shows as literal pattern
+            $decoded['raw_crlf_normalized'] = str_replace(["\r\n", "\r", "\n"], ' ', $rawContent);
+            // Unicode escape sequences (Burp Suite / JS obfuscation): \u0027 -> '
+            $decoded['raw_unicode_decoded'] = preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/i', static fn ($m) => mb_chr((int) hexdec($m[1]), 'UTF-8'), $rawContent);
+        }
+
+        foreach (['query', 'body'] as $source) {
+            if (empty($inputs[$source]) || !is_array($inputs[$source])) {
+                continue;
+            }
+            $flat = \Illuminate\Support\Arr::flatten($inputs[$source]);
+            $parts = [];
+            foreach ($flat as $value) {
+                if (!is_string($value)) {
+                    continue;
+                }
+                $parts[] = rawurldecode($value);
+                // Double-decode for %2527 -> %27 -> ' (Burp double-encoding)
+                $parts[] = rawurldecode(rawurldecode($value));
+                $parts[] = str_replace(["\r\n", "\r", "\n"], ' ', $value);
+                // Unicode escape sequences: \u0027 -> ' (Burp/JS obfuscation)
+                $parts[] = preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/i', static fn ($m) => mb_chr((int) hexdec($m[1]), 'UTF-8'), $value);
+                // Fullwidth Unicode normalization: ＳＥＬＥＣＴ -> SELECT (NFKC) when intl available
+                $normalizer = class_exists('\Normalizer') ? \Normalizer::normalize($value, \Normalizer::FORM_KC) : null;
+                if ($normalizer !== false && $normalizer !== null && $normalizer !== $value) {
+                    $parts[] = $normalizer;
+                }
+                // Literal escape-sequence decode: \s\s -> spaces, \t -> tab (sqlmap/etc.)
+                $parts[] = str_replace(['\\s', '\\t', '\\n', '\\r'], [' ', "\t", "\n", "\r"], $value);
+            }
+            if (!empty($parts)) {
+                $decoded[$source . '_decoded'] = implode(' ', $parts);
+            }
+        }
+
+        return array_merge($inputs, $decoded);
     }
 }

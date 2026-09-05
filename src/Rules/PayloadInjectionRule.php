@@ -29,12 +29,16 @@ class PayloadInjectionRule extends AbstractDetectionRule
      * @var array<string, string>
      */
     protected array $signatures = [
-        'sqli' => '/(\b(union(\s+all)?\s+select|select\s+[\s\S]*?\s+from|insert\s+into|update\s+[\s\S]*?\s+set|delete\s+from|drop\s+(table|database)|truncate\s+table)\b|(\'|\")\s*(\b(or|and)\b)\s*(\'|\")?[^\s\']+?(\'|\")?\s*=\s*(\'|\")?[^\s\']+?|(\'|\")\s*--|(\bwaitfor\s+delay\b|\bsleep\(\d+\)|\bbenchmark\(\d+,))/is',
+        'sqli' => '/(\b(union(\s+all)?\s+select|select\s+[\s\S]*?\s+from|insert\s+into|update\s+[\s\S]*?\s+set|delete\s+from|drop\s+(table|database)|truncate\s+table)\b|(\'|\")\s*(\b(or|and)\b)\s*(\'|\")?[^\s\']+?(\'|\")?\s*=\s*(\'|\")?[^\s\']+?|(\'|\")\s*--|(\bwaitfor\s+delay\b|\bsleep\(\d+\)|\bbenchmark\(\d+,)|(\bor\b|\band\b|\bunion\b)\s+\d+\s*=\s*\d+|(\bor\b|\band\b)\s+\d+\s*=\s*\d+)/is',
         'xss' => '/(<script\b[^>]*>[\s\S]*?<\/script>|<script\b[^>]*>|<\/script>|javascript\s*:|on(error|load|click|mouseover|submit|focus)\s*=|document\.(cookie|location)|<[a-z0-9]+\b[^>]*?(onerror|onload|onclick)\s*=|alert\(|prompt\(|confirm\()/is',
-        'traversal' => '/(\.\.[\/\\\\]|\.\.%2f|\.\.%5c|\b(etc[\/\\\\]passwd|windows[\/\\\\]win\.ini|boot\.ini)\b)/is',
-        'command_injection' => '/(;|\&|\||\`|\$\()\s*(cat\s+[\/.]|ls\s+-|whoami|id|uname\s+-|netstat|curl\s+https?|wget\s+https?|cmd\.exe|powershell)\b/is',
-        'eval_based' => '/(\beval\s*\(|\bbase64_decode\s*\(|\bpassthru\s*\(|\bshell_exec\s*\(|\bsystem\s*\()/is',
+        'traversal' => '/(\.\.[\/\\\\]|\.\.%2f|\.\.%5c|%00|\b(etc[\/\\\\]passwd|windows[\/\\\\]win\.ini|boot\.ini)\b)/is',
+        'command_injection' => '/(;|\&|\||\`|\$\()\s*(cat\s+[\/.]|ls\s+-|whoami|id|uname\s+-|netstat|curl\s+https?|wget\s+https?|cmd\.exe|powershell|bash\s+-c|nc\s+-e|ping\s+-c|(?:(?:\/)?bin\/)?bash\s+-c)\b|(^|[;|&])\s*(phpinfo|shell_exec|system|exec)\(/is',
+        'eval_based' => '/(\beval\s*\(|\bbase64_decode\s*\(|\bpassthru\s*\(|\bshell_exec\s*\(|\bsystem\s*\(|\bphpinfo\s*\()/is',
+        'php_code_execution' => '/(\b(include|require|include_once|require_once)\s*\(?\s*[\'"](?:https?:|php:|data:|file:)|<\?php\b|\b(assert|create_function|call_user_func|preg_replace)\s*\(\s*[\'"][\/]?.*(e|eval)|(?:@)?\s*\$\_(GET|POST|REQUEST|COOKIE|FILES|SERVER)\b)/is',
+        'ssrf' => '/(\b(gopher|dict|file|ftp|ldap|tftp|scgi)\s*:\/\/|(?:https?:\/\/)?(?:127\.0\.0\.1|localhost|169\.254\.169\.254|0\.0\.0\.0|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?::\d{1,5})?[\/\s"\'])/is',
+        'xxe' => '/(<!DOCTYPE\s+[a-z0-9_-]+|<!ENTITY\s+[a-z0-9_-]+\s+(SYSTEM|PUBLIC)|xsi:noNamespaceSchemaLocation|xmlns:xsi)/is',
         'template_injection' => '/(\{\{\s*[\s\S]*?\b(system|exec|passthru|shell_exec|phpinfo)\b[\s\S]*?\}\}|\$\{\s*[\s\S]*?\b(env|cmd|exec)\b[\s\S]*?\})/is',
+        'crlf_injection' => '/(\r\n|\r|\n)\s*([a-z0-9-]+:\s*.*|Set-Cookie:|Location:|X-)/is',
     ];
 
     public function evaluate(SecurityEvent $event): ?SecurityThreat

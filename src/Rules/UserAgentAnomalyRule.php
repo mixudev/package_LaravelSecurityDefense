@@ -59,6 +59,38 @@ class UserAgentAnomalyRule extends AbstractDetectionRule
         'wapiti' => '/\bwapiti\b/i',
     ];
 
+    /**
+     * Generic headless script clients / HTTP libraries commonly used by
+     * mass-scanning bots (Burp repeater, curl, python-requests, etc).
+     * Blocking these is opt-in via config because legitimate tooling
+     * (CI pipelines, health checks, monitoring) may use the same clients.
+     *
+     * @var array<string, string>
+     */
+    protected array $headlessClientSignatures = [
+        'curl' => '/^curl\/[0-9.]+/i',
+        'wget' => '/^Wget\/[0-9.]+/i',
+        'python_requests' => '/python-requests\/[0-9.]+/i',
+        'python_urllib' => '/^Python-urllib\/[0-9.]+/i',
+        'python_aiohttp' => '/aiohttp\/[0-9.]+/i',
+        'go_http_client' => '/^Go-http-client\/[0-9.]+/i',
+        'libwww_perl' => '/libwww-perl\/[0-9.]+/i',
+        'java_http' => '/^Java\/[0-9.]+/i',
+        'okhttp' => '/okhttp\/[0-9.]+/i',
+        'apache_httpclient' => '/Apache-HttpClient\/[0-9.]+/i',
+        'node_fetch' => '/^node-fetch\/[0-9.]+/i',
+        'axios' => '/^axios\/[0-9.]+/i',
+        'postman' => '/PostmanRuntime\/[0-9.]+/i',
+        'insomnia' => '/^insomnia\/[0-9.]+/i',
+        'httpie' => '/^HTTPie\/[0-9.]+/i',
+        'scrapy' => '/Scrapy\/[0-9.]+/i',
+        'phantomjs' => '/PhantomJS\/[0-9.]+/i',
+        'headless_chrome' => '/HeadlessChrome\/[0-9.]+/i',
+        'puppeteer' => '/Puppeteer\/[0-9.]+/i',
+        'selenium' => '/Selenium\/[0-9.]+/i',
+        'httpx_tool' => '/httpx\/[0-9.]+/i',
+    ];
+
     public function evaluate(SecurityEvent $event): ?SecurityThreat
     {
         if (!$this->isEnabled()) {
@@ -113,13 +145,22 @@ class UserAgentAnomalyRule extends AbstractDetectionRule
     }
 
     /**
-     * Identify scanner name from user-agent string.
+     * Identify scanner name from user-agent string, including headless clients
+     * when blocking them is enabled.
      */
     public function identifyScanner(string $userAgent): ?string
     {
         foreach ($this->scannerSignatures as $toolName => $pattern) {
             if (preg_match($pattern, $userAgent)) {
                 return $toolName;
+            }
+        }
+
+        if ((bool) config('security-defense.detection.rules.user_agent_anomaly.block_headless_clients', false)) {
+            foreach ($this->headlessClientSignatures as $clientName => $pattern) {
+                if (preg_match($pattern, $userAgent)) {
+                    return $clientName;
+                }
             }
         }
 

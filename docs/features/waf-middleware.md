@@ -77,3 +77,42 @@ Melindungi endpoint website dari scraper agresif dan serangan flooding layer 7 m
 
 - String masukan dipotong secara aman jika melampaui `hardening.max_inspection_length` (default 4096 karakter) sebelum dicek regex.
 - Rekursi array dibatasi maksimal 5 tingkat kedalaman (`hardening.max_traversal_depth`) untuk mengamankan memori server dari stack overflow.
+
+---
+
+## 5. Pemindaian Payload & Dekode Anti-Evasion
+
+Sebelum pencocokan regex, middleware membuat *varian dekode* dari setiap parameter sehingga payload yang diobfuskasi tetap terdeteksi:
+
+| Teknik Attacker | Varian yang Di-scan |
+|---|---|
+| URL-encoding (`%20`, `%27`) | `rawurldecode()` |
+| Double-encoding (`%2527`) | `rawurldecode(rawurldecode())` |
+| Unicode escape (`\u0027`) | Decode `\uXXXX` via `mb_chr()` |
+| Fullwidth Unicode (`ＳＥＬＥＣＴ`) | Normalisasi NFKC (`\Normalizer`) |
+| Escape sequence literal (`\s\s`) | `\s`/`\t`/`\n` diganti spasi/tab |
+| CRLF injection (`\r\nX-Injected:`) | CRLF dinormalisasi jadi spasi + signature khusus |
+
+### Kategori Signature yang Dideteksi (`payload_injection.patterns`)
+
+- `sqli` — UNION SELECT, OR/AND bypass, komentar `--`, `#`, `/**/`, time-based (`SLEEP`, `BENCHMARK`, `WAITFOR DELAY`).
+- `xss` — `<script>`, event handler (`onerror`, `onload`, `onclick`), `javascript:`, `alert()/prompt()/confirm()`, `document.cookie/location`.
+- `traversal` — `../`, `..%2f`, `..%5c`, null byte `%00`, `etc/passwd`, `win.ini`.
+- `command_injection` — chained `;`, `&&`, `|`, backtick, `$( )`, `bash -c`, `nc -e`, `curl/wget` eksfiltrasi, `phpinfo()/system()/exec()`.
+- `eval_based` — `eval()`, `base64_decode()`, `passthru()`, `shell_exec()`, `system()`, `phpinfo()`.
+- `php_code_execution` — `include/require` dari URL, `<?php`, `assert()`, `create_function()`, `call_user_func()`, superglobal `$_GET/$_POST/$_REQUEST`.
+- `ssrf` — IP metadata cloud (`169.254.169.254`), localhost/private range, protokol `gopher://`, `dict://`, `file://`.
+- `xxe` — `<!DOCTYPE`, `<!ENTITY SYSTEM/PUBLIC`, `xsi:noNamespaceSchemaLocation`.
+- `template_injection` — `{{ system(...) }}`, `${env/cmd/exec}`.
+- `crlf_injection` — header injection via `\r\n` + `Set-Cookie:`/`Location:`/`X-*`.
+
+---
+
+## 6. Pertahanan Bot & Scanner Otomatis
+
+Memblokir tool otomatis yang memindai sistem secara massal:
+
+- **30+ scanner tool** diblokir default: `sqlmap`, `nuclei`, `nikto`, `wpscan`, `dirbuster`, `gobuster`, `masscan`, `nmap`, `acunetix`, `nessus`, `hydra`, `ffuf`, `wfuzz`, `whatweb`, `dalfox`, `xxstrike`, `commix`, `wapiti`, dan lainnya (`block_known_scanners => true`).
+- **Headless client & HTTP library** (opsional, default `false`): `curl`, `wget`, `python-requests`, `Go-http-client`, `PostmanRuntime`, `HeadlessChrome`, `Scrapy`, `axios`, `Java/`, `node-fetch`, dll — aktifkan `block_headless_clients => true` bila semua lalu lintas dari browser asli.
+- **Anti-false-positive**: browser asli (Chrome, Firefox, Safari, Edge, mobile Chrome) selalu lolos; test suite membuktikan hal ini.
+- **Layer cadangan**: request flood limiter O(1) + karantina IP otomatis memutus scraper yang lolos deteksi UA.
