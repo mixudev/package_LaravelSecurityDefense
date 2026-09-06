@@ -122,6 +122,10 @@ return [
                     'template_injection' => true,
                     'crlf_injection' => true,
                     'ssrf' => true,
+                    // localhost/127.0.0.1 SSRF — OFF by default (host apps legitimately
+                    // post to their own origin, e.g. http://localhost:8000/ telemetry).
+                    // Set to true only on strict deployments without local loopback traffic.
+                    'ssrf_localhost' => false,
                     'xxe' => true,
                 ],
             ],

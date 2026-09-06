@@ -101,7 +101,7 @@ Sebelum pencocokan regex, middleware membuat *varian dekode* dari setiap paramet
 - `command_injection` — chained `;`, `&&`, `|`, backtick, `$( )`, `bash -c`, `nc -e`, `curl/wget` eksfiltrasi, `phpinfo()/system()/exec()`.
 - `eval_based` — `eval()`, `base64_decode()`, `passthru()`, `shell_exec()`, `system()`, `phpinfo()`.
 - `php_code_execution` — `include/require` dari URL, `<?php`, `assert()`, `create_function()`, `call_user_func()`, superglobal `$_GET/$_POST/$_REQUEST`.
-- `ssrf` — IP metadata cloud (`169.254.169.254`), localhost/private range, protokol `gopher://`, `dict://`, `file://`.
+- `ssrf` — IP metadata cloud (`169.254.169.254`), private range, protokol `gopher://`, `dict://`, `file://`. Deteksi `localhost`/`127.0.0.1` dipisah ke pola `ssrf_localhost` dan **nonaktif default** agar referensi origin lokal (mis. telemetry `http://localhost:8000/`) tidak diblokir; aktifkan saat deployment strict tanpa traffic loopback.
 - `xxe` — `<!DOCTYPE`, `<!ENTITY SYSTEM/PUBLIC`, `xsi:noNamespaceSchemaLocation`.
 - `template_injection` — `{{ system(...) }}`, `${env/cmd/exec}`.
 - `crlf_injection` — header injection via `\r\n` + `Set-Cookie:`/`Location:`/`X-*`.

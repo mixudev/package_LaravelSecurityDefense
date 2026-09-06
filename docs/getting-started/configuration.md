@@ -67,6 +67,7 @@ Menghitung akumulasi risiko dari berbagai jenis serangan berbeda terhadap target
 | `payload_scanner.action` | `'block'` | Tindakan saat deteksi ancaman: `'block'` (HTTP 403) atau `'log_only'`. |
 | `payload_scanner.scan_empty_requests` | `false` | Fast-path: lewati scanning regex pada GET/HEAD tanpa body & tanpa query params. |
 | `payload_scanner.excluded_paths` | `[]` | URI path yang dikecualikan dari scanning. |
+| `detection.rules.payload_injection.patterns.ssrf_localhost` | `false` | Deteksi SSRF `localhost`/`127.0.0.1`. Default `false` karena app sah mengirim ke origin sendiri (mis. telemetry `http://localhost:8000/`). Aktifkan (`true`) hanya di deployment strict tanpa traffic loopback.
 | `request_flood.enabled` | `true` | Mengaktifkan proteksi flood per-IP berbasis counter atomic O(1). |
 | `request_flood.max_requests_per_second` | `200` | Batas maksimum request per detik sebelum dikembalikan 429 dan dimasukkan karantina. |
 | `quarantine.enabled` | `true` | Mengaktifkan sistem Fail2Ban IP Quarantine. |

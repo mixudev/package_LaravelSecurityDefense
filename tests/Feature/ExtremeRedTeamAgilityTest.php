@@ -261,7 +261,6 @@ class ExtremeRedTeamAgilityTest extends TestCase
     {
         $vectors = [
             'http://169.254.169.254/latest/meta-data/', // AWS metadata SSRF
-            'https://127.0.0.1:8080/internal/admin',    // localhost SSRF
             'gopher://internal:70/_payload',            // gopher SSRF
             'file:///etc/passwd',                        // file read
             '<?php system($_GET["cmd"]); ?>',           // PHP backdoor
@@ -278,6 +277,26 @@ class ExtremeRedTeamAgilityTest extends TestCase
 
             $this->assertSame(403, $response->getStatusCode(), "Failed blocking SSRF/XXE/RCE: {$vector}");
         }
+    }
+
+    public function test_localhost_ssrf_is_allowed_by_default_for_dev_mode_traffic(): void
+    {
+        // Host apps legitimately post to their own origin (e.g. browser telemetry
+        // sending http://localhost:8000/). Must NOT be treated as an attack.
+        $response = $this->withServerVariables(['REMOTE_ADDR' => '198.51.110.1'])
+            ->postJson('/api/profile', ['payload' => 'http://localhost:8000/']);
+
+        $this->assertSame(200, $response->getStatusCode(), 'Legitimate localhost origin reference falsely blocked');
+    }
+
+    public function test_localhost_ssrf_is_blocked_when_opted_in(): void
+    {
+        config()->set('security-defense.detection.rules.payload_injection.patterns.ssrf_localhost', true);
+
+        $response = $this->withServerVariables(['REMOTE_ADDR' => '198.51.110.2'])
+            ->postJson('/api/profile', ['payload' => 'http://localhost:8000/']);
+
+        $this->assertSame(403, $response->getStatusCode(), 'Localhost SSRF not blocked in strict mode');
     }
 
     public function test_sql_comment_obfuscation_and_fullwidth_unicode_are_blocked(): void
