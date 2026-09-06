@@ -8,11 +8,14 @@ use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 
 /**
- * One-command integration between mixudev/security-defense and
- * mixudev/laravel-authentication: installs the auth package, publishes its
- * assets, injects the WAF middleware, and wires the event-subscriber bridge
- * so every auth domain event (login failed/succeeded, lockout, 2FA, device,
- * password, session) flows into the SIEM/defense engine automatically.
+ * Generates the event bridge between mixudev/security-defense and
+ * mixudev/laravel-authentication: one subscriber file that forwards every
+ * auth domain event (login failed/succeeded, lockout, 2FA, device, password,
+ * session) into the SIEM/defense engine.
+ *
+ * Instalasi package auth (composer require, publish config, migrasi) sengaja
+ * TIDAK ditangani di sini — itu urusan package auth itu sendiri
+ * (php artisan authentication:install).
  */
 class AuthSyncCommand extends Command
 {
@@ -22,67 +25,45 @@ class AuthSyncCommand extends Command
      * @var string
      */
     protected $signature = 'auth:sync
-                            {--force : Overwrite existing published auth files and bridge}
-                            {--dry-run : Show the planned steps without writing anything}
-                            {--composer= : Composer binary/command to use (default: composer)}';
+                            {--force : Overwrite the existing bridge subscriber}
+                            {--dry-run : Show the planned steps without writing anything}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Install mixudev/laravel-authentication, publish assets, and wire the security-defense event bridge automatically';
+    protected $description = 'Generate the security-defense event bridge subscriber for mixudev/laravel-authentication events';
 
     public function handle(Filesystem $filesystem): int
     {
         $dryRun = (bool) $this->option('dry-run');
-        $force = (bool) $this->option('force');
-        $composer = is_string($this->option('composer')) ? $this->option('composer') : 'composer';
 
         if (! $this->authPackageInstalled()) {
             if ($dryRun) {
-                $this->line('  [DRY-RUN] Would run: ' . $composer . ' require mixudev/laravel-authentication');
+                $this->line('  [DRY-RUN] mixudev/laravel-authentication not installed — would abort.');
             } else {
-                $this->info('[1/6] Installing mixudev/laravel-authentication via Composer...');
-
-                $result = $this->runProcess([$composer, 'require', 'mixudev/laravel-authentication', '--no-interaction']);
-                if ($result !== 0) {
-                    $this->error('Composer install failed. Run it manually and retry auth:sync.');
-                    $this->line('  Manual: ' . $composer . ' require mixudev/laravel-authentication');
-
-                    return self::FAILURE;
-                }
+                $this->error('mixudev/laravel-authentication belum terpasang.');
             }
-        } else {
-            $this->line('  [OK] mixudev/laravel-authentication already installed.');
+
+            $this->line('  Install dulu package auth-nya (urusan package itu sendiri):');
+            $this->line('    composer require mixudev/laravel-authentication');
+            $this->line('    php artisan authentication:install');
+            $this->line('  Lalu jalankan ulang: php artisan auth:sync');
+
+            return self::FAILURE;
         }
 
-        $steps = [
-            'vendor:publish --tag=authentication-config' => 'Publish auth configuration to config/authentication.php',
-            'vendor:publish --tag=authentication-migrations' => 'Publish auth migrations to database/migrations/',
-        ];
+        $this->line('  [OK] mixudev/laravel-authentication detected.');
 
-        foreach ($steps as $command => $label) {
-            $this->line($dryRun ? "  [DRY-RUN] Would run: php artisan {$command} --force" : "  → {$label}");
-            if (! $dryRun) {
-                $this->call('vendor:publish', [
-                    '--tag' => str_replace('vendor:publish --tag=', '', $command),
-                    '--force' => $force,
-                ]);
-            }
-        }
-
-        // WAF middleware injection
-        $this->injectWafMiddleware($filesystem, $dryRun);
-
-        // Event bridge subscriber
+        // Generate the bridge subscriber (the only file auth:sync creates)
         $this->createBridgeSubscriber($filesystem, $dryRun);
 
-        // Auth event mapping (used for both dry-run report and registration check)
-        $events = $this->authEventMapping();
+        // Inject the package's own WAF middleware if not yet registered
+        $this->injectWafMiddleware($filesystem, $dryRun);
 
         if ($dryRun) {
-            $this->line('  [DRY-RUN] Would register ' . count($events) . ' auth event handlers via AppServiceProvider::subscribe().');
+            $this->line('  [DRY-RUN] Would register ' . count($this->authEventMapping()) . ' auth event handlers.');
 
             return self::SUCCESS;
         }
@@ -95,7 +76,7 @@ class AuthSyncCommand extends Command
         }
 
         $this->newLine();
-        $this->info('[DONE] auth:sync completed. Subscribe the bridge, then run: php artisan migrate');
+        $this->info('[DONE] auth:sync selesai. Bridge subscriber siap mendengarkan semua event package auth.');
 
         return self::SUCCESS;
     }
@@ -294,36 +275,18 @@ PHP;
     }
 
     /**
-     * Run an external process, returning its exit code.
-     *
-     * @param array<int, string> $command
-     */
-    protected function runProcess(array $command): int
-    {
-        $output = [];
-        $exitCode = 0;
-
-        exec(implode(' ', array_map('escapeshellarg', $command)) . ' 2>&1', $output, $exitCode);
-
-        foreach ($output as $line) {
-            $this->line($line);
-        }
-
-        return $exitCode;
-    }
-
-    /**
-     * Inject the WAF middleware into the host application.
+     * Inject the package's own WAF middleware into the host application.
      * Laravel 11+ uses bootstrap/app.php; Laravel 10 uses app/Http/Kernel.php.
+     * This is security-defense's own component, so auth:sync handles it.
      */
     protected function injectWafMiddleware(Filesystem $filesystem, bool $dryRun): void
     {
-        $appBootstrap = base_path('bootstrap/app.php');
-        $kernelPath = app_path('Http/Kernel.php');
+        $appBootstrap = $this->bootstrapFile();
+        $kernelPath = $this->kernelFile();
+        $needle = 'Mixudev\SecurityDefense\Middleware\RequestThreatScanner';
 
         if ($filesystem->exists($appBootstrap)) {
             $content = $filesystem->get($appBootstrap);
-            $needle = 'Mixudev\SecurityDefense\Middleware\RequestThreatScanner';
 
             if (str_contains($content, $needle)) {
                 $this->line('  [OK] WAF middleware already registered in bootstrap/app.php');
@@ -332,29 +295,24 @@ PHP;
             }
 
             if (str_contains($content, '$middleware->append(')) {
-                $injection = $dryRun
-                    ? '  [DRY-RUN] Would append RequestThreatScanner to bootstrap/app.php'
-                    : '';
-                $this->line($injection ?: '  → Injecting WAF middleware into bootstrap/app.php');
-
-                if ($dryRun) {
-                    return;
+                if (! $dryRun) {
+                    $content = str_replace(
+                        '$middleware->append(',
+                        '$middleware->append(\\Mixudev\\SecurityDefense\\Middleware\\RequestThreatScanner::class);' . PHP_EOL . '        $middleware->append(',
+                        $content
+                    );
+                    $filesystem->put($appBootstrap, $content);
+                    $this->line('  → Injected RequestThreatScanner into bootstrap/app.php');
+                } else {
+                    $this->line('  [DRY-RUN] Would inject RequestThreatScanner into bootstrap/app.php');
                 }
-
-                $content = str_replace(
-                    '$middleware->append(',
-                    '$middleware->append(\\Mixudev\\SecurityDefense\\Middleware\\RequestThreatScanner::class);' . PHP_EOL . '        $middleware->append(',
-                    $content
-                );
-                $filesystem->put($appBootstrap, $content);
 
                 return;
             }
 
-            $this->warn('  [WARN] bootstrap/app.php found but no $middleware->append( pattern. Add RequestThreatScanner manually.');
+            $this->warn('  [WARN] bootstrap/app.php found but no $middleware->append( pattern. Register RequestThreatScanner manually.');
         } elseif ($filesystem->exists($kernelPath)) {
             $content = $filesystem->get($kernelPath);
-            $needle = 'Mixudev\SecurityDefense\Middleware\RequestThreatScanner';
 
             if (str_contains($content, $needle)) {
                 $this->line('  [OK] WAF middleware already registered in app/Http/Kernel.php');
@@ -374,10 +332,26 @@ PHP;
                 $content
             );
             $filesystem->put($kernelPath, $content);
-            $this->line('  → Injected WAF middleware into app/Http/Kernel.php');
+            $this->line('  → Injected RequestThreatScanner into app/Http/Kernel.php');
         } else {
             $this->warn('  [WARN] No bootstrap/app.php or app/Http/Kernel.php found. Register RequestThreatScanner globally.');
         }
+    }
+
+    /**
+     * Path to the Laravel 11+ bootstrap/app.php.
+     */
+    protected function bootstrapFile(): string
+    {
+        return base_path('bootstrap/app.php');
+    }
+
+    /**
+     * Path to the Laravel 10 app/Http/Kernel.php.
+     */
+    protected function kernelFile(): string
+    {
+        return app_path('Http/Kernel.php');
     }
 
     /**

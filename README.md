@@ -188,7 +188,7 @@ Untuk panduan konfigurasi mendalam, detail arsitektur, dan operasional tingkat l
 - [docs/integrations/telemetry-ingestion.md](./docs/integrations/telemetry-ingestion.md) — Cara menghubungkan event login dari Breeze, Fortify, Sanctum, Jetstream, atau custom JWT ke method `record()`.
 - [docs/integrations/telegram-bot.md](./docs/integrations/telegram-bot.md) — Panduan lengkap kontrol panel bot Telegram: setup Webhook (server/cPanel tanpa daemon) vs Polling (localhost), menu health check, dan remote pardon.
 - [docs/integrations/laravel-auth-package.md](./docs/integrations/laravel-auth-package.md) — Panduan integrasi khusus via Event Subscriber dengan package `mixudev/laravel-authentication`.
-- [docs/integrations/auth-sync-command.md](./docs/integrations/auth-sync-command.md) — Command `auth:sync`: instal otomatis package authentication, publish aset, suntik middleware WAF, dan generate bridge subscriber.
+- [docs/integrations/auth-sync-command.md](./docs/integrations/auth-sync-command.md) — Command `auth:sync`: generate bridge subscriber agar defense mendengarkan semua event package `mixudev/laravel-authentication`, plus inject middleware WAF bila belum terdaftar.
 
 ### 4. Operasional & Pemeliharaan (Operations)
 - [docs/operations/dashboard.md](./docs/operations/dashboard.md) — Cara mengakses web dashboard SIEM bawaan, pengamanan rute produksi via Laravel Gate, metrik, dan toggle tema.

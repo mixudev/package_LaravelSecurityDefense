@@ -19,14 +19,17 @@ class AuthSyncCommandTest extends TestCase
         $this->assertTrue($this->artisan('list')->run() === 0);
     }
 
-    public function test_auth_sync_dry_run_reports_planned_steps_without_writing(): void
+    public function test_auth_sync_aborts_when_auth_package_not_installed(): void
     {
-        // dry-run must be safe in a package (no composer, no auth package installed)
-        $exitCode = $this->artisan('auth:sync', ['--dry-run' => true])
-            ->expectsOutputToContain('[DRY-RUN]')
+        // Auth package is NOT installed in this package's test env — command must
+        // fail gracefully with a pointer to authentication:install, no writes.
+        $exitCode = $this->artisan('auth:sync')
+            ->expectsOutputToContain('belum terpasang')
+            ->expectsOutputToContain('authentication:install')
             ->run();
 
-        $this->assertSame(0, $exitCode);
+        $this->assertSame(1, $exitCode);
+        $this->assertFileDoesNotExist(app_path('Listeners/AuthenticationSecuritySubscriber.php'));
     }
 
     public function test_auth_event_mapping_has_expected_handlers(): void
@@ -40,6 +43,42 @@ class AuthSyncCommandTest extends TestCase
         $this->assertArrayHasKey('loginSucceeded', $events);
         $this->assertSame('LoginFailed', $events['loginFailed']['eventType']);
         $this->assertSame('OTP_VERIFIED', $events['otpVerified']['eventType']);
+    }
+
+    public function test_waf_middleware_injection_into_bootstrap_app(): void
+    {
+        $tmpBase = sys_get_temp_dir() . '/authsync-waf-' . uniqid();
+        $files = new \Illuminate\Filesystem\Filesystem();
+        $files->ensureDirectoryExists($tmpBase . '/bootstrap');
+        $files->put($tmpBase . '/bootstrap/app.php', "<?php\n\nreturn \\Illuminate\\Foundation\\Application::configure(basePath: dirname(__DIR__))\n    ->withMiddleware(function (\\Illuminate\\Foundation\\Configuration\\Middleware \$middleware) {\n        \$middleware->append(\\Illuminate\\Session\\Middleware\\StartSession::class);\n    })\n    ->create();\n");
+
+        $command = new class extends AuthSyncCommand {
+            public string $tmpBase = '';
+
+            protected function bootstrapFile(): string
+            {
+                return $this->tmpBase . '/bootstrap/app.php';
+            }
+
+            protected function kernelFile(): string
+            {
+                return $this->tmpBase . '/app/Http/Kernel.php';
+            }
+        };
+        $command->tmpBase = $tmpBase;
+        $command->setOutput(new \Illuminate\Console\OutputStyle(
+            new \Symfony\Component\Console\Input\ArrayInput([]),
+            new \Symfony\Component\Console\Output\BufferedOutput()
+        ));
+
+        $reflection = new \ReflectionMethod(AuthSyncCommand::class, 'injectWafMiddleware');
+        $reflection->invoke($command, $files, false);
+
+        $content = $files->get($tmpBase . '/bootstrap/app.php');
+        $this->assertStringContainsString('RequestThreatScanner', $content);
+        $this->assertStringContainsString('$middleware->append(', $content);
+
+        $files->deleteDirectory($tmpBase);
     }
 
     public function test_generated_subscriber_body_is_valid_php(): void
