@@ -26,6 +26,7 @@ Dokumentasi lengkap untuk integrasi, konfigurasi, operasional, dan arsitektur pa
 - [Ingesti Telemetri Autentikasi](./integrations/telemetry-ingestion.md) - Menghubungkan telemetri dari Laravel Breeze, Fortify, Sanctum, Passport, atau sistem kustom.
 - [Bot Telegram Interaktif](./integrations/telegram-bot.md) - Setup Webhook produksi vs Polling lokal, menu kontrol panel, health check, dan remote pardon.
 - [Integrasi Package mixudev/laravel-authentication](./integrations/laravel-auth-package.md) - Panduan subscriber event bridge dengan package autentikasi enterprise.
+- [Sinkronisasi Otomatis `auth:sync`](./integrations/auth-sync-command.md) - Instal otomatis package authentication, publish aset, suntik middleware WAF, dan buat bridge subscriber satu perintah.
 
 ### 4. Operasional & Pemeliharaan (Operations)
 - [Dashboard SIEM](./operations/dashboard.md) - Cara membuka dan mengamankan web dashboard pemantauan keamanan lokal, metrik, dan toggle tema.

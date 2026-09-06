@@ -182,6 +182,7 @@ class SecurityDefenseServiceProvider extends ServiceProvider
             ], 'security-defense-views');
 
             $this->commands([
+                \Mixudev\SecurityDefense\Console\Commands\AuthSyncCommand::class,
                 \Mixudev\SecurityDefense\Console\Commands\TestWebhookCommand::class,
                 \Mixudev\SecurityDefense\Console\Commands\TelegramPollCommand::class,
                 \Mixudev\SecurityDefense\Console\Commands\TelegramWebhookCommand::class,
