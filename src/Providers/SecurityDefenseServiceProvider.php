@@ -55,7 +55,9 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                 // flat config accessor (config('a.b.c')) reads them correctly.
                 foreach ($overrides as $key => $value) {
                     if (str_contains((string) $key, '.')) {
-                        data_set($this->app['config']->get('security-defense'), $key, $value);
+                        $config = $this->app['config']->get('security-defense');
+                        data_set($config, $key, $value);
+                        $this->app['config']->set('security-defense', $config);
                     }
                 }
             }
