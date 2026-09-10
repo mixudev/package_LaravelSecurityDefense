@@ -93,7 +93,7 @@ Catatan: direktori `src/Contracts/` berisi 5 interface inti. Interface epistemic
 - `RequestThreatScanner` (`src/Middleware/`) — pre-controller; fast-path GET/HEAD tanpa query/body kecuali `scan_empty_requests=true`; TRACE/TRACK block; request flood limiter (default 200 req/s, jail 2 jendela, 429); payload scan; auto-jail critical; quarantine lookup cache + DB fallback (`security_quarantines`); pemrosesan telemetry ke detection engine; 403 JSON/HTML.
 - `AuthenticatedSessionScanner` — session intelligence post-login (hijack, velocity, header anomaly).
 - `ContentSecurityPolicyArmor` — inject CSP header nonce default bila `policy=null`.
-- `EnsureLocalAccess` (`src/Http/Middleware/`) — batasi akses dashboard ke `dashboard.allowed_ips`/local-only.
+- `EnsureLocalAccess` (`src/Http/Middleware/`) — fail-closed: local environment + IP/CIDR allowlist; public mode opt-in dengan authenticated user, authorization/step-up Gate, hashed-IP denial rate limit, dan no-store security headers.
 
 ---
 

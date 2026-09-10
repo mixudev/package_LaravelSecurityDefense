@@ -47,7 +47,7 @@ Tabel aktif di dashboard menampilkan setiap IP yang di-jail (Fail2Ban style):
   whitelist permanen via overrides file + langsung pardon. IP whitelisted tak
   pernah di-jail lagi.
 
-Keduanya dilindungi dashboard gate (local_only + allowed_ips).
+Keduanya memakai `EnsureLocalAccess`: mode lokal mensyaratkan environment `local` + `allowed_ips`; mode publik (opt-in) mensyaratkan `public.enabled`, IP/CIDR allowlist, user terautentikasi, dan authorization Gate.
 
 ## Live WAF Events
 

@@ -295,23 +295,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Security Defense Monitoring Dashboard
-    |--------------------------------------------------------------------------
-    | Dedicated real-time monitoring interface for security posture, threat stats,
-    | IP quarantines, and alert channel diagnostic testing.
-    */
-    'dashboard' => [
-        'enabled' => true,
-        'path' => 'security-defense',
-        'local_only' => true,
-        'allowed_ips' => [
-            '127.0.0.1',
-            '::1',
-        ],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Database Change Monitoring & Tamper Intelligence (Audit Trail)
     |--------------------------------------------------------------------------
     | Tracks what data changed, when, by whom, originating URL, method, and
@@ -409,6 +392,7 @@ return [
     */
     'dashboard' => [
         'enabled' => true,
+        'path' => 'security-defense',
         'local_only' => true,
         'allowed_ips' => ['127.0.0.1', '::1'],
         'cache' => [
@@ -418,6 +402,20 @@ return [
         'rate_limit' => [
             'enabled' => true,
             'max_probes_per_minute' => 30,
+        ],
+        // Public exposure is opt-in and fail-closed. Prefer VPN/private network.
+        'public' => [
+            'enabled' => false,
+            'authorization_gate' => 'viewSecurityDefenseDashboard',
+            'require_authenticated_user' => true,
+            'require_step_up' => false,
+            'step_up_gate' => null,
+            'allowed_ips' => [],
+            'allowed_cidrs' => [],
+            'rate_limit' => [
+                'max_attempts' => 10,
+                'decay_seconds' => 60,
+            ],
         ],
     ],
 

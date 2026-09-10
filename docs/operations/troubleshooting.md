@@ -6,16 +6,18 @@ Penyelesaian masalah umum saat mengintegrasikan atau menjalankan package.
 
 ## 1. Dashboard Mengembalikan Respon HTTP 403 Forbidden
 
-**Penyebab**: Middleware `EnsureLocalAccess` menolak akses pada dashboard. Kondisi lingkungan bukan `local`, atau IP klien tidak terdaftar di `allowed_ips`, atau Gate kustom `viewSecurityDefenseDashboard` belum dikonfigurasi.
+**Penyebab**: Middleware `EnsureLocalAccess` menolak akses pada dashboard. Kondisi lingkungan bukan `local`, atau IP klien tidak cocok dengan allowlist.
 
 **Solusi**:
-- Saat development: akses melalui `localhost` atau `127.0.0.1`.
-- Pada server staging/production: definisikan Laravel Gate di `AppServiceProvider::boot()`:
+- Mode lokal (default): akses dari `localhost` / `127.0.0.1` / `::1` pada environment `local`; tambahkan IP lain (atau CIDR) ke `dashboard.allowed_ips` bila perlu.
+- Mode produksi yang sengaja mengekspos dashboard: set `dashboard.local_only=false`, `dashboard.public.enabled=true`, daftarkan IP/CIDR di `dashboard.public.allowed_ips`/`allowed_cidrs`, dan wajibkan Gate host:
   ```php
   Gate::define('viewSecurityDefenseDashboard', function ($user) {
       return $user && $user->is_admin;
   });
   ```
+  Pastikan juga `dashboard.public.require_authenticated_user=true` dan user sudah login.
+- Jika tetap 403: periksa rate-limit publik (`public.rate_limit`) — percobaan berulang dari IP yang tidak diizinkan akan mendapat 429.
 
 ---
 

@@ -22,6 +22,9 @@ class DashboardAccessTest extends TestCase
 
     protected function tearDown(): void
     {
+        \Illuminate\Support\Facades\RateLimiter::clear('security-defense:dashboard-access:' . hash('sha256', '127.0.0.1'));
+        \Illuminate\Support\Facades\RateLimiter::clear('security-defense:dashboard-access:' . hash('sha256', '203.0.113.88'));
+
         // Restore environment to testing so teardown migration rollbacks don't prompt in production
         $this->app['env'] = 'testing';
 
@@ -105,8 +108,14 @@ class DashboardAccessTest extends TestCase
     public function test_dashboard_allows_access_if_custom_gate_is_satisfied(): void
     {
         $this->app['env'] = 'production';
+        config()->set('security-defense.dashboard.local_only', false);
+        config()->set('security-defense.dashboard.public.enabled', true);
+        config()->set('security-defense.dashboard.public.require_authenticated_user', false);
+        config()->set('security-defense.dashboard.public.allowed_ips', ['127.0.0.1', '::1']);
 
         Gate::define('viewSecurityDefenseDashboard', fn (?object $user = null) => true);
+        $this->assertTrue(config('security-defense.dashboard.public.enabled'));
+        $this->assertTrue(Gate::has('viewSecurityDefenseDashboard'));
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
             ->get('/security-defense');

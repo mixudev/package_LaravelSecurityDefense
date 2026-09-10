@@ -15,14 +15,49 @@ Pengaturan di `config/security-defense.php` (`dashboard`):
 - `enabled`: Mengaktifkan rute dashboard (default `true`).
 - `path`: URL slug path (default `'security-defense'`).
 - `local_only`: Batasi akses hanya untuk localhost / environment `local` (default `true`).
+- `allowed_ips`: Daftar alamat IP (atau CIDR) yang diizinkan pada mode lokal (default `['127.0.0.1', '::1']`).
+- `public.enabled`: Aktifkan exposure publik secara eksplisit (default `false` — fail-closed).
+- `public.allowed_ips` / `public.allowed_cidrs`: Allowlist ketat untuk mode publik.
+- `public.authorization_gate`: Nama Laravel Gate yang wajib diizinkan pada mode publik.
+- `public.require_authenticated_user`: Wajibkan user terautentikasi (default `true`).
+- `public.require_step_up` / `public.step_up_gate`: Verifikasi lanjutan opsional.
+- `public.rate_limit`: Batas percobaan akses gagal per IP (default `max_attempts=10` / `decay_seconds=60`).
+
+Akses mode lokal (default, `local_only=true`):
+- Hanya environment `local` + alamat IP loopback/allowlist yang bisa masuk.
+- Tidak ada login diminta — dashboard adalah alat operasional lokal.
+- Gate host tidak pernah bisa meng-elevasi ip non-loopback pada mode lokal.
+
+Akses mode publik (opt-in, `local_only=false`):
+- Wajib `public.enabled=true`, jika tidak: HTTP 403.
+- Wajib IP/CIDR klien terdaftar di allowlist.
+- Wajib user terautentikasi secara host.
+- Wajib Gate `public.authorization_gate` mengizinkan (user + request).
+- Opsional step-up Gate bila `require_step_up=true`.
+- Semua penolakan akses publik dibatasi rate (HTTP 429 setelah batas).
+
+Header keamanan pada semua response dashboard:
+`Cache-Control: no-store, no-cache, must-revalidate, private`, `Pragma: no-cache`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`.
+
+Header spoofing tidak pernah dipercaya: `X-Forwarded-For`, `X-Real-IP`, `Client-IP` tidak mempengaruhi keputusan izin.
 
 ---
 
 ## 2. Pengamanan Akses di Server Produksi (`EnsureLocalAccess`)
 
-Dashboard dilindungi oleh middleware khusus `EnsureLocalAccess`. Pada environment produksi, akses akan ditolak (HTTP 403) kecuali jika:
-1. Alamat IP terdaftar pada `config('security-defense.dashboard.allowed_ips')`.
-2. Anda mendefinisikan Laravel Gate bernama `viewSecurityDefenseDashboard` di `AppServiceProvider::boot()`:
+Dashboard dilindungi oleh middleware `EnsureLocalAccess`. Kebijakannya fail-closed:
+
+Mode lokal (default `local_only=true`):
+1. Environment harus `local`.
+2. IP klien harus dalam `allowed_ips` (loopback default — dukungan CIDR).
+
+Jika keduanya tidak terpenuhi: HTTP 403. Gate host tidak relevan di mode ini.
+
+Mode publik (`local_only=false` — hanya untuk deployment yang benar-benar ingin expose; lebih disarankan VPN/private network):
+1. `public.enabled` harus `true`.
+2. IP klien harus dalam `public.allowed_ips` / `public.allowed_cidrs` (IPv4 dan IPv6, CIDR didukung).
+3. Wajib ada user terautentikasi (`require_authenticated_user=true`).
+4. Gate `public.authorization_gate` harus diizinkan:
 
 ```php
 use Illuminate\Support\Facades\Gate;
@@ -32,7 +67,9 @@ Gate::define('viewSecurityDefenseDashboard', function ($user) {
 });
 ```
 
-Dengan Gate ini, hanya administrator terautentikasi yang dapat membuka halaman dashboard di server live.
+5. Opsional: step-up Gate kedua bila `require_step_up=true`.
+
+Dengan konfigurasi ini, hanya operator terautentikasi dari alamat IP yang terdaftar yang bisa membuka dashboard saat terpapar publik. Semua kondisi gagal menghasilkan 403/429 yang identik (tanpa bocor alasan/topologi).
 
 ---
 
