@@ -64,11 +64,11 @@ Bukti berasal dari `SecurityEvent`, bukti yang diberikan melalui `AnalysisContex
 
 ### Confidence
 
-`confidence` menyatakan seberapa kuat bukti mendukung hipotesis setelah bukti pendukung dan kontradiktif dipertimbangkan. Confidence bukan probabilitas kebenaran yang dijamin dan bukan pengganti verifikasi operasional.
+- `confidence` menyatakan seberapa kuat bukti mendukung hipotesis setelah bukti pendukung dan kontradiktif dipertimbangkan (`EpistemicEngine::computeConfidence`). Confidence bukan probabilitas kebenaran yang dijamin dan bukan pengganti verifikasi operasional.
 
 ### Risk
 
-`risk` adalah skor risiko hasil `RiskEngine` untuk assessment. Risk membantu pemeringkatan dan pengambilan tindakan, tetapi tidak membuktikan identitas penyerang atau niatnya.
+- `risk` adalah skor risiko hasil `RiskEngine` untuk assessment (`calculate(ThreatBelief, RiskScore, config)`). Risk membantu pemeringkatan dan pengambilan tindakan, tetapi tidak membuktikan identitas penyerang atau niatnya.
 
 ### Policy
 
@@ -90,13 +90,13 @@ if ($hypotheses !== []) {
 }
 ```
 
-`SecurityDefense::recordFeedback(ThreatBelief $belief, string $outcome, ?string $feedbackId = null): void` adalah API publik. Outcome yang valid hanya `'confirmed_attack'` dan `'false_positive'`; `'confirmed'` tidak valid. `feedbackId` opsional mencegah replay feedback selama retensi. Jangan menganggap feedback sebagai bukti baru tanpa proses validasi.
+`SecurityDefense::recordFeedback(ThreatBelief $belief, string $outcome, ?string $feedbackId = null): void` adalah API publik. Outcome valid hanya `'confirmed_attack'` dan `'false_positive'`; `'confirmed'` tidak valid. `feedbackId` opsional mencegah replay feedback selama retensi. Feedback diverifikasi via `FeedbackHandler` (`src/Epistemic/Feedback/FeedbackHandler.php`). Jangan menganggap feedback sebagai bukti baru tanpa proses validasi.
 
 ## Batas provider AI
 
 `AiEvidenceProviderInterface` hanya memasok evidence tambahan melalui `getEvidenceFor(AnalysisContext $context): array`. Provider default `NullAiProvider` tidak memasok bukti. Evidence AI yang lolos validasi dapat ikut korelasi dan memengaruhi assessment, tetapi tetap advisory; AI bukan decision authority.
 
-`epistemic.response.enabled=false` secara default. Tidak ada enforcement tanpa konfigurasi `DecisionResponseAdapterInterface` dan opt-in eksplisit; `NoopResponseAdapter` tidak melakukan enforcement.
+- `epistemic.response.enabled=false` secara default. Tidak ada enforcement tanpa konfigurasi `DecisionResponseAdapterInterface` dan opt-in eksplisit; `NoopResponseAdapter` tidak melakukan enforcement. Response execution deduplicated lewat cache key (`response.dedup_ttl`, fallback 300 detik) agar adapter tidak menjalankan tindakan ganda untuk assessment yang sama.
 
 AI berada di sisi **evidence source**, bukan decision authority. Provider tidak boleh:
 
@@ -121,8 +121,8 @@ Implementasi provider nyata harus didaftarkan melalui binding Service Provider a
 
 - `AnalysisContext` membatasi maksimal 500 event dan 500 evidence; metadata dibatasi 4096 byte.
 - Graph dibatasi `max_depth=8`, `max_nodes=500`, dan `window_seconds=900`. Timestamp evidence AI lebih dari 60 detik ke masa depan ditolak.
-- Memory berbasis cache menyimpan maksimal 10000 pola dengan retensi 30 hari. Penyimpanan memakai cache lock; fallback memakai counter atomik bila lock tidak tersedia.
-- Batas dan timestamp dapat mengurangi cakupan korelasi; sistem bukan mesin replay bebas atas seluruh histori.
+- Memory berbasis cache menyimpan maksimal 10000 pola (`memory.max_patterns`) dengan retensi 30 hari (`memory.retention_days`). Penyimpanan memakai cache lock; fallback memakai counter atomik bila lock tidak tersedia. `feedbackId` menutup replay feedback selama retensi.
+- Batas dan timestamp dapat mengurangi cakupan korelasi; sistem bukan mesin replay bebas atas seluruh histori. AI evidence hanya ikut korelasi bila ada minimal 2 bukti trusted; tanpa bukti trusted, decision tidak dibuat (`null`).
 
 ## Keterbatasan keamanan
 

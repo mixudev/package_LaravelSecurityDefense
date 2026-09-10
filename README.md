@@ -5,6 +5,7 @@
 [![Versi PHP](https://img.shields.io/badge/PHP-%5E8.2-blue.svg?style=flat-square)]()
 [![Kompatibilitas Laravel](https://img.shields.io/badge/Laravel-10%20%7C%2011%20%7C%2012%20%7C%2013-red.svg?style=flat-square)]()
 [![Lisensi: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-311%20%7C%20948%20assertions-brightgreen.svg?style=flat-square)]()
 
 **`mixudev/security-defense`** adalah package pertahanan keamanan tingkat enterprise untuk aplikasi Laravel. Bertindak sebagai **"kamera pengawas, perisai proaktif, dan integritas data"** yang mendeteksi ancaman secara real-time, mengorelasikan pola serangan multi-vektor, mengisolasi penyerang (Fail2Ban IP Quarantine), memantau mutasi data & mendeteksi manipulasi parameter Burp Suite, melindungi sesi terautentikasi dari pencurian cookie malware, serta mengirimkan alert ter-deduplikasi ke berbagai saluran.
 
@@ -13,7 +14,7 @@
 ## Ringkasan Teknologi & Sistem
 
 - **Decoupled Architecture**: Tidak menggantikan auth (user, session, hashing, atau token). Package murni mengonsumsi telemetri keamanan dari aplikasi.
-- **11 Aturan Deteksi Modular**: Brute Force, Credential Stuffing, Distributed Spray, Rate Limit Bypass, Injeksi Payload (SQLi, XSS, RCE, LFI), Impossible Travel, Path Reconnaissance, Scanner User-Agent, **Session Fingerprint & Hijack**, **Behavioral Velocity**, dan **HTTP Header Consistency**.
+- **11 Aturan Deteksi Modular**: Brute Force, Credential Stuffing, Distributed Spray, Rate Limit Bypass, Payload Injection (SQLi, XSS, command injection, traversal, SSRF/XXE, dan lainnya), Impossible Travel, Path Reconnaissance, User-Agent Anomaly, Session Fingerprint, Behavioral Velocity, dan HTTP Header Consistency.
 - **Database Change Monitoring & Burp Tamper Detection**: Melacak mutasi database (`created`, `updated`, `deleted`), old vs new values, URL, method, actor, snapshot payload, dan mendeteksi injeksi parameter sensitif / mass assignment via Burp Suite dengan garansi *zero-leakage redaction* (password disamarkan).
 - **Session Intelligence Layer**: Mendeteksi pencurian session cookie oleh malware di device korban (*infostealer*) serta scraping cepat pada akun yang sudah login.
 - **Multi-Tab Security Dashboard**: Navigasi lengkap untuk Threat Telemetry SIEM, Database Mutations, dan Session Intelligence.
@@ -22,6 +23,7 @@
 - **Fast-Path & Self-Defense Bounded**: Request GET/HEAD bersih tanpa body/query melewati scan regex secara instan. Dilengkapi proteksi Anti-ReDoS, batas memori rekursi, dan pembatas penulisan database.
 - **Notifikasi Multi-Channel**: Database, Telegram, Discord, Webhook (tanda tangan HMAC-SHA256), dan Email native Laravel dengan dukungan antrean asinkron (queue).
 - **Interactive Telegram Bot**: Kontrol panel interaktif via bot Telegram untuk health check, review insiden, dan unban IP.
+- **Epistemic Security (opt-in)**: Pipeline berbasis evidence dengan confidence, risk, threat graph, policy, feedback, cache memory, provider AI advisory, dan response adapter default-off.
 
 ---
 
@@ -29,7 +31,8 @@
 
 - PHP `^8.2`
 - Laravel `10.x`, `11.x`, `12.x`, atau `13.x`
-- Driver cache **Redis** atau **Memcached** (sangat disarankan untuk produksi)
+- Dependensi Composer runtime: PHP `^8.2`, `illuminate/support`, `illuminate/database`, `illuminate/cache`, `illuminate/http`, dan `illuminate/events` versi `^10.0|^11.0|^12.0|^13.0`
+- Redis atau Memcached sangat disarankan untuk produksi; package tetap dapat memakai cache store aplikasi lain
 
 ---
 
@@ -174,11 +177,12 @@ Untuk panduan konfigurasi mendalam, detail arsitektur, dan operasional tingkat l
 - [docs/getting-started/configuration.md](./docs/getting-started/configuration.md) — Referensi lengkap setiap kunci konfigurasi pada file `config/security-defense.php` beserta nilai default-nya.
 
 ### 2. Fitur Keamanan (Features)
-- [docs/features/detection-rules.md](./docs/features/detection-rules.md) — Penjelasan cara kerja 8 aturan deteksi modular (Brute force, Stuffing, Spray, Injection, Travel, Recon, Scanner UA).
+- [docs/features/detection-rules.md](./docs/features/detection-rules.md) — Penjelasan 11 aturan deteksi modular (Brute force, Stuffing, Spray, Bypass, Injection, Travel, Recon, Scanner UA, Session Fingerprint, Behavioral Velocity, Header Consistency).
 - [docs/features/dashboard.md](./docs/features/dashboard.md) — Fitur dashboard monitoring: KPI, quick-action toggle, IP quarantine management, live WAF events, date range filter.
 - [docs/features/waf-middleware.md](./docs/features/waf-middleware.md) — Penjelasan pipeline inspeksi middleware `RequestThreatScanner`, proteksi request flood, dan Fail2Ban auto-jailing.
 - [docs/features/threat-scoring.md](./docs/features/threat-scoring.md) — Mekanisme kalkulasi skor risiko kumulatif multi-vektor dan eskalasi otomatis ke status compound threat.
 - [docs/features/alert-channels.md](./docs/features/alert-channels.md) — Konfigurasi 5 saluran alert (Database, Telegram, Discord, Webhook HMAC, Email), deduplikasi fingerprint, dan antrean asinkron (queue).
+- [docs/features/epistemic-security.md](./docs/features/epistemic-security.md) — Analisis threat berbasis evidence, confidence, risk, policy, graph, memory, feedback, dan provider AI advisory.
 
 ### 3. Integrasi Sistem (Integrations)
 - [docs/integrations/data-audit.md](./docs/integrations/data-audit.md) — Panduan audit mutasi database, masking kredensial, dan deteksi manipulasi parameter Burp Suite.

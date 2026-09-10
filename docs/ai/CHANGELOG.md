@@ -8,9 +8,40 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Changed
-- Dokumentasi epistemic diperbarui untuk API array `SecurityDefense::analyze`, outcome feedback `confirmed_attack`/`false_positive`, batas input dan graph, memory cache, replay guard, cache lock, provider AI advisory, response adapter default-off, API publik, migrasi, dan config cache.
+### Added
+- **Epistemic pipeline** (`feat(epistemic): add autonomous security analysis subsystem`, feat `b0fdad9` 2026-09-10): `SecurityDefense::analyze(AnalysisContext|array)`, evidence/confidence/risk engine, `ThreatGraph` bounded traversal, `PolicyEngine` (threshold block 0.85 / quarantine 0.70 / challenge 0.50 / monitor 0.30), `FeedbackHandler` (outcome `confirmed_attack`/`false_positive`), `ExperienceMemory` cache, provider AI advisory, response adapter default-off. Default `epistemic.enabled=false`.
+- **Hardening epistemic pipeline** (`fix(security): harden epistemic integrity and telemetry`, `6fa668d` 2026-09-10): AI evidence tidak memicu response saat bukti trusted kurang; response execution dedup cache key; race hardening memory/lock; telemetry bounded.
+- **Hardening races quarantine & dashboard** (`fix(security): harden races quarantine and dashboard`, `0b96677` 2026-09-10): race condition quarantine persist dan dashboard toggle/state.
+- Update dokumentasi epistemic: API array `SecurityDefense::analyze`, outcome feedback `confirmed_attack`/`false_positive`, batas input dan graph, memory cache, replay guard, cache lock, provider AI advisory, response adapter default-off, API publik, migrasi, config cache.
 - Status epistemic ditegaskan sebagai eksperimental dan belum siap produksi.
+
+### Changed
+- `epistemic` default off, eksperimental, belum siap produksi.
+
+---
+
+## [1.7.2] - 2026-09-10 (HEAD, belum ditag)
+
+### Added
+- **`auth:sync` command** (`v1.7.0` `28a875a` 2026-09-06): generate bridge subscriber ke semua event `mixudev/laravel-authentication`.
+- **WAF middleware injection** (`v1.7.1` `36d8d68` 2026-09-06): `auth:sync` hanya generate bridge; injeksi middleware WAF dibuka kembali bila belum terdaftar.
+- **`ssrf_localhost` pattern** (`v1.6.2` `6159e0f` 2026-09-06): SSRF localhost/loopback split, default off (host app sah mengirim ke origin sendiri).
+- **Fix config override** (`aecc033` 2026-09-06): ekspansi file overrides via `data_set` by-reference fatal; toggle switch mencerminkan state (`c0d70a0`).
+
+### Changed (v1.5.x–v1.4.x)
+- **Dashboard date-range filter global** (`cbfa800` 2026-09-05): dashboard, data-audits, session pages.
+- **Quick-action toggles** (`8755969` 2026-09-05): block headless, CSP armor, async queue — persist via overrides file.
+- **IP quarantine management + live WAF events meter** (`7c0a772` 2026-09-05).
+- **Dark theme seragam semua tabel** (`779c2ea` 2026-09-05).
+- **Refactor services by responsibility** (`385ef42` 2026-09-05).
+- **Red-team agility suite + anti-evasion decoding** (`b0b2482` 2026-09-05): SSRF/XXE signature, PHP code execution, bot defense.
+- **Adversarial bypass/evasion test suite + signature hardening** (`256ae89` 2026-09-05).
+- **Async audit queue + official security events** (`6eaf090` 2026-09-05): `SessionCompromised`, `ParameterTampered`, `IpQuarantined`.
+- **Dashboard dark theme, equal chart heights, cache deserialization robust, configurable strictness** (`7bc1312` 2026-09-05).
+- **Data audit, session intelligence, CSP armor, data pruning** (`7087fa4` 2026-09-05, v1.3.0).
+
+### Tests
+- Baseline HEAD: **311 tests, 948 assertions** (PHPUnit OK). Direktori: `tests/Feature/` (termasuk `Epistemic/`), `tests/Unit/` (termasuk `Epistemic/`).
 
 ---
 
@@ -42,7 +73,7 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Tests
 - `RequestThreatScannerEnterpriseTest` baru (5 test): fast-path, query tetap
   discan, TRACE block, flood limiter jail, scanner UA diperluas.
-- Total suite: 77 tests, 300 assertions hijau.
+- Historical release validation passed; current HEAD baseline is **311 tests, 948 assertions**.
 
 ---
 

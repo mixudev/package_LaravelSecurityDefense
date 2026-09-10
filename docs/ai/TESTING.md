@@ -1,40 +1,46 @@
 # Testing Strategy — `mixudev/security-defense`
 
-Release validation targets package contracts, not only isolated service behavior.
+Validasi release mencakup kontrak package, integrasi Laravel, dan unit service.
 
 ## Environment
 
-- PHPUnit `11.5.56`
-- Orchestra Testbench `10.11.0` (Laravel 12 lock)
+- PHPUnit `12.x` dari `composer.json`
+- Orchestra Testbench `^8.0|^9.0|^10.0|^11.0`
 - SQLite in-memory database
-- Array cache by default; dedicated stores tested explicitly
+- Array cache default; cache store lain diuji eksplisit
 
-Run:
+## Menjalankan test
 
 ```bash
 vendor/bin/phpunit
 composer test
 ```
 
-## Current coverage
+Baseline HEAD: **311 tests, 948 assertions**. Output PHPUnit tetap sumber kebenaran.
 
-Current baseline before release-contract additions: **286 tests, 863 assertions**. Do not copy a test total from this document after adding or removing tests; use PHPUnit output as source of truth.
+## Struktur test
 
-`tests/Feature/IntegrationReleaseContractsTest.php` covers:
+```text
+tests/
+├── Feature/
+│   └── Epistemic/
+└── Unit/
+    └── Epistemic/
+```
 
-- SQLite migration `up` creation and `down` rollback for all package migrations.
-- Default config boot and cached-config-compatible provider defaults.
-- `security-defense.cache_store` isolation for `AlertDispatcher`, `ExperienceMemory`, and `IpQuarantineService`.
-- Epistemic provider bindings when feature disabled/enabled.
-- Manual host registration requirement for WAF middleware; package does not auto-register middleware aliases.
+- `tests/Feature/` — kontrak package, middleware, dashboard, audit, queue, command, telemetry, integrasi epistemic.
+- `tests/Feature/Epistemic/` — `EpistemicAnalyzerTest.php`, `EpistemicBackwardCompatibilityTest.php`.
+- `tests/Unit/` — channel, dispatcher, rules, sanitizer, scoring, service, event, regression security.
+- `tests/Unit/Epistemic/` — value objects, evidence, engine, graph, policy, memory, feedback, correlation, response boundary.
+- `tests/TestCase.php` — base test case.
 
-Existing unit and feature tests cover sanitization, detection rules, threat scoring, alert channels, queue dispatch, middleware behavior, dashboard flows, telemetry, and epistemic components.
+## Cakupan kontrak penting
 
-## Schema note
+`IntegrationReleaseContractsTest` memverifikasi migrasi, config boot, cache-store isolation, binding epistemic saat enabled/disabled, dan kewajiban registrasi middleware WAF oleh host app. Test epistemic juga memverifikasi batas evidence, feedback outcome, AI advisory, policy, response adapter, dan backward compatibility.
 
-`epistemic_threat_patterns` migration is currently dead schema: `ExperienceMemory` persists patterns in configured cache and has no model or database repository path. Tests verify migration rollback only. Do not infer DB persistence from this table or wire DB persistence without an explicit design change.
+`epistemic_threat_patterns` adalah schema migrasi yang belum dipakai sebagai repository. `ExperienceMemory` menyimpan pola pada cache. Jangan mengklaim persistence database tanpa perubahan desain.
 
-## Validation checklist
+## Checklist validasi
 
 ```bash
 vendor/bin/phpunit
@@ -42,4 +48,4 @@ find src tests database config routes -name '*.php' -print0 | xargs -0 -n1 php -
 git diff --check
 ```
 
-PHPStan is not part of local validation when unavailable. Composer validation remains environment-dependent if local Composer phar path is broken.
+PHPStan bukan dependency package. Markdown lint tidak tersedia di environment ini.

@@ -48,5 +48,5 @@ Dokumen ini memantau status pengerjaan seluruh fase paket `mixudev/security-defe
 - [x] `UserAgentAnomalyRule` (deteksi `sqlmap`, `nikto`, scanner bot tools)
 - [x] Active `IpQuarantineService` (Fail2Ban-style auto-jail & instant HTTP 429 rejection)
 - [x] Asynchronous Queued Alert Delivery (`DispatchAlertChannelJob`, `ShouldQueue`)
-- [x] 34 Unit & Feature tests (100% passing, 142 assertions)
+- [x] 311 Unit & Feature tests (948 assertions) pada package; integration playground terpisah diverifikasi dengan 19 tests dan 57 assertions
 - [x] Living documentation `docs/ai/*` diperbarui penuh

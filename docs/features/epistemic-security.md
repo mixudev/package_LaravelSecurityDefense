@@ -108,7 +108,7 @@ if ($hypotheses !== []) {
 }
 ```
 
-`SecurityDefense::recordFeedback(ThreatBelief $belief, string $outcome, ?string $feedbackId = null): void` adalah API publik. Outcome yang diterima hanya `'confirmed_attack'` dan `'false_positive'`; `'confirmed'` tidak valid. `feedbackId` opsional memberi deduplikasi feedback.
+`SecurityDefense::recordFeedback(ThreatBelief $belief, string $outcome, ?string $feedbackId = null): void` adalah API publik. Outcome yang diterima hanya `'confirmed_attack'` dan `'false_positive'`; `'confirmed'` tidak valid. `feedbackId` opsional memberi deduplikasi feedback selama retensi memory.
 
 Catat feedback hanya jika outcome sudah diverifikasi oleh proses aplikasi. Feedback salah dapat memengaruhi memory dan analisis berikutnya.
 
@@ -138,8 +138,8 @@ Package tidak menyediakan endpoint AI atau vendor tertentu. Feedback tersedia me
 
 ## Batas implementasi
 
-- `AnalysisContext` membatasi `max_events=500` dan `max_evidence=500`; metadata dibatasi `max_metadata_bytes=4096`.
-- Graph dibatasi `max_depth=8`, `max_nodes=500`, dan `window_seconds=900` secara konfigurasi. `windowSeconds` pada konteks default 900 detik. Timestamp masa depan evidence AI lebih dari 60 detik ditolak.
+- `AnalysisContext` dibatasi analyzer: `limits.max_events=500`, `limits.max_evidence=500`; direct evidence dan AI evidence dibatasi `ai.max_metadata_bytes=4096`.
+- Graph dibatasi `graph.max_depth=8`, `graph.max_nodes=500`, dan `graph.window_seconds=900`; `windowSeconds` DTO default 900 detik. Timestamp masa depan evidence lebih dari `ai.allowed_future_seconds=60` ditolak.
 - Memory berbasis cache menyimpan paling banyak `max_patterns=10000` pola dengan retensi `retention_days=30`. Penyimpanan memakai cache lock; fallback memakai counter atomik bila lock tidak tersedia. `feedbackId` mencegah replay feedback selama retensi.
 - Batas dapat mengurangi cakupan; event/evidence di luar batas, timestamp kedaluwarsa, atau rantai graph yang terlalu dalam dapat tidak terhubung.
 
