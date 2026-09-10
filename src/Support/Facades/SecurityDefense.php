@@ -19,6 +19,8 @@ use Mixudev\SecurityDefense\Services\SecurityDefenseManager;
  * @method static bool resolveAlert(int|SecurityAlert $alert)
  * @method static ThreatDetector detector()
  * @method static AlertDispatcher dispatcher()
+ * @method static \Mixudev\SecurityDefense\Epistemic\DTO\ThreatAssessment analyze(\Mixudev\SecurityDefense\Epistemic\DTO\AnalysisContext|array $context)
+ * @method static \Mixudev\SecurityDefense\Epistemic\EpistemicAnalyzer|null epistemic()
  *
  * @see SecurityDefenseManager
  */

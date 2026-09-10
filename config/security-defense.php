@@ -417,5 +417,19 @@ return [
             'max_probes_per_minute' => 30,
         ],
     ],
+
+    'epistemic' => [
+        'enabled' => false,
+        'confidence' => ['min' => 0.0, 'max' => 1.0],
+        'risk' => ['epsilon' => 0.001, 'max_iterations' => 10, 'decay' => 0.95],
+        'graph' => ['max_depth' => 8, 'max_nodes' => 500, 'window_seconds' => 900],
+        'memory' => ['retention_days' => 30, 'max_patterns' => 10000],
+        'policy' => [
+            'block_threshold' => 0.85,
+            'quarantine_threshold' => 0.70,
+            'challenge_threshold' => 0.50,
+            'monitor_threshold' => 0.30,
+        ],
+    ],
 ];
 

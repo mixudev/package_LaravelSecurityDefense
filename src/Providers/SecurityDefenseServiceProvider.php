@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Providers;
 
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Support\ServiceProvider;
 use Mixudev\SecurityDefense\Channels\DatabaseChannel;
 use Mixudev\SecurityDefense\Channels\DiscordChannel;
@@ -12,6 +13,14 @@ use Mixudev\SecurityDefense\Channels\TelegramChannel;
 use Mixudev\SecurityDefense\Channels\WebhookChannel;
 use Mixudev\SecurityDefense\Contracts\AlertDeduplicatorInterface;
 use Mixudev\SecurityDefense\Contracts\ThreatDetector;
+use Mixudev\SecurityDefense\Epistemic\AI\NullAiProvider;
+use Mixudev\SecurityDefense\Epistemic\Contracts\AiEvidenceProviderInterface;
+use Mixudev\SecurityDefense\Epistemic\Correlation\ThreatCorrelator;
+use Mixudev\SecurityDefense\Epistemic\Engine\EpistemicEngine;
+use Mixudev\SecurityDefense\Epistemic\Engine\RiskEngine;
+use Mixudev\SecurityDefense\Epistemic\EpistemicAnalyzer;
+use Mixudev\SecurityDefense\Epistemic\Memory\ExperienceMemory;
+use Mixudev\SecurityDefense\Epistemic\Policy\PolicyEngine;
 use Mixudev\SecurityDefense\Detection\AnomalyDetector;
 use Mixudev\SecurityDefense\Rules\BehavioralVelocityRule;
 use Mixudev\SecurityDefense\Rules\BruteForceRule;
@@ -144,13 +153,65 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         // Bind WAF threat telemetry recorder
         $this->app->singleton(\Mixudev\SecurityDefense\Services\ThreatTelemetryRecorder::class);
 
-        // Bind Primary Coordinator Manager with Enterprise Modules
+        // Epistemic subsystem (opt-in)
+        if ((bool) config('security-defense.epistemic.enabled', false)) {
+            $this->app->singleton(EpistemicEngine::class, function () {
+                $cfg = (array) config('security-defense.epistemic', []);
+                return new EpistemicEngine(
+                    evidenceTtlSeconds: (float) ($cfg['graph']['window_seconds'] ?? 900),
+                    confidenceMin: (float) ($cfg['confidence']['min'] ?? 0.0),
+                    confidenceMax: (float) ($cfg['confidence']['max'] ?? 1.0),
+                );
+            });
+            $this->app->singleton(RiskEngine::class, function () {
+                $cfg = (array) config('security-defense.epistemic.risk', []);
+                return new RiskEngine(
+                    decay: (float) ($cfg['decay'] ?? 0.95),
+                    epsilon: (float) ($cfg['epsilon'] ?? 0.001),
+                    maxIterations: (int) ($cfg['max_iterations'] ?? 10),
+                );
+            });
+            $this->app->singleton(PolicyEngine::class, function () {
+                $cfg = (array) config('security-defense.epistemic.policy', []);
+                return new PolicyEngine(
+                    blockThreshold: (float) ($cfg['block_threshold'] ?? 0.85),
+                    quarantineThreshold: (float) ($cfg['quarantine_threshold'] ?? 0.70),
+                    challengeThreshold: (float) ($cfg['challenge_threshold'] ?? 0.50),
+                    monitorThreshold: (float) ($cfg['monitor_threshold'] ?? 0.30),
+                );
+            });
+            $this->app->singleton(ExperienceMemory::class, function ($app) {
+                $cfg = (array) config('security-defense.epistemic.memory', []);
+                return new ExperienceMemory(
+                    cache: $app->make(CacheRepository::class),
+                    cachePrefix: (string) config('security-defense.cache_prefix', 'security_defense:'),
+                    maxPatterns: (int) ($cfg['max_patterns'] ?? 10000),
+                    retentionDays: (int) ($cfg['retention_days'] ?? 30),
+                );
+            });
+            $this->app->singleton(AiEvidenceProviderInterface::class, NullAiProvider::class);
+            $this->app->singleton(EpistemicAnalyzer::class, function ($app) {
+                return new EpistemicAnalyzer(
+                    epistemicEngine: $app->make(EpistemicEngine::class),
+                    riskEngine: $app->make(RiskEngine::class),
+                    correlator: new ThreatCorrelator(),
+                    policyEngine: $app->make(PolicyEngine::class),
+                    aiProvider: $app->make(AiEvidenceProviderInterface::class),
+                    config: (array) config('security-defense.epistemic', []),
+                );
+            });
+        }
+
+        // Bind Security Defense Manager (coordinator)
         $this->app->singleton(SecurityDefenseManager::class, function ($app) {
+            $epistemic = (bool) config('security-defense.epistemic.enabled', false)
+                ? $app->make(EpistemicAnalyzer::class) : null;
             return new SecurityDefenseManager(
                 detector: $app->make(ThreatDetector::class),
                 dispatcher: $app->make(AlertDispatcher::class),
                 scoringEngine: $app->make(ThreatScoringEngine::class),
-                quarantineService: $app->make(IpQuarantineService::class)
+                quarantineService: $app->make(IpQuarantineService::class),
+                epistemicAnalyzer: $epistemic,
             );
         });
 

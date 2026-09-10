@@ -8,6 +8,9 @@ use Mixudev\SecurityDefense\Contracts\ThreatDetector;
 use Mixudev\SecurityDefense\Contracts\ThreatSource;
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
+use Mixudev\SecurityDefense\Epistemic\DTO\AnalysisContext;
+use Mixudev\SecurityDefense\Epistemic\DTO\ThreatAssessment;
+use Mixudev\SecurityDefense\Epistemic\EpistemicAnalyzer;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
 use Mixudev\SecurityDefense\Sources\GenericArraySource;
 
@@ -20,7 +23,8 @@ class SecurityDefenseManager
         protected ThreatDetector $detector,
         protected AlertDispatcher $dispatcher,
         protected ?ThreatScoringEngine $scoringEngine = null,
-        protected ?IpQuarantineService $quarantineService = null
+        protected ?IpQuarantineService $quarantineService = null,
+        protected ?EpistemicAnalyzer $epistemicAnalyzer = null
     ) {
     }
 
@@ -110,5 +114,38 @@ class SecurityDefenseManager
     public function quarantine(): ?IpQuarantineService
     {
         return $this->quarantineService;
+    }
+
+    /**
+     * Epistemic analysis: probabilistic, evidence-correlated threat assessment.
+     * Opt-in. Does NOT replace record()/processEvent() — purely additive.
+     *
+     * @param AnalysisContext|array<SecurityEvent>|array<array<string, mixed>> $context
+     */
+    public function analyze(AnalysisContext|array $context): ThreatAssessment
+    {
+        if (!($context instanceof AnalysisContext)) {
+            $events = array_map(
+                fn($e) => $e instanceof SecurityEvent ? $e : SecurityEvent::fromArray((array) $e),
+                $context
+            );
+            $context = new AnalysisContext(events: $events);
+        }
+
+        if ($this->epistemicAnalyzer === null) {
+            throw new \RuntimeException(
+                'EpistemicAnalyzer not available. Set epistemic.enabled = true in config/security-defense.php.'
+            );
+        }
+
+        return $this->epistemicAnalyzer->analyze($context);
+    }
+
+    /**
+     * Get the epistemic analyzer instance.
+     */
+    public function epistemic(): ?EpistemicAnalyzer
+    {
+        return $this->epistemicAnalyzer;
     }
 }
