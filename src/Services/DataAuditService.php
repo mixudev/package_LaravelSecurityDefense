@@ -98,7 +98,7 @@ class DataAuditService
                 'actor_type' => $actor['type'],
                 'ip_address' => $request?->ip() ?? '127.0.0.1',
                 'user_agent' => substr((string) ($request?->userAgent() ?? 'CLI / System Process'), 0, 500),
-                'request_url' => $request ? substr($request->fullUrl(), 0, 1000) : 'CLI Console Command',
+                'request_url' => $request ? $this->safeRequestUrl($request) : 'CLI Console Command',
                 'request_method' => $request?->method() ?? 'CLI',
                 'request_route' => $request?->route()?->getName(),
                 'old_values' => empty($oldValues) ? null : $oldValues,
@@ -236,6 +236,16 @@ class DataAuditService
         } catch (Throwable) {
             // Fail-safe
         }
+    }
+
+    private function safeRequestUrl(Request $request): string
+    {
+        $routeName = $request->route()?->getName();
+        if (is_string($routeName) && str_starts_with($routeName, 'security-defense.')) {
+            return '[dashboard-route:' . $routeName . ']';
+        }
+
+        return substr($request->getSchemeAndHttpHost() . '/' . ltrim($request->path(), '/'), 0, 1000);
     }
 
     /**

@@ -22,6 +22,12 @@ Pengaturan di `config/security-defense.php` (`dashboard`):
 - `public.require_authenticated_user`: Wajibkan user terautentikasi (default `true`).
 - `public.require_step_up` / `public.step_up_gate`: Verifikasi lanjutan opsional.
 - `public.rate_limit`: Batas percobaan akses gagal per IP (default `max_attempts=10` / `decay_seconds=60`).
+- `opaque_path.enabled`: Sembunyikan prefix default dan gunakan path opaque host-managed (default `false`). Ini hanya discovery barrier, bukan autentikasi.
+- `SECURITY_DEFENSE_DASHBOARD_PATH`: Secret host environment berupa 43+ karakter base64url tanpa `/`, `=`, atau query token. Jangan simpan di config overrides, source, log, atau URL query.
+
+Opaque path memakai static secret dari environment agar kompatibel dengan `route:cache`. Rotasi berarti ubah secret pada deployment, rebuild config/route cache, lalu revoke session host bila ada indikasi kebocoran. Cache-backed atau per-request rotation tidak dipakai: bisa membuat node berbeda, route cache stale, dan open tab mati mendadak.
+
+URL opaque tetap bearer capability sampai secret dirotasi. TLS/HTTPS, secure session cookie, host authentication, Gate, IP/CIDR, CSRF, dan step-up tetap wajib.
 
 Akses mode lokal (default, `local_only=true`):
 - Hanya environment `local` + alamat IP loopback/allowlist yang bisa masuk.

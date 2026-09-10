@@ -6,10 +6,14 @@ use Illuminate\Support\Facades\Route;
 use Mixudev\SecurityDefense\Http\Controllers\DashboardController;
 use Mixudev\SecurityDefense\Http\Controllers\TelegramWebhookController;
 use Mixudev\SecurityDefense\Http\Middleware\EnsureLocalAccess;
+use Mixudev\SecurityDefense\Support\OpaqueDashboardPathResolver;
 
 // Dashboard Routes (Local Only)
 if (config('security-defense.dashboard.enabled', true)) {
-    $path = (string) config('security-defense.dashboard.path', 'security-defense');
+    $path = OpaqueDashboardPathResolver::resolvePath(
+        (bool) config('security-defense.dashboard.opaque_path.enabled', false),
+        (string) config('security-defense.dashboard.path', 'security-defense')
+    );
 
     Route::prefix($path)
         ->middleware(['web', EnsureLocalAccess::class])

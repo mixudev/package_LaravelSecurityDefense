@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Mixudev\SecurityDefense\Services\DashboardAccessPolicy;
+use Mixudev\SecurityDefense\Support\OpaqueDashboardPathResolver;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -83,7 +84,8 @@ class EnsureLocalAccess
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
             ->header('Pragma', 'no-cache')
             ->header('X-Content-Type-Options', 'nosniff')
-            ->header('X-Frame-Options', 'DENY');
+            ->header('X-Frame-Options', 'DENY')
+            ->header('Referrer-Policy', 'no-referrer');
     }
 
     private function networkAllows(string $clientIp, array $public): bool
@@ -147,11 +149,27 @@ class EnsureLocalAccess
         return RateLimiter::tooManyAttempts($rateKey, $maxAttempts);
     }
 
+    private function safeLogPath(Request $request): string
+    {
+        $routeName = $request->route()?->getName();
+        if (is_string($routeName) && str_starts_with($routeName, 'security-defense.')) {
+            return '[dashboard-route:' . $routeName . ']';
+        }
+
+        $path = $request->path();
+        $configuredToken = OpaqueDashboardPathResolver::token();
+        if (is_string($configuredToken) && $configuredToken !== '') {
+            $path = str_replace($configuredToken, '[REDACTED]', $path);
+        }
+
+        return substr($path, 0, 200);
+    }
+
     private function deny(Request $request, bool $localOnly, string $reason): void
     {
         Log::warning('Security Defense dashboard access denied.', [
             'reason' => $reason,
-            'path' => $request->path(),
+            'path' => $this->safeLogPath($request),
             'user_id' => $request->user()?->getAuthIdentifier(),
             'local_only' => $localOnly,
         ]);

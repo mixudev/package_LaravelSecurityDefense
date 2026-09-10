@@ -21,6 +21,37 @@ class AuthenticatedSessionScanner
     ) {
     }
 
+    private function safeRequestLocation(Request $request): string
+    {
+        $routeName = $request->route()?->getName();
+        if (is_string($routeName) && str_starts_with($routeName, 'security-defense.')) {
+            return '[dashboard-route:' . $routeName . ']';
+        }
+
+        return substr($request->path(), 0, 200);
+    }
+
+    /**
+     * Keep only low-risk diagnostic headers. Never persist auth, cookie, proxy,
+     * referer, or arbitrary host headers into session telemetry.
+     *
+     * @return array<string, string>
+     */
+    private function safeHeaders(Request $request): array
+    {
+        $allowed = ['accept', 'content-type', 'user-agent'];
+        $result = [];
+
+        foreach ($allowed as $header) {
+            $value = $request->headers->get($header);
+            if (is_string($value)) {
+                $result[$header] = substr($value, 0, 256);
+            }
+        }
+
+        return $result;
+    }
+
     /**
      * Handle incoming authenticated request.
      *
@@ -47,9 +78,9 @@ class AuthenticatedSessionScanner
                     'userAgent' => (string) ($request->userAgent() ?: ''),
                     'metadata' => [
                         'session_id' => $sessionId,
-                        'url' => $request->path(),
+                        'url' => $this->safeRequestLocation($request),
                         'method' => $request->method(),
-                        'headers' => $request->headers->all(),
+                        'headers' => $this->safeHeaders($request),
                     ],
                 ]);
 
