@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Mixudev\SecurityDefense\Services\SecurityDefenseManager;
+use Mixudev\SecurityDefense\Support\RequestLocationRedactor;
 use Throwable;
 
 /**
@@ -19,16 +20,6 @@ class AuthenticatedSessionScanner
     public function __construct(
         protected SecurityDefenseManager $defenseManager,
     ) {
-    }
-
-    private function safeRequestLocation(Request $request): string
-    {
-        $routeName = $request->route()?->getName();
-        if (is_string($routeName) && str_starts_with($routeName, 'security-defense.')) {
-            return '[dashboard-route:' . $routeName . ']';
-        }
-
-        return substr($request->path(), 0, 200);
     }
 
     /**
@@ -78,7 +69,7 @@ class AuthenticatedSessionScanner
                     'userAgent' => (string) ($request->userAgent() ?: ''),
                     'metadata' => [
                         'session_id' => $sessionId,
-                        'url' => $this->safeRequestLocation($request),
+                        'url' => RequestLocationRedactor::path($request),
                         'method' => $request->method(),
                         'headers' => $this->safeHeaders($request),
                     ],

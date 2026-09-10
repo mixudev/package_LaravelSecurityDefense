@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
+use Mixudev\SecurityDefense\Support\RequestLocationRedactor;
 use Mixudev\SecurityDefense\Support\Sanitizer;
 
 /**
@@ -42,15 +43,15 @@ class ThreatTelemetryRecorder
             'matched_field' => $field,
             'matched_sample' => $sample,
             'method' => $request->method(),
-            'path' => $request->path(),
-            'url' => $request->url(),
+            'path' => RequestLocationRedactor::path($request),
+            'url' => RequestLocationRedactor::url($request),
             'ip' => $ip,
             'user_agent' => (string) ($request->userAgent() ?: ''),
         ]));
         Log::warning(sprintf('SecurityDefense: Preventive WAF blocked %s attempt.', strtoupper($category)), [
             'ip' => $ip,
             'field' => $field,
-            'path' => $request->path(),
+            'path' => RequestLocationRedactor::path($request),
             'category' => $category,
             'metadata' => Sanitizer::clean($metadata),
         ]);

@@ -7,6 +7,7 @@ namespace Mixudev\SecurityDefense\Sources;
 use Illuminate\Http\Request;
 use Mixudev\SecurityDefense\Contracts\ThreatSource;
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
+use Mixudev\SecurityDefense\Support\RequestLocationRedactor;
 use Mixudev\SecurityDefense\Support\Sanitizer;
 
 /**
@@ -47,8 +48,8 @@ class RequestThreatSource implements ThreatSource
         ]);
         $metadata = Sanitizer::clean(array_merge([
             'method' => $this->request->method(),
-            'url' => $this->request->url(),
-            'path' => $this->request->path(),
+            'url' => RequestLocationRedactor::url($this->request),
+            'path' => RequestLocationRedactor::path($this->request),
             'route' => $this->request->route()?->getName(),
             'headers' => $headers,
             'query' => $this->request->query(),

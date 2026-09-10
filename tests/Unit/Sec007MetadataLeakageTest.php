@@ -38,6 +38,23 @@ class Sec007MetadataLeakageTest extends TestCase
         $this->assertStringNotContainsString('token=', $json);
     }
 
+    public function test_request_source_redacts_opaque_dashboard_token_from_path_and_url(): void
+    {
+        $token = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCde';
+        putenv('SECURITY_DEFENSE_DASHBOARD_PATH=' . $token);
+
+        try {
+            $request = \Illuminate\Http\Request::create('/' . $token . '/epistemic', 'GET');
+            $event = (new RequestThreatSource($request))->toSecurityEvent();
+            $json = json_encode($event->toArray());
+
+            $this->assertStringNotContainsString($token, $json);
+            $this->assertStringContainsString('[REDACTED]', $json);
+        } finally {
+            putenv('SECURITY_DEFENSE_DASHBOARD_PATH');
+        }
+    }
+
     public function test_request_source_hashes_identifier_from_email(): void
     {
         $request = \Illuminate\Http\Request::create('/test', 'POST', ['email' => 'user@example.com']);
