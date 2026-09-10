@@ -74,6 +74,14 @@ protected $middleware = [
 ];
 ```
 
+### Setup dashboard satu perintah
+
+```bash
+php artisan security-defense:install --with-opaque-path
+```
+
+Command idempotent ini menjaga config custom, membuat `SECURITY_DEFENSE_DASHBOARD_PATH` secara aman jika belum ada, menyimpan secret hanya di `.env`, menjalankan migrasi, dan rebuild route cache. Token tidak pernah dicetak. Lihat [panduan instalasi](./docs/getting-started/installation.md) untuk semua opsi command dan [threat model](./docs/operations/security-threat-model.md) untuk rotasi secret.
+
 ### 4. Hubungkan Telemetri Autentikasi
 
 Teruskan event autentikasi aplikasi ke `SecurityDefense::record()` pada `AppServiceProvider::boot()`:

@@ -101,18 +101,18 @@ Sesuai arsitektur package, pengaturan switch enable/disable utama berada di file
 
 ```env
 # Kredensial Telegram Bot Alerting
-SECURITY_TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
-SECURITY_TELEGRAM_CHAT_ID=-1001234567890
+SECURITY_TELEGRAM_BOT_TOKEN=[REDACTED]
+SECURITY_TELEGRAM_CHAT_ID=[REDACTED]
 
 # Kredensial Discord Webhook
-SECURITY_DISCORD_WEBHOOK=https://discord.com/api/webhooks/123456789/token_here
+SECURITY_DISCORD_WEBHOOK=[REDACTED]
 
 # Kredensial Webhook Eksternal / SIEM
-SECURITY_WEBHOOK_URL=https://siem.internal/api/v1/ingest
-SECURITY_WEBHOOK_SECRET=your-hmac-sha256-signing-secret
+SECURITY_WEBHOOK_URL=[REDACTED]
+SECURITY_WEBHOOK_SECRET=[REDACTED]
 
-# Email Tujuan Notifikasi Alert
-SECURITY_ALERT_EMAIL=security@example.com
+# Email Alert
+SECURITY_ALERT_EMAIL=[REDACTED]
 ```
 
 ---
