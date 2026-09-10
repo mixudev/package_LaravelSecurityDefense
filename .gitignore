@@ -7,3 +7,5 @@ composer.lock
 .env.backup
 .DS_Store
 Thumbs.db
+.hermes/
+storage/
