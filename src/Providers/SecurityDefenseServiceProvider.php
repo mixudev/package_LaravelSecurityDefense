@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mixudev\SecurityDefense\Providers;
 
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider;
 use Mixudev\SecurityDefense\Channels\DatabaseChannel;
 use Mixudev\SecurityDefense\Channels\DiscordChannel;
@@ -209,6 +210,7 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                     : new NoopResponseAdapter();
             });
             $this->app->singleton(EpistemicAnalyzer::class, function ($app) {
+                $cacheStore = config('security-defense.cache_store');
                 return new EpistemicAnalyzer(
                     epistemicEngine: $app->make(EpistemicEngineInterface::class),
                     riskEngine: $app->make(RiskEngineInterface::class),
@@ -218,6 +220,7 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                     config: (array) config('security-defense.epistemic', []),
                     memory: $app->make(ExperienceMemoryInterface::class),
                     responseAdapter: $app->make(DecisionResponseAdapterInterface::class),
+                    cache: $cacheStore ? Cache::store($cacheStore) : null,
                 );
             });
 

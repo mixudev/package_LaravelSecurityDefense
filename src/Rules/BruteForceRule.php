@@ -58,14 +58,14 @@ class BruteForceRule extends AbstractDetectionRule
                 threatType: 'brute_force',
                 fingerprint: $fingerprint,
                 metadata: [
-                    'target' => $target,
-                    'identifier' => $event->identifier,
+                    'target_hash' => hash('sha256', $target),
+                    'identifier_hash' => hash('sha256', $event->identifier),
                     'ip' => $event->ip,
                     'attempt_count' => $count,
                     'threshold' => $threshold,
                     'window_seconds' => $window,
                     'event_type' => $event->eventType,
-                    'user_agent' => $event->userAgent,
+                    'user_agent_hash' => hash('sha256', $event->userAgent ?: 'empty'),
                 ],
                 ruleIdentifier: $this->identifier()
             );

@@ -76,4 +76,21 @@ class EvidenceTest extends TestCase
         $e = $this->make(EvidenceType::LOGIN_FAILED);
         $this->assertTrue($e->isThreatSupporting());
     }
+
+    public function test_empty_source_is_rejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->make(source: '');
+    }
+
+    public function test_oversized_metadata_is_rejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->makeMetadata(str_repeat('x', 9000));
+    }
+
+    private function makeMetadata(string $value): Evidence
+    {
+        return new Evidence(EvidenceType::LOGIN_FAILED, 'test', new DateTimeImmutable(), Confidence::from(0.8), ['value' => $value]);
+    }
 }

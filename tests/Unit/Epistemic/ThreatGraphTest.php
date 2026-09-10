@@ -99,4 +99,25 @@ class ThreatGraphTest extends TestCase
         $g->addNode($this->node('Y'));
         $this->assertEquals(2, $g->nodeCount());
     }
+
+    public function test_edges_are_deduplicated_and_capped(): void
+    {
+        $g = new ThreatGraph(10, 1);
+        $g->addNode($this->node('A'));
+        $g->addNode($this->node('B'));
+        $edge = $this->edge('A', 'B');
+        $g->addEdge($edge);
+        $g->addEdge($edge);
+        $g->addEdge(new GraphEdge('A', 'B', 'OTHER', time()));
+        $this->assertCount(1, $g->edgesFrom('A'));
+    }
+
+    public function test_future_edges_are_rejected(): void
+    {
+        $g = new ThreatGraph();
+        $g->addNode($this->node('A'));
+        $g->addNode($this->node('B'));
+        $g->addEdge(new GraphEdge('A', 'B', 'RELATED_TO', time() + 3600));
+        $this->assertCount(0, $g->edgesFrom('A'));
+    }
 }

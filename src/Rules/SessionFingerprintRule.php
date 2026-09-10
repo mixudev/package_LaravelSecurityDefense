@@ -76,11 +76,11 @@ class SessionFingerprintRule extends AbstractDetectionRule
 
             $metadata = [
                 'session_hash' => $sessionHash,
-                'identifier' => $event->identifier,
+                'identifier_hash' => hash('sha256', $event->identifier),
                 'current_ip' => $event->ip,
                 'initial_ip' => $stored['initial_ip'] ?? null,
-                'current_ua' => $event->userAgent,
-                'initial_ua' => $stored['user_agent'] ?? null,
+                'current_ua_hash' => hash('sha256', $event->userAgent ?: 'empty'),
+                'initial_ua_hash' => hash('sha256', $stored['user_agent'] ?? ''),
                 'mismatches' => $mismatches,
                 'reasons' => 'Session cookie was presented with contradictory network subnet or client signature',
             ];

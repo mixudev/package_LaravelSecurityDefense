@@ -60,7 +60,8 @@ class SecurityDefenseEndToEndTest extends TestCase
         /** @var SecurityAlert $alert */
         $alert = SecurityAlert::query()->where('threat_type', 'brute_force')->firstOrFail();
         $this->assertEquals(SecurityAlert::STATUS_NEW, $alert->status);
-        $this->assertEquals('target.user@app.test', $alert->metadata['target']);
+        $this->assertEquals(hash('sha256', 'target.user@app.test'), $alert->metadata['target_hash']);
+        $this->assertArrayNotHasKey('target', $alert->metadata);
         $this->assertArrayNotHasKey('password', $alert->metadata); // Verified sanitized!
 
         // Test resolving the alert

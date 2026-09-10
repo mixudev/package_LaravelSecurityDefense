@@ -37,17 +37,16 @@ class ThreatTelemetryRecorder
 
         $fingerprint = hash('sha256', sprintf('request_threat:%s:%s:%s', $category, $ip, $sample));
 
-        $metadata = [
+        $metadata = Sanitizer::bound(Sanitizer::clean([
             'category' => $category,
             'matched_field' => $field,
             'matched_sample' => $sample,
             'method' => $request->method(),
             'path' => $request->path(),
-            'url' => $request->fullUrl(),
+            'url' => $request->url(),
             'ip' => $ip,
             'user_agent' => (string) ($request->userAgent() ?: ''),
-        ];
-
+        ]));
         Log::warning(sprintf('SecurityDefense: Preventive WAF blocked %s attempt.', strtoupper($category)), [
             'ip' => $ip,
             'field' => $field,

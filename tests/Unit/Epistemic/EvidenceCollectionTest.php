@@ -51,4 +51,14 @@ class EvidenceCollectionTest extends TestCase
         $this->assertTrue($col->hasId('xyz'));
         $this->assertFalse($col->hasId('nope'));
     }
+
+    public function test_duplicate_id_preserves_first_trusted_evidence(): void
+    {
+        $col = new EvidenceCollection();
+        $trusted = $this->make(EvidenceType::LOGIN_FAILED, 'same-id');
+        $ai = new Evidence(EvidenceType::TRUSTED_DEVICE, 'ai:model', new DateTimeImmutable(), Confidence::from(1.0), ['provenance' => 'model'], 'same-id');
+        $col->add($trusted);
+        $col->add($ai);
+        $this->assertSame($trusted, $col->all()[0]);
+    }
 }

@@ -86,6 +86,25 @@ class Sanitizer
     }
 
     /**
+     * Bound serialized telemetry while retaining a small forensic preview.
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    public static function bound(array $data, int $maxBytes = 8192): array
+    {
+        $encoded = json_encode($data);
+        if ($encoded !== false && strlen($encoded) <= $maxBytes) {
+            return $data;
+        }
+
+        return [
+            '_telemetry_warning' => 'Metadata exceeded byte limit and was truncated.',
+            'preview' => array_slice($data, 0, 12, true),
+        ];
+    }
+
+    /**
      * Check whether a given key name matches sensitive patterns.
      *
      * @param string $key
@@ -112,13 +131,14 @@ class Sanitizer
      */
     public static function cleanString(string $value): string
     {
-        // 1. Redact Bearer tokens in headers/strings
+        // Redact credentials carried as values, including query/header-style strings.
         $value = (string) preg_replace('/Bearer\s+[A-Za-z0-9\-\._~\+\/]+=*/i', 'Bearer [REDACTED]', $value);
+        $value = (string) preg_replace('/(password|passphrase|secret|token|api[_-]?key|authorization|cookie)\s*[=:]\s*([^&\s,;]+)/i', '$1=[REDACTED]', $value);
 
-        // 2. Redact basic auth in URLs
+        // Redact basic auth in URLs.
         $value = (string) preg_replace('/:\/\/[^:]+:[^@]+@/', '://[REDACTED]:[REDACTED]@', $value);
 
-        // 3. Defang dangerous executable payloads (XSS, script injection, control characters)
+        // Defang dangerous executable payloads (XSS, shell injection, control characters)
         return static::defangString($value);
     }
 

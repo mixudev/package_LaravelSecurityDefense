@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Mixudev\SecurityDefense\Epistemic;
 
 use DateTimeImmutable;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Mixudev\SecurityDefense\Epistemic\Contracts\AiEvidenceProviderInterface;
 use Mixudev\SecurityDefense\Epistemic\Contracts\ExperienceMemoryInterface;
 use Mixudev\SecurityDefense\Epistemic\Contracts\PolicyEngineInterface;
@@ -37,6 +38,7 @@ final class EpistemicAnalyzer
         private readonly array $config = [],
         private readonly ?ExperienceMemoryInterface $memory = null,
         private readonly ?DecisionResponseAdapterInterface $responseAdapter = null,
+        private readonly ?CacheRepository $cache = null,
     ) {
         $this->responseResults = [];
     }
@@ -61,7 +63,7 @@ final class EpistemicAnalyzer
             if (($e = EvidenceBuilder::fromSecurityEvent($event)) !== null) $collection->add($e);
         }
         foreach (array_slice($context->evidence, 0, $this->maxEvidence()) as $e) {
-            if ($e instanceof Evidence) $collection->add($e);
+            if ($e instanceof Evidence && $this->isValidDirectEvidence($e)) $collection->add($e);
         }
         foreach ($this->validatedAiEvidence($context) as $e) $collection->add($e);
         $trustedEvidence = array_values(array_filter($collection->all(), fn (Evidence $e) => !$this->isAiEvidence($e)));
@@ -108,13 +110,17 @@ final class EpistemicAnalyzer
             : $this->policyEngine->decide($assessment);
         if (($this->config['response']['enabled'] ?? false) && $this->responseAdapter !== null && $decision !== null) {
             $decisionId = $decision->id();
-            $executionKey = $this->responseExecutionKey($decisionId, $context, $collection);
-            if (!isset($this->responseExecutionKeys[$executionKey])) {
-                $this->responseExecutionKeys[$executionKey] = true;
+            $executionKey = $this->responseExecutionKey($decisionId, $decision, $context, $collection);
+            $cacheClaimed = $this->tryClaimExecutionKey($executionKey);
+            if ($cacheClaimed) {
                 try {
                     $this->responseResults[$decisionId] = $this->responseAdapter->respond($decision);
-                } catch (\Throwable) {
-                    $this->responseResults[$decisionId] = new ResponseResult(false, $decisionId, 'Response adapter failed.');
+                } catch (\Throwable $e) {
+                    try {
+                        $this->responseResults[$decisionId] = $this->responseAdapter->respond($decision);
+                    } catch (\Throwable) {
+                        $this->responseResults[$decisionId] = new ResponseResult(false, $decisionId, 'Response adapter failed.');
+                    }
                 }
             }
         }
@@ -130,11 +136,27 @@ final class EpistemicAnalyzer
             && in_array($e->type->value, $trustedTypes, true)));
     }
 
-    private function responseExecutionKey(string $decisionId, AnalysisContext $context, EvidenceCollection $collection): string
+    private function responseExecutionKey(string $decisionId, \Mixudev\SecurityDefense\Epistemic\Policy\ThreatDecision $decision, AnalysisContext $context, EvidenceCollection $collection): string
     {
-        return hash('sha256', $decisionId . ':' . $context->subject . ':' . $context->windowSeconds . ':' . implode(',', array_map(
-            fn (Evidence $e) => $e->id, $collection->all()
-        )));
+        return 'security-defense:epistemic-response:' . hash('sha256', serialize([$decisionId, $decision->action->value, $decision->reason, $decision->context, $context->subject, $context->windowSeconds, array_map(fn (Evidence $e) => [$e->id, $e->type->value, $e->source, $e->metadata], $collection->all())]));
+    }
+
+    private function tryClaimExecutionKey(string $key): bool
+    {
+        if (isset($this->responseExecutionKeys[$key])) return false;
+        if ($this->cache !== null && !$this->cache->add($key, true, (int) ($this->config['response']['dedup_ttl'] ?? 300))) return false;
+        $this->responseExecutionKeys[$key] = true;
+        return true;
+    }
+
+    private function isValidDirectEvidence(Evidence $e): bool
+    {
+        $cfg = (array) ($this->config['ai'] ?? []);
+        $futureSkew = max(0, (int) ($cfg['allowed_future_seconds'] ?? 60));
+        $maxMetadata = max(0, (int) ($cfg['max_metadata_bytes'] ?? 4096));
+        if ($e->id === '' || $e->source === '' || $e->occurredAt->getTimestamp() > time() + $futureSkew) return false;
+        $json = json_encode($e->metadata);
+        return $json !== false && strlen($json) <= $maxMetadata;
     }
 
     /** @return Evidence[] */
@@ -182,17 +204,22 @@ final class EpistemicAnalyzer
 (AnalysisContext $context): ThreatGraph
     {
         $cfg = (array) ($this->config['graph'] ?? []);
-        $graph = new ThreatGraph((int) ($cfg['max_nodes'] ?? 500));
+        $now = time();
+        $graph = new ThreatGraph(
+            (int) ($cfg['max_nodes'] ?? 500),
+            (int) ($cfg['max_edges'] ?? 1000),
+            max(0, (int) ($cfg['max_future_skew'] ?? 60)),
+        );
         $subjectId = $this->subjectNodeId($context);
         $graph->addNode(new GraphNode($subjectId, 'subject', substr($context->subject, 0, 256)));
-        $windowStart = time() - max(1, (int) ($cfg['window_seconds'] ?? $context->windowSeconds));
+        $windowStart = $now - max(1, (int) ($cfg['window_seconds'] ?? $context->windowSeconds));
         $previousId = $subjectId;
         foreach (array_slice($context->events, 0, (int) ($cfg['max_nodes'] ?? 500)) as $i => $event) {
             if (!$event instanceof SecurityEvent) continue;
             $id = 'event:' . $i . ':' . hash('sha256', serialize($event));
             if (!$this->addGraphNode($graph, new GraphNode($id, 'event', substr((string) ($event->eventType ?? 'event'), 0, 256)))) break;
             $occurredAt = $this->eventTimestamp($event);
-            if ($occurredAt >= $windowStart) {
+            if ($occurredAt >= $windowStart && $occurredAt <= $now) {
                 $graph->addEdge(new GraphEdge($previousId, $id, 'RELATED_TO', $occurredAt));
                 $previousId = $id;
             }
@@ -202,7 +229,7 @@ final class EpistemicAnalyzer
             $id = 'evidence:' . $evidence->id;
             if (!$this->addGraphNode($graph, new GraphNode($id, 'evidence', substr($evidence->type->value, 0, 256))) ) break;
             $occurredAt = $evidence->occurredAt->getTimestamp();
-            if ($occurredAt >= $windowStart) $graph->addEdge(new GraphEdge($previousId, $id, 'SUPPORTS', $occurredAt));
+            if ($occurredAt >= $windowStart && $occurredAt <= $now) $graph->addEdge(new GraphEdge($previousId, $id, 'SUPPORTS', $occurredAt));
         }
         return $graph;
     }

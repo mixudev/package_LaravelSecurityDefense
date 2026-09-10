@@ -16,10 +16,17 @@ final class ThreatGraph
     private array $edges = [];
 
     private int $maxNodes;
+    private int $maxEdges;
+    private int $maxFutureSkew;
+    private int $maxPastAge;
+    private int $edgeCount = 0;
 
-    public function __construct(int $maxNodes = 500)
+    public function __construct(int $maxNodes = 500, int $maxEdges = 1000, int $maxFutureSkew = 60, int $maxPastAge = PHP_INT_MAX)
     {
         $this->maxNodes = max(1, $maxNodes);
+        $this->maxEdges = max(0, $maxEdges);
+        $this->maxFutureSkew = max(0, $maxFutureSkew);
+        $this->maxPastAge = max(0, $maxPastAge);
     }
 
     public function addNode(GraphNode $node): bool
@@ -33,10 +40,18 @@ final class ThreatGraph
 
     public function addEdge(GraphEdge $edge): void
     {
-        if (!isset($this->nodes[$edge->fromId], $this->nodes[$edge->toId])) {
+        if (!isset($this->nodes[$edge->fromId], $this->nodes[$edge->toId])
+            || $this->edgeCount >= $this->maxEdges
+            || $edge->occurredAt > time() + $this->maxFutureSkew
+            || $edge->occurredAt < time() - $this->maxPastAge
+        ) {
             return;
         }
+        foreach ($this->edges[$edge->fromId] ?? [] as $existing) {
+            if ($existing->toId === $edge->toId && $existing->relation === $edge->relation) return;
+        }
         $this->edges[$edge->fromId][] = $edge;
+        $this->edgeCount++;
     }
 
     public function hasNode(string $id): bool { return isset($this->nodes[$id]); }
@@ -50,16 +65,21 @@ final class ThreatGraph
     {
         if (!isset($this->nodes[$startId])) return [];
         $visited = [];
+        // Indexed queue: avoids O(n²) array_shift.
         $queue = [[$startId, 0]];
+        $head = 0;
         $result = [];
-        while (!empty($queue)) {
-            [$currentId, $depth] = array_shift($queue);
+        $len = 1;
+        while ($head < $len) {
+            [$currentId, $depth] = $queue[$head++];
             if (isset($visited[$currentId]) || $depth > $maxDepth) continue;
             $visited[$currentId] = true;
             $result[] = $this->nodes[$currentId];
             if ($depth < $maxDepth) {
                 foreach ($this->edges[$currentId] ?? [] as $edge) {
-                    if (!isset($visited[$edge->toId])) $queue[] = [$edge->toId, $depth + 1];
+                    if (!isset($visited[$edge->toId])) {
+                        $queue[$len++] = [$edge->toId, $depth + 1];
+                    }
                 }
             }
         }

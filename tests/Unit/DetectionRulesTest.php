@@ -34,7 +34,8 @@ class DetectionRulesTest extends TestCase
         $threat = $rule->evaluate($event); // attempt 3 -> threshold reached!
         $this->assertNotNull($threat);
         $this->assertEquals('brute_force', $threat->threatType);
-        $this->assertEquals('victim@example.com', $threat->metadata['target']);
+        $this->assertEquals(hash('sha256', 'victim@example.com'), $threat->metadata['target_hash']);
+        $this->assertArrayNotHasKey('target', $threat->metadata);
         $this->assertEquals(3, $threat->metadata['attempt_count']);
     }
 

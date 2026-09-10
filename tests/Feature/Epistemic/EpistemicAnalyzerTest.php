@@ -180,4 +180,41 @@ class EpistemicAnalyzerTest extends TestCase
         $this->assertNotNull($assessment);
         $this->assertCount(1, $assessment->evidence());
     }
+
+    public function test_future_direct_evidence_is_excluded(): void
+    {
+        $future = new Evidence(EvidenceType::LOGIN_FAILED, 'test', new DateTimeImmutable('+3600 seconds'), Confidence::from(0.8));
+        $assessment = $this->makeAnalyzer()->analyze(new AnalysisContext(evidence: [$future]));
+
+        $this->assertCount(0, $assessment->evidence());
+    }
+
+    public function test_ai_evidence_cannot_overwrite_trusted_evidence_with_same_id(): void
+    {
+        $trusted = $this->makeEvidence(EvidenceType::LOGIN_FAILED);
+        $ai = new Evidence(EvidenceType::TRUSTED_DEVICE, 'ai:model', new DateTimeImmutable(), Confidence::from(1.0), ['provenance' => 'x'], $trusted->id);
+        $provider = new class($ai) implements AiEvidenceProviderInterface {
+            public function __construct(private mixed $evidence) {}
+            public function getEvidenceFor(AnalysisContext $context): array { return [$this->evidence]; }
+        };
+        $analyzer = new EpistemicAnalyzer(new EpistemicEngine(), new RiskEngine(), new ThreatCorrelator(), new PolicyEngine(), $provider);
+        $assessment = $analyzer->analyze(new AnalysisContext(evidence: [$trusted]));
+
+        $this->assertCount(1, $assessment->evidence());
+        $this->assertSame('test', $assessment->evidence()[0]->source);
+    }
+
+    public function test_ai_evidence_requiring_provenance_cannot_pose_as_trusted(): void
+    {
+        $ai = new class implements AiEvidenceProviderInterface {
+            public function getEvidenceFor(AnalysisContext $context): array
+            {
+                return [new Evidence(EvidenceType::LOGIN_FAILED, 'ai:model', new DateTimeImmutable(), Confidence::from(1.0))];
+            }
+        };
+        $analyzer = new EpistemicAnalyzer(new EpistemicEngine(), new RiskEngine(), new ThreatCorrelator(), new PolicyEngine(), $ai, ['ai' => ['max_evidence' => 10, 'max_metadata_bytes' => 4096, 'allowed_future_seconds' => 60]]);
+        $assessment = $analyzer->analyze(new AnalysisContext(evidence: []));
+
+        $this->assertCount(0, $assessment->evidence());
+    }
 }

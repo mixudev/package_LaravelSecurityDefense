@@ -236,6 +236,21 @@ class SecurityFixRegressionTest extends TestCase
         $this->assertStringNotContainsString('internal.admin', json_encode($headers));
     }
 
+    public function test_request_source_redacts_secret_query_and_bounds_metadata(): void
+    {
+        $request = \Illuminate\Http\Request::create('/login?password=super-secret&api_key=key-secret', 'GET');
+        $source = new \Mixudev\SecurityDefense\Sources\RequestThreatSource($request, extraMetadata: [
+            'nested' => ['token' => 'token-secret', 'note' => "safe\r\nline"],
+        ]);
+        $json = json_encode($source->toSecurityEvent()->toArray());
+
+        $this->assertStringNotContainsString('super-secret', $json);
+        $this->assertStringNotContainsString('key-secret', $json);
+        $this->assertStringNotContainsString('token-secret', $json);
+        $this->assertStringNotContainsString("\r", $json);
+        $this->assertStringNotContainsString("\n", $json);
+    }
+
     public function test_path_recon_atomic_counter(): void
     {
         config()->set('security-defense.detection.rules.path_reconnaissance.threshold', 2);

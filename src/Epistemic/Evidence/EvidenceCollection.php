@@ -10,7 +10,11 @@ final class EvidenceCollection
 
     public function add(Evidence $e): void
     {
-        $this->items[$e->id] = $e;
+        // Trusted evidence wins collisions regardless of provider ordering.
+        $existing = $this->items[$e->id] ?? null;
+        if ($existing === null || (str_starts_with($existing->source, 'ai') && !str_starts_with($e->source, 'ai'))) {
+            $this->items[$e->id] = $e;
+        }
     }
 
     /** @return Evidence[] */

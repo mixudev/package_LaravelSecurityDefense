@@ -11,6 +11,11 @@ final class Evidence
 {
     public readonly string $id;
 
+    /** Evidence construction bounds — applied uniformly to all sources. */
+    private const MAX_METADATA_BYTES = 4096;
+    private const FUTURE_SKEW_SECONDS = 300;  // 5 min
+    private const PAST_BOUND_SECONDS = 86400 * 365; // 1 year
+
     /**
      * @param array<string, mixed> $metadata
      */
@@ -22,6 +27,13 @@ final class Evidence
         public readonly array             $metadata = [],
         ?string                           $id = null,
     ) {
+        // Validate inputs at trust boundary.
+        if ($source === '') throw new \InvalidArgumentException('Evidence source must not be empty');
+        if (strlen($source) > 128) throw new \InvalidArgumentException('Evidence source exceeds 128 chars');
+        $json = json_encode($metadata);
+        if ($json !== false && strlen($json) > self::MAX_METADATA_BYTES) {
+            throw new \InvalidArgumentException(sprintf('Evidence metadata exceeds %d bytes', self::MAX_METADATA_BYTES));
+        }
         if ($id !== null && $id !== '') {
             $this->id = $id;
             return;
