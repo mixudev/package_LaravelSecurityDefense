@@ -267,6 +267,7 @@ class SecurityDefenseServiceProvider extends ServiceProvider
 
             $this->commands([
                 \Mixudev\SecurityDefense\Console\Commands\AuthSyncCommand::class,
+                \Mixudev\SecurityDefense\Console\Commands\InstallCommand::class,
                 \Mixudev\SecurityDefense\Console\Commands\TestWebhookCommand::class,
                 \Mixudev\SecurityDefense\Console\Commands\TelegramPollCommand::class,
                 \Mixudev\SecurityDefense\Console\Commands\TelegramWebhookCommand::class,

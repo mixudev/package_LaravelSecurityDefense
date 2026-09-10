@@ -29,6 +29,15 @@ Opaque path memakai static secret dari environment agar kompatibel dengan `route
 
 URL opaque tetap bearer capability sampai secret dirotasi. TLS/HTTPS, secure session cookie, host authentication, Gate, IP/CIDR, CSRF, dan step-up tetap wajib.
 
+Uji production-like di playground/host staging:
+```bash
+APP_ENV=production APP_DEBUG=false php artisan optimize:clear
+php artisan route:list --path=security-defense
+php artisan security-defense:install --with-opaque-path --no-migrate
+```
+
+Verifikasi URL lama `/security-defense` menghasilkan 404, token opaque valid masuk ke gateway, token salah menghasilkan 404 generic, user tanpa Gate/IP/auth ditolak, dan token tidak muncul pada output command maupun telemetry. Jangan uji public mode tanpa HTTPS dan Gate host.
+
 Akses mode lokal (default, `local_only=true`):
 - Hanya environment `local` + alamat IP loopback/allowlist yang bisa masuk.
 - Tidak ada login diminta — dashboard adalah alat operasional lokal.
