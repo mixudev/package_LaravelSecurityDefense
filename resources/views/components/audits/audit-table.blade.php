@@ -129,11 +129,11 @@
 
                         <!-- Actions -->
                         <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
-                            <button type="button" onclick="inspectDiff('{{ e(json_encode($audit, JSON_HEX_APOS | JSON_HEX_QUOT)) }}')"
+                            <button type="button" aria-label="Inspect audit diff" onclick="inspectDiff('{{ e(json_encode($audit, JSON_HEX_APOS | JSON_HEX_QUOT)) }}')"
                                     class="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold transition cursor-pointer shadow-xs">
                                 View Diff
                             </button>
-                            <button type="button" onclick="inspectPayload('{{ e(json_encode($audit, JSON_HEX_APOS | JSON_HEX_QUOT)) }}')"
+                            <button type="button" aria-label="Inspect audit payload" onclick="inspectPayload('{{ e(json_encode($audit, JSON_HEX_APOS | JSON_HEX_QUOT)) }}')"
                                     class="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold transition cursor-pointer shadow-xs">
                                 Payload
                             </button>

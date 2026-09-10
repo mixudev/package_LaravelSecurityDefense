@@ -41,6 +41,31 @@
         ])
     </div>
 
+    <!-- Epistemic Summary -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 mt-3.5">
+        @include('security-defense::components.stat-card', [
+            'title' => 'Epistemic Engine',
+            'value' => $epistemicSummary['enabled'] ? 'Enabled' : 'Disabled',
+            'subtitle' => 'Probabilistic assessment',
+            'badge' => 'Epistemic',
+            'badgeColor' => $epistemicSummary['enabled'] ? 'emerald' : 'zinc',
+        ])
+        @include('security-defense::components.stat-card', [
+            'title' => 'Learned Patterns',
+            'value' => number_format($epistemicSummary['patterns']),
+            'subtitle' => 'Memory index entries',
+            'badge' => 'Memory',
+            'badgeColor' => 'violet',
+        ])
+        @include('security-defense::components.stat-card', [
+            'title' => 'Last Analysis Risk',
+            'value' => $epistemicSummary['risk'] === null ? '—' : number_format($epistemicSummary['risk'] * 100, 1) . '%',
+            'subtitle' => 'Cached assessment',
+            'badge' => 'Risk',
+            'badgeColor' => $epistemicSummary['risk'] !== null && $epistemicSummary['risk'] >= 0.7 ? 'rose' : 'zinc',
+        ])
+    </div>
+
     <!-- Date Range Filter -->
     <div class="flex items-center justify-between gap-3 mb-3">
         @include('security-defense::components.date-range-filter', ['current' => $dateRange['preset']])

@@ -18,7 +18,7 @@
                     <p class="text-xs text-zinc-500 dark:text-zinc-400">Safely test notification channels and webhook endpoints with simulated payload verification.</p>
                 </div>
             </div>
-            <button type="button" onclick="closeChannelProbeModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer text-lg font-bold">
+            <button type="button" aria-label="Close channel probe modal" onclick="closeChannelProbeModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer text-lg font-bold">
                 &times;
             </button>
         </div>
@@ -103,7 +103,7 @@
         <!-- Modal Footer -->
         <div class="px-6 py-3 bg-zinc-50 dark:bg-[#18181b] border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center text-xs text-zinc-500 dark:text-zinc-400">
             <span class="text-[11px]">Probes are sent in non-intrusive sandbox format.</span>
-            <button type="button" onclick="closeChannelProbeModal()" class="px-4 py-1.5 rounded-lg bg-zinc-200 hover:bg-zinc-300 dark:bg-[#27272a] dark:hover:bg-[#3f3f46] text-zinc-800 dark:text-zinc-200 font-semibold cursor-pointer transition">
+            <button type="button" aria-label="Close channel probe modal" onclick="closeChannelProbeModal()" class="px-4 py-1.5 rounded-lg bg-zinc-200 hover:bg-zinc-300 dark:bg-[#27272a] dark:hover:bg-[#3f3f46] text-zinc-800 dark:text-zinc-200 font-semibold cursor-pointer transition">
                 Close
             </button>
         </div>

@@ -18,6 +18,8 @@ if (config('security-defense.dashboard.enabled', true)) {
             Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
             Route::get('/data-audits', [DashboardController::class, 'dataAudits'])->name('data-audits');
             Route::get('/sessions', [DashboardController::class, 'sessionIntelligence'])->name('sessions');
+            Route::get('/epistemic', [DashboardController::class, 'epistemic'])->name('epistemic');
+            Route::post('/epistemic/feedback', [DashboardController::class, 'epistemicFeedback'])->name('epistemic.feedback');
             Route::post('/test-channel', [DashboardController::class, 'testChannel'])->name('test-channel');
             Route::post('/alerts/{alert}/acknowledge', [DashboardController::class, 'acknowledge'])->name('alerts.acknowledge');
             Route::post('/alerts/{alert}/resolve', [DashboardController::class, 'resolve'])->name('alerts.resolve');

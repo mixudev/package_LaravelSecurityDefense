@@ -11,7 +11,7 @@
                 <p class="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">{{ session('status_message') }}</p>
             </div>
         </div>
-        <button type="button" onclick="document.getElementById('statusAlertBanner').remove()" class="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-100 p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition cursor-pointer">
+        <button type="button" aria-label="Dismiss success message" onclick="document.getElementById('statusAlertBanner').remove()" class="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-100 p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition cursor-pointer">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -32,7 +32,7 @@
                 <p class="text-xs text-rose-700 dark:text-rose-300 mt-0.5">{{ session('error_message') }}</p>
             </div>
         </div>
-        <button type="button" onclick="document.getElementById('errorAlertBanner').remove()" class="text-rose-600 hover:text-rose-900 dark:text-rose-400 dark:hover:text-rose-100 p-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/40 transition cursor-pointer">
+        <button type="button" aria-label="Dismiss error message" onclick="document.getElementById('errorAlertBanner').remove()" class="text-rose-600 hover:text-rose-900 dark:text-rose-400 dark:hover:text-rose-100 p-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/40 transition cursor-pointer">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -67,7 +67,7 @@
 
             <div class="flex items-center space-x-2">
                 <span class="text-[11px] text-zinc-400 font-mono hidden sm:inline">{{ now()->toTimeString() }}</span>
-                <button type="button" onclick="document.getElementById('diagnosticResultsPanel').remove()" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer">
+                <button type="button" aria-label="Dismiss diagnostic results" onclick="document.getElementById('diagnosticResultsPanel').remove()" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>

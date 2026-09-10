@@ -1,4 +1,4 @@
-<div id="metadataModal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-200">
+<div id="metadataModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-200">
     <div class="bg-white dark:bg-[#141416] border border-zinc-300 dark:border-zinc-800 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl transform transition-all">
         <!-- Modal Header -->
         <div class="px-5 py-3.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-[#18181b]">
@@ -16,14 +16,14 @@
 
             <div class="flex items-center space-x-2">
                 <!-- Copy JSON button -->
-                <button type="button" id="copyTelemetryBtn" onclick="copyTelemetryJson()" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white hover:bg-zinc-100 dark:bg-[#202024] dark:hover:bg-[#28282c] text-zinc-700 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer shadow-xs">
+                <button type="button" id="copyTelemetryBtn" aria-label="Copy telemetry payload" onclick="copyTelemetryJson()" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white hover:bg-zinc-100 dark:bg-[#202024] dark:hover:bg-[#28282c] text-zinc-700 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer shadow-xs">
                     <svg id="copyIcon" class="w-3.5 h-3.5 mr-1 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                     <span id="copyText">Copy Payload</span>
                 </button>
 
-                <button type="button" onclick="closeMetadataModal()" class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer font-bold text-base">
+                <button type="button" aria-label="Close telemetry modal" onclick="closeMetadataModal()" class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer font-bold text-base">
                     &times;
                 </button>
             </div>
@@ -83,7 +83,7 @@
         navigator.clipboard.writeText(textToCopy).then(function() {
             const copyText = document.getElementById('copyText');
             if (copyText) {
-                copyText.innerText = '✓ Copied!';
+                copyText.innerText = 'Copied';
                 setTimeout(() => {
                     copyText.innerText = 'Copy Payload';
                 }, 2000);

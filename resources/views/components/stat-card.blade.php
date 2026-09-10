@@ -1,6 +1,6 @@
 @props([
-    'title',
-    'value',
+    'title' => '',
+    'value' => null,
     'subtitle' => null,
     'badge' => null,
     'badgeColor' => 'zinc', // 'zinc', 'rose', 'orange', 'emerald', 'amber', 'purple'
@@ -27,7 +27,7 @@
         @endif
     </div>
     <div class="mt-3 flex items-baseline justify-between">
-        <span class="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono">{{ $value }}</span>
+        <span class="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono">{{ $value ?? '0' }}</span>
         @if($subtitle)
             <span class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{{ $subtitle }}</span>
         @endif

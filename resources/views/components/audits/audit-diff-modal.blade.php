@@ -7,7 +7,7 @@
                 <h3 id="modal-title" class="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">Mutation Details</h3>
                 <p id="modal-subtitle" class="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5 truncate"></p>
             </div>
-            <button type="button" onclick="closeAuditModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer text-lg font-bold flex-shrink-0 transition" aria-label="Close modal">
+            <button type="button" aria-label="Close audit modal" onclick="closeAuditModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer text-lg font-bold flex-shrink-0 transition">
                 &times;
             </button>
         </div>
@@ -17,10 +17,10 @@
 
         <!-- Modal Footer -->
         <div class="px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#18181b] flex justify-end gap-2">
-            <button type="button" onclick="copyModalContent()" class="px-4 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold cursor-pointer transition">
+            <button type="button" aria-label="Copy audit details" onclick="copyModalContent()" class="px-4 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold cursor-pointer transition">
                 Copy
             </button>
-            <button type="button" onclick="closeAuditModal()" class="px-4 py-1.5 rounded-lg bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold cursor-pointer transition">
+            <button type="button" aria-label="Close audit modal" onclick="closeAuditModal()" class="px-4 py-1.5 rounded-lg bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold cursor-pointer transition">
                 Close
             </button>
         </div>
@@ -44,7 +44,7 @@
         navigator.clipboard.writeText(title + '\n\n' + body.innerText).then(() => {
             const btn = event.target;
             const prev = btn.innerHTML;
-            btn.innerHTML = 'Copied!';
+            btn.innerHTML = 'Copied';
             setTimeout(() => btn.innerHTML = prev, 1200);
         });
     }

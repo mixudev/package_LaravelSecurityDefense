@@ -124,7 +124,35 @@ final class EpistemicAnalyzer
                 }
             }
         }
-        return new ThreatAssessment(risk: $maxRisk, confidence: $aggConfidence, hypotheses: $computedBeliefs, evidence: $collection->all(), decision: $decision);
+        $assessment = new ThreatAssessment(risk: $maxRisk, confidence: $aggConfidence, hypotheses: $computedBeliefs, evidence: $collection->all(), decision: $decision);
+        $this->publishDashboardSnapshot($assessment);
+        return $assessment;
+    }
+
+    private function publishDashboardSnapshot(ThreatAssessment $assessment): void
+    {
+        if ($this->cache === null) return;
+
+        $this->cache->put('security-defense:epistemic:last_analysis', [
+            'risk' => $assessment->risk->toFloat(),
+            'confidence' => $assessment->confidence->toFloat(),
+            'hypotheses' => array_map(function ($belief) use ($assessment): array {
+                return [
+                    'hypothesis' => $belief->hypothesis->value,
+                    'confidence' => $belief->confidence->toFloat(),
+                    'risk' => $assessment->risk->toFloat(),
+                    'supporting' => array_map(fn ($e) => $e->type->value, $belief->supportingEvidence),
+                    'contradicting' => array_map(fn ($e) => $e->type->value, $belief->contradictingEvidence),
+                    'action' => $assessment->decision?->action->value ?? 'monitor',
+                ];
+            }, $assessment->hypotheses),
+            'evidence_feed' => array_map(static fn (Evidence $e): array => [
+                'type' => $e->type->value,
+                'source' => substr($e->source, 0, 128),
+                'timestamp' => $e->occurredAt->format(DATE_ATOM),
+                'reliability' => $e->reliability->toFloat(),
+            ], array_slice($assessment->evidence, 0, 50)),
+        ], 300);
     }
 
     /** @param Evidence[] $all @param Evidence[] $trusted @return Evidence[] */

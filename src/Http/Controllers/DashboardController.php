@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Http\Controllers;
 
+use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Mixudev\SecurityDefense\Epistemic\Belief\ThreatBelief;
+use Mixudev\SecurityDefense\Epistemic\Belief\ThreatHypothesis;
+use Mixudev\SecurityDefense\Epistemic\ValueObjects\Confidence;
+use Mixudev\SecurityDefense\Epistemic\Evidence\Evidence;
+use Mixudev\SecurityDefense\Support\Facades\SecurityDefense;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
 use Mixudev\SecurityDefense\Services\ChannelTestService;
 use Mixudev\SecurityDefense\Services\ConfigWriterService;
@@ -51,6 +58,12 @@ class DashboardController extends Controller
         $quarantinedIps = $this->analyticsService->getActiveQuarantines($refresh);
         $channelsStatus = ($testService ?? $this->channelTestService)->getChannelsStatus();
         $postureScore = $this->analyticsService->calculatePostureScore($stats);
+        $lastAnalysis = Cache::get('security-defense:epistemic:last_analysis');
+        $epistemicSummary = [
+            'enabled' => (bool) config('security-defense.epistemic.enabled', false),
+            'patterns' => $this->epistemicFeedbackCount(),
+            'risk' => is_array($lastAnalysis) && is_numeric($lastAnalysis['risk'] ?? null) ? (float) $lastAnalysis['risk'] : null,
+        ];
 
         $filters = $request->only(['status', 'severity', 'threat_type', 'range']);
         $dateRange = DateRangeFilter::resolve($request);
@@ -61,6 +74,7 @@ class DashboardController extends Controller
 
         return view('security-defense::dashboard', [
             'stats' => $stats,
+            'epistemicSummary' => $epistemicSummary,
             'alerts' => $alerts,
             'liveEvents' => $liveEvents,
             'dateRange' => $dateRange,
@@ -76,6 +90,145 @@ class DashboardController extends Controller
             'channelsStatus' => $channelsStatus,
             'filters' => $filters,
         ]);
+    }
+
+    /**
+     * Display epistemic analysis telemetry.
+     */
+    public function epistemic()
+    {
+        $recent = SecurityAlert::query()->latest()->limit(100)->get(['metadata']);
+        $scores = $recent->map(fn (SecurityAlert $alert) => $this->epistemicScores($alert->metadata))->filter();
+        $lastAnalysis = Cache::get('security-defense:epistemic:last_analysis');
+
+        $analysis = is_array($lastAnalysis) ? $lastAnalysis : [];
+        $hypotheses = $this->normaliseHypotheses($analysis['hypotheses'] ?? []);
+        $evidenceFeed = $this->normaliseEvidence($analysis['evidence_feed'] ?? []);
+        $memoryPatterns = $this->epistemicFeedbackCount();
+
+        return view('security-defense::epistemic', [
+            'stats' => [
+                'total_analyses' => $recent->count(),
+                'average_risk' => round((float) ($scores->avg('risk') ?? 0), 3),
+                'average_confidence' => round((float) ($scores->avg('confidence') ?? 0), 3),
+                'feedback_count' => $memoryPatterns,
+                'memory_patterns' => $memoryPatterns,
+            ],
+            'hypotheses' => $hypotheses,
+            'evidenceFeed' => $evidenceFeed,
+            'responseAdapters' => [$this->epistemicAdapterStatus()],
+            'feedbackRoute' => route('security-defense.epistemic.feedback'),
+            'epistemicConfig' => (array) config('security-defense.epistemic', []),
+        ]);
+    }
+
+    /**
+     * Record verified epistemic feedback.
+     */
+    public function epistemicFeedback(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'hypothesis' => 'required|string|in:account_compromise,credential_stuffing,session_hijack,brute_force_attack,data_exfiltration,insider_threat,automated_scraping,impossible_travel,payload_attack,bot_activity,compound_attack,unknown',
+            'outcome' => 'required|string|in:confirmed_attack,false_positive',
+        ]);
+
+        if ((bool) config('security-defense.epistemic.enabled', false)) {
+            $hypothesis = ThreatHypothesis::from((string) $request->input('hypothesis'));
+            SecurityDefense::recordFeedback(
+                new ThreatBelief($hypothesis, Confidence::from(0.5), [], [], new DateTimeImmutable()),
+                (string) $request->input('outcome')
+            );
+        }
+
+        return back()->with('status_message', 'Epistemic feedback recorded.');
+    }
+
+    /** @return array{risk: float, confidence: float}|null */
+    private function epistemicScores(?array $metadata): ?array
+    {
+        if (!is_array($metadata)) return null;
+        $risk = $metadata['risk'] ?? $metadata['epistemic']['risk'] ?? null;
+        $confidence = $metadata['confidence'] ?? $metadata['epistemic']['confidence'] ?? null;
+        return is_numeric($risk) && is_numeric($confidence) ? ['risk' => (float) $risk, 'confidence' => (float) $confidence] : null;
+    }
+
+    /** @return array{class: string, enabled: bool, last_response: string} */
+    private function epistemicAdapterStatus(): array
+    {
+        $cfg = (array) config('security-defense.epistemic.response', []);
+        $adapter = is_string($cfg['adapter'] ?? null) ? (string) $cfg['adapter'] : 'NoopResponseAdapter';
+
+        return [
+            'class' => $adapter,
+            'enabled' => (bool) ($cfg['enabled'] ?? false) && $adapter !== 'NoopResponseAdapter',
+            'last_response' => 'No response recorded',
+        ];
+    }
+
+    private function epistemicFeedbackCount(): int
+    {
+        $index = Cache::get((string) config('security-defense.cache_prefix', 'security_defense:') . 'ep:pattern-index', []);
+        return is_array($index) ? count($index) : 0;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>|ThreatBelief> $raw
+     * @return list<array{hypothesis: string, confidence: float, risk: float, supporting: array<int, string>, contradicting: array<int, string>, action: string}>
+     */
+    private function normaliseHypotheses(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $belief) {
+            if ($belief instanceof ThreatBelief) {
+                $out[] = [
+                    'hypothesis' => $belief->hypothesis->value,
+                    'confidence' => $belief->confidence->toFloat(),
+                    'risk' => 0.0,
+                    'supporting' => array_map(fn($e) => $e->type->value, $belief->supportingEvidence),
+                    'contradicting' => array_map(fn($e) => $e->type->value, $belief->contradictingEvidence),
+                    'action' => 'monitor',
+                ];
+                continue;
+            }
+            if (!is_array($belief)) continue;
+            $out[] = [
+                'hypothesis' => (string) (data_get($belief, 'hypothesis.value', data_get($belief, 'hypothesis', 'unknown'))),
+                'confidence' => (float) data_get($belief, 'confidence.value', data_get($belief, 'confidence', 0)),
+                'risk' => (float) data_get($belief, 'risk.value', data_get($belief, 'risk', 0)),
+                'supporting' => array_values((array) data_get($belief, 'supportingEvidence', data_get($belief, 'supporting', []))),
+                'contradicting' => array_values((array) data_get($belief, 'contradictingEvidence', data_get($belief, 'contradicting', []))),
+                'action' => (string) data_get($belief, 'decision.action.value', data_get($belief, 'action', 'monitor')),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>|Evidence> $raw
+     * @return list<array{type: string, source: string, timestamp: string, reliability: float}>
+     */
+    private function normaliseEvidence(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $e) {
+            if ($e instanceof Evidence) {
+                $out[] = [
+                    'type' => $e->type->value,
+                    'source' => $e->source,
+                    'timestamp' => $e->occurredAt->format(DATE_ATOM),
+                    'reliability' => $e->reliability->toFloat(),
+                ];
+                continue;
+            }
+            if (!is_array($e)) continue;
+            $out[] = [
+                'type' => (string) data_get($e, 'type.value', data_get($e, 'type', 'signal')),
+                'source' => (string) data_get($e, 'source', 'unknown'),
+                'timestamp' => (string) data_get($e, 'timestamp', data_get($e, 'occurred_at', '—')),
+                'reliability' => (float) data_get($e, 'reliability.value', data_get($e, 'reliability', 0)),
+            ];
+        }
+        return $out;
     }
 
     /**
