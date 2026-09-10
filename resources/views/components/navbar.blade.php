@@ -1,5 +1,10 @@
 <header class="sticky top-0 z-30 border-b border-zinc-200/90 dark:border-zinc-800 bg-white/95 dark:bg-[#101012]/95 backdrop-blur-md shadow-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        @if (request()->routeIs('security-defense.portal.*'))
+            <div class="flex items-center h-16">
+                <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Security Defense</span>
+            </div>
+        @else
         <div class="flex items-center justify-between h-16">
             <!-- Left: Brand -->
             <div class="flex items-center space-x-3">
@@ -112,5 +117,6 @@
                 Epistemic Analysis
             </a>
         </div>
+        @endif
     </div>
 </header>

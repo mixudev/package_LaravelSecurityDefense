@@ -25,7 +25,9 @@ Pengaturan di `config/security-defense.php` (`dashboard`):
 - `opaque_path.enabled`: Sembunyikan prefix default dan gunakan path opaque host-managed (default `false`). Ini hanya discovery barrier, bukan autentikasi.
 - `SECURITY_DEFENSE_DASHBOARD_PATH`: Secret host environment berupa 43+ karakter base64url tanpa `/`, `=`, atau query token. Jangan simpan di config overrides, source, log, atau URL query.
 
-Opaque path memakai static secret dari environment agar kompatibel dengan `route:cache`. Rotasi berarti ubah secret pada deployment, rebuild config/route cache, lalu revoke session host bila ada indikasi kebocoran. Cache-backed atau per-request rotation tidak dipakai: bisa membuat node berbeda, route cache stale, dan open tab mati mendadak.
+Opaque path memakai static secret dari environment agar kompatibel dengan `route:cache`. Saat aktif, `/security-defense` menjadi portal verifikasi minimal; portal memakai middleware `EnsureLocalAccess` yang sama, lalu mengirim relative `Location` ke path opaque setelah POST CSRF berhasil. Portal tidak menampilkan token, tidak memakai layout dashboard/CDN, dan tidak boleh dianggap autentikasi. Saat nonaktif, `/security-defense` tetap dashboard.
+
+Rotasi berarti ubah secret pada deployment, rebuild config/route cache, lalu revoke session host bila ada indikasi kebocoran. Cache-backed atau per-request rotation tidak dipakai: bisa membuat node berbeda, route cache stale, dan open tab mati mendadak.
 
 URL opaque tetap bearer capability sampai secret dirotasi. TLS/HTTPS, secure session cookie, host authentication, Gate, IP/CIDR, CSRF, dan step-up tetap wajib.
 

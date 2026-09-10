@@ -68,8 +68,14 @@ class EnsureLocalAccess
         }
 
         if (!$authorized) {
-            if (!$localOnly && $denyReason !== 'public-disabled') {
-                $public = (array) config('security-defense.dashboard.public', []);
+            $isLoopback = in_array($clientIp, ['127.0.0.1', '::1', 'localhost'], true);
+            $public = (array) config('security-defense.dashboard.public', []);
+
+            // Throttle remote denials in BOTH modes (loopback stays unthrottled
+            // for operator diagnostics). Prevents log-flood DoS + free probing
+            // of the gate/dashboard in local mode and counter-splitting across
+            // the two endpoints in public mode.
+            if ((!$localOnly && $denyReason !== 'public-disabled') || !$isLoopback) {
                 if ($this->isRateLimited($clientIp, $public)) {
                     $denyReason = 'rate-limited';
                 }

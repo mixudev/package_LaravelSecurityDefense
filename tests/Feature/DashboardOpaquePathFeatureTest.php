@@ -28,11 +28,12 @@ class DashboardOpaquePathFeatureTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_predictable_route_is_absent_when_opaque_enabled(): void
+    public function test_predictable_route_is_secure_gate_when_opaque_enabled(): void
     {
         $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
             ->get('/security-defense')
-            ->assertNotFound();
+            ->assertOk()
+            ->assertDontSee(self::TOKEN);
     }
 
     public function test_valid_opaque_path_reaches_dashboard_locally(): void
@@ -53,9 +54,16 @@ class DashboardOpaquePathFeatureTest extends TestCase
 
     public function test_query_and_fragment_tokens_never_authorize(): void
     {
+        // Opaque mode: predictable route is the gate, NOT authorizing by token.
         $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
             ->get('/security-defense?token=' . self::TOKEN)
-            ->assertNotFound();
+            ->assertOk()
+            ->assertDontSee(self::TOKEN);
+
+        // A query token on the opaque path itself must remain irrelevant.
+        $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->get('/' . self::TOKEN . '?token=' . self::TOKEN)
+            ->assertOk();
     }
 
     public function test_opaque_path_does_not_bypass_public_gateway(): void
