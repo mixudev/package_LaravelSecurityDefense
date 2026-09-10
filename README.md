@@ -5,7 +5,7 @@
 [![Versi PHP](https://img.shields.io/badge/PHP-%5E8.2-blue.svg?style=flat-square)]()
 [![Kompatibilitas Laravel](https://img.shields.io/badge/Laravel-10%20%7C%2011%20%7C%2012%20%7C%2013-red.svg?style=flat-square)]()
 [![Lisensi: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-311%20%7C%20948%20assertions-brightgreen.svg?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/tests-361%20%7C%201078%20assertions-brightgreen.svg?style=flat-square)]()
 
 **`mixudev/security-defense`** adalah package pertahanan keamanan tingkat enterprise untuk aplikasi Laravel. Bertindak sebagai **"kamera pengawas, perisai proaktif, dan integritas data"** yang mendeteksi ancaman secara real-time, mengorelasikan pola serangan multi-vektor, mengisolasi penyerang (Fail2Ban IP Quarantine), memantau mutasi data & mendeteksi manipulasi parameter Burp Suite, melindungi sesi terautentikasi dari pencurian cookie malware, serta mengirimkan alert ter-deduplikasi ke berbagai saluran.
 
@@ -126,18 +126,18 @@ Aktivasi channel dilakukan di `config/security-defense.php`. File `.env` hanya d
 
 ```env
 # Telegram Alerting
-SECURITY_TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
-SECURITY_TELEGRAM_CHAT_ID=-1001234567890
+SECURITY_TELEGRAM_BOT_TOKEN=[REDACTED]
+SECURITY_TELEGRAM_CHAT_ID=[REDACTED]
 
 # Discord Webhook
-SECURITY_DISCORD_WEBHOOK=https://discord.com/api/webhooks/123456789/token_here
+SECURITY_DISCORD_WEBHOOK=[REDACTED]
 
 # SIEM Webhook
-SECURITY_WEBHOOK_URL=https://siem.internal/api/v1/ingest
-SECURITY_WEBHOOK_SECRET=your-secret-key
+SECURITY_WEBHOOK_URL=[REDACTED]
+SECURITY_WEBHOOK_SECRET=[REDACTED]
 
 # Email Alert
-SECURITY_ALERT_EMAIL=security@example.com
+SECURITY_ALERT_EMAIL=[REDACTED]
 ```
 
 Uji konektivitas channel melalui terminal:
@@ -195,6 +195,7 @@ Untuk panduan konfigurasi mendalam, detail arsitektur, dan operasional tingkat l
 
 ### 4. Operasional & Pemeliharaan (Operations)
 - [docs/operations/dashboard.md](./docs/operations/dashboard.md) — Cara mengakses web dashboard SIEM bawaan, pengamanan rute produksi via Laravel Gate, metrik, dan toggle tema.
+- [docs/operations/security-threat-model.md](./docs/operations/security-threat-model.md) — Threat model & perimeter: trust boundaries, prosedur rotasi secret opaque path, dan skenario serangan lintas-batas (session theft, manipulasi jaringan, brute-force URL).
 - [docs/operations/hardening.md](./docs/operations/hardening.md) — Panduan pengerasan produksi: konfigurasi Redis cache, persistensi karantina database, fast-path scanning, dan parameter self-defense.
 - [docs/operations/testing-and-diagnostics.md](./docs/operations/testing-and-diagnostics.md) — Panduan eksekusi pengujian otomatis PHPUnit dan diagnostic probe saluran alert melalui Artisan CLI.
 - [docs/operations/troubleshooting.md](./docs/operations/troubleshooting.md) — Solusi mengatasi kendala umum seperti error 403 dashboard, pesan alert tidak terkirim, dan penanganan cache flush.
