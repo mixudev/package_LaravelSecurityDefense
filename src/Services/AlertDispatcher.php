@@ -13,22 +13,11 @@ use Mixudev\SecurityDefense\Events\SecurityAlertResolved;
 use Mixudev\SecurityDefense\Jobs\DispatchAlertChannelJob;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
 
-/**
- * Orchestrates alert deduplication, rate limiting, database persistence, and channel broadcasting.
- */
 class AlertDispatcher
 {
-    /**
-     * Registered alert channels.
-     *
-     * @var array<string, AlertChannel>
-     */
+    /** @var array<string, AlertChannel> */
     protected array $channels = [];
 
-    /**
-     * @param AlertDeduplicatorInterface $deduplicator
-     * @param iterable<AlertChannel> $channels
-     */
     public function __construct(
         protected AlertDeduplicatorInterface $deduplicator,
         iterable $channels = []
@@ -38,9 +27,6 @@ class AlertDispatcher
         }
     }
 
-    /**
-     * Register an alert channel.
-     */
     public function registerChannel(AlertChannel $channel): self
     {
         $this->channels[$channel->identifier()] = $channel;
@@ -48,61 +34,28 @@ class AlertDispatcher
         return $this;
     }
 
-    /**
-     * Retrieve all registered channels.
-     *
-     * @return array<string, AlertChannel>
-     */
+    /** @return array<string, AlertChannel> */
     public function getChannels(): array
     {
         return $this->channels;
     }
 
-    /**
-     * Process a detected threat: rate limit, deduplicate, persist, notify channels, and emit domain event.
-     *
-     * @param SecurityThreat $threat
-     * @return SecurityAlert|null Returns created SecurityAlert, or null if suppressed.
-     */
     public function dispatch(SecurityThreat $threat): ?SecurityAlert
     {
-        // 1. Check global alert rate limit (Anti-Disk Exhaustion Hardening)
-        if ($this->isRateLimited()) {
-            return null;
-        }
-
-        // 2. Deduplication evaluation
         if (!$this->deduplicator->shouldAlert($threat)) {
             return null;
         }
 
-        // 3. Record fingerprint in deduplicator cache window
-        $this->deduplicator->record($threat);
-
-        // 4. Truncate metadata if too large (prevent storage exhaustion)
-        $maxMetadataSize = (int) config('security-defense.hardening.max_alert_metadata_size', 16384);
-        $metadata = $threat->metadata;
-        $metadataJson = json_encode($metadata);
-        if (strlen((string) $metadataJson) > $maxMetadataSize) {
-            // Trim oversized string values first, then bound the top-level array size
-            $trimmed = [];
-            foreach ($metadata as $key => $value) {
-                if (is_string($value) && strlen($value) > 200) {
-                    $trimmed[$key] = substr($value, 0, 200) . '...[TRUNCATED]';
-                } else {
-                    $trimmed[$key] = $value;
-                }
-            }
-            // If still too many keys, keep only the first 10
-            if (count($trimmed) > 10) {
-                $trimmed = array_slice($trimmed, 0, 10, true);
-            }
-            $trimmed['_truncated'] = true;
-            $trimmed['_original_size'] = strlen((string) $metadataJson);
-            $metadata = $trimmed;
+        if (!$this->acquireRateLimitSlot()) {
+            $this->deduplicator->forget($threat->fingerprint);
+            return null;
         }
 
-        // 5. Persist alert to database (Mandatory default)
+        $metadata = $this->boundMetadata(
+            $threat->metadata,
+            max(1, (int) config('security-defense.hardening.max_alert_metadata_size', 16384))
+        );
+
         $alert = new SecurityAlert([
             'severity' => $threat->severity,
             'threat_type' => $threat->threatType,
@@ -119,21 +72,11 @@ class AlertDispatcher
             $alert->save();
         }
 
-        // 5. Increment rate limiter counter
-        $this->incrementRateLimiter();
-
-        // 6. Broadcast to other active channels (Telegram, Discord, Webhook)
         $useQueue = (bool) config('security-defense.alerts.queue.enabled', false);
-
         foreach ($this->channels as $identifier => $channel) {
-            if ($identifier === 'database') {
+            if ($identifier === 'database' || !$channel->isEnabled() || !$channel->isConfigured()) {
                 continue;
             }
-
-            if (!$channel->isEnabled() || !$channel->isConfigured()) {
-                continue;
-            }
-
             if ($useQueue) {
                 dispatch(new DispatchAlertChannelJob(get_class($channel), $alert));
             } else {
@@ -141,57 +84,91 @@ class AlertDispatcher
             }
         }
 
-        // 7. Dispatch domain event
         event(new SecurityAlertCreated($alert, $threat));
 
         return $alert;
     }
 
-    /**
-     * Resolve an alert and dispatch event.
-     */
     public function resolveAlert(SecurityAlert $alert): bool
     {
         $alert->resolve();
-
         event(new SecurityAlertResolved($alert));
 
         return true;
     }
 
-    /**
-     * Check if alert dispatching is currently rate-limited.
-     */
-    protected function isRateLimited(): bool
+    /** Atomically reserve one slot. Never allows more than cap. */
+    protected function acquireRateLimitSlot(): bool
     {
-        $enabled = (bool) config('security-defense.hardening.alert_rate_limit.enabled', true);
-        if (!$enabled) {
-            return false;
+        if (!(bool) config('security-defense.hardening.alert_rate_limit.enabled', true)) {
+            return true;
         }
 
-        $max = (int) config('security-defense.hardening.alert_rate_limit.max_alerts_per_minute', 60);
+        $max = max(0, (int) config('security-defense.hardening.alert_rate_limit.max_alerts_per_minute', 60));
         $key = config('security-defense.cache_prefix', 'security_defense:') . 'rate_limit:alerts_per_minute';
+        $cache = Cache::store(config('security-defense.cache_store'));
 
-        $current = (int) Cache::get($key, 0);
+        $reserve = function () use ($cache, $key, $max): bool {
+            $cache->add($key, 0, 60);
+            $current = (int) $cache->increment($key);
+            if ($current <= $max) {
+                return true;
+            }
+            $cache->decrement($key);
+            return false;
+        };
 
-        return $current >= $max;
+        if (method_exists($cache, 'lock')) {
+            return (bool) $cache->lock($key . ':lock', 5)->block(1, $reserve);
+        }
+
+        return $reserve();
+
     }
 
-    /**
-     * Increment the alert rate limit counter.
-     */
-    protected function incrementRateLimiter(): void
+    /** Recursively trim strings first, then enforce one global JSON byte ceiling. */
+    protected function boundMetadata(array $metadata, int $maxBytes): array
     {
-        $enabled = (bool) config('security-defense.hardening.alert_rate_limit.enabled', true);
-        if (!$enabled) {
-            return;
+        $originalJson = (string) json_encode($metadata);
+
+        $trim = function (mixed $value) use (&$trim): mixed {
+            if (is_array($value)) {
+                $result = [];
+                foreach ($value as $key => $child) {
+                    $result[$key] = $trim($child);
+                }
+                return $result;
+            }
+            if (is_string($value) && strlen($value) > 200) {
+                return substr($value, 0, 200) . '...[TRUNCATED]';
+            }
+            return $value;
+        };
+
+        $bounded = $trim($metadata);
+        $bytes = strlen((string) json_encode($bounded));
+
+        if ($bytes <= $maxBytes) {
+            return $bounded;
         }
 
-        $key = config('security-defense.cache_prefix', 'security_defense:') . 'rate_limit:alerts_per_minute';
-        // Atomic: seed TTL only on first create, always increment
-        if (!Cache::has($key)) {
-            Cache::put($key, 0, 60);
+        // If still too large after trimming strings, drop keys from the end.
+        $dropped = ($bounded !== $metadata);
+        while ($bytes > $maxBytes && $bounded !== []) {
+            $key = array_key_last($bounded);
+            unset($bounded[$key]);
+            $bytes = strlen((string) json_encode($bounded));
+            $dropped = true;
         }
-        Cache::increment($key);
+
+        if ($dropped && $bytes <= $maxBytes) {
+            $bounded['_truncated'] = true;
+            if (strlen((string) json_encode($bounded)) > $maxBytes && count($bounded) > 1) {
+                // The marker itself didn't fit, drop it.
+                unset($bounded['_truncated']);
+            }
+        }
+
+        return $bounded;
     }
 }

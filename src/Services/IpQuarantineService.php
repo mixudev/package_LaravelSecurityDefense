@@ -15,6 +15,12 @@ use Mixudev\SecurityDefense\Models\SecurityQuarantine;
  */
 class IpQuarantineService
 {
+    /** Maximum quarantine duration in seconds (24 hours). */
+    private const MAX_DURATION = 86400;
+
+    /** Maximum reason string length (DB column safe). */
+    private const MAX_REASON_LENGTH = 255;
+
     public function __construct(protected ?CacheRepository $cache = null)
     {
     }
@@ -45,6 +51,15 @@ class IpQuarantineService
         return (bool) config('security-defense.middleware.quarantine.persist_to_database', false);
     }
 
+    /**
+     * When true, DB failure during isQuarantined() treats unknown state as quarantined (fail-closed).
+     * When false (default), unknown state returns false to avoid blocking clean traffic on DB outage.
+     */
+    protected function dbFailClosed(): bool
+    {
+        return (bool) config('security-defense.middleware.quarantine.db_fail_closed', false);
+    }
+
     public function isEnabled(): bool
     {
         $global = (bool) config('security-defense.enabled', true);
@@ -54,10 +69,45 @@ class IpQuarantineService
     }
 
     /**
+     * Validate IP address format using inet_pton (stdlib, no filter_var dependency).
+     */
+    protected function isValidIp(string $ip): bool
+    {
+        return inet_pton($ip) !== false;
+    }
+
+    /**
+     * Clamp duration to [1, MAX_DURATION].
+     * Rejects zero/negative → 1, huge values → MAX_DURATION.
+     */
+    protected function clampDuration(?int $duration): int
+    {
+        $default = (int) config('security-defense.middleware.quarantine.duration', 900);
+
+        if ($duration === null) {
+            return max(1, min($default, self::MAX_DURATION));
+        }
+
+        return max(1, min($duration, self::MAX_DURATION));
+    }
+
+    /**
+     * Bound reason string length to prevent DB column overflow.
+     */
+    protected function boundReason(string $reason): string
+    {
+        return mb_substr($reason, 0, self::MAX_REASON_LENGTH, 'UTF-8');
+    }
+
+    /**
      * Check whether an IP is currently quarantined.
      */
     public function isQuarantined(string $ip): bool
     {
+        if (!$this->isValidIp($ip)) {
+            return false;
+        }
+
         if (!$this->isEnabled()) {
             return false;
         }
@@ -79,8 +129,10 @@ class IpQuarantineService
                     ->active()
                     ->exists();
             } catch (\Throwable) {
-                // Fail open if DB unavailable in a non-critical path
-                return false;
+                // SEC-004/SEC-012: DB unavailable after cache miss — indeterminate state.
+                // db_fail_closed=true → treat unknown as quarantined (safe for active threat indicators).
+                // db_fail_closed=false → allow traffic (fail-open) to avoid blocking every clean request.
+                return $this->dbFailClosed();
             }
         }
 
@@ -92,11 +144,16 @@ class IpQuarantineService
      */
     public function jail(string $ip, ?int $duration = null, string $reason = 'Security policy violation'): bool
     {
+        if (!$this->isValidIp($ip)) {
+            return false;
+        }
+
         if ($this->isWhitelisted($ip)) {
             return false;
         }
 
-        $quarantineDuration = $duration ?? (int) config('security-defense.middleware.quarantine.duration', 900);
+        $quarantineDuration = $this->clampDuration($duration);
+        $reason = $this->boundReason($reason);
         $cacheKey = $this->getCacheKey($ip);
         $expiresAt = time() + $quarantineDuration;
 
@@ -135,8 +192,11 @@ class IpQuarantineService
      */
     public function pardon(string $ip): void
     {
-        $this->getCache()->forget($this->getCacheKey($ip));
+        if (!$this->isValidIp($ip)) {
+            return;
+        }
 
+        $this->getCache()->forget($this->getCacheKey($ip));
         if ($this->persistToDatabase()) {
             try {
                 SecurityQuarantine::query()->forIp($ip)->delete();
@@ -153,6 +213,10 @@ class IpQuarantineService
      */
     public function getDetails(string $ip): ?array
     {
+        if (!$this->isValidIp($ip)) {
+            return null;
+        }
+
         // Check cache first
         $cached = $this->getCache()->get($this->getCacheKey($ip));
         if (is_array($cached)) {

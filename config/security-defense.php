@@ -282,6 +282,9 @@ return [
             'response_status' => 429,         // HTTP 429 Too Many Requests
             'response_message' => 'Your IP has been temporarily quarantined due to suspicious security activity.',
             'persist_to_database' => false,
+            // DB lookup failure after cache miss: false avoids blocking clean traffic;
+            // true fails closed for deployments where active threat indicators require it.
+            'db_fail_closed' => false,
             'table' => 'security_quarantines',
             'whitelist' => [
                 '127.0.0.1',

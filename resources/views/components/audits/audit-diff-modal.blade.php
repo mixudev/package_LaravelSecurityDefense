@@ -27,7 +27,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     function parseAudit(auditData) {
         if (typeof auditData === 'object' && auditData !== null) return auditData;
         try {
@@ -94,8 +94,8 @@
             html += `<tr><td colspan="3" class="p-4 text-center text-zinc-400">No field changes captured.</td></tr>`;
         } else {
             fields.forEach(f => {
-                const oldVal = oldVals[f] !== undefined ? JSON.stringify(oldVals[f]) : '<span class="text-zinc-400 italic">null</span>';
-                const newVal = newVals[f] !== undefined ? JSON.stringify(newVals[f]) : '<span class="text-zinc-400 italic">null</span>';
+                const oldVal = oldVals[f] !== undefined ? escapeHtml(JSON.stringify(oldVals[f])) : '<span class="text-zinc-400 italic">null</span>';
+                const newVal = newVals[f] !== undefined ? escapeHtml(JSON.stringify(newVals[f])) : '<span class="text-zinc-400 italic">null</span>';
                 html += `
                     <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition">
                         <td class="px-3 py-2 font-bold text-zinc-800 dark:text-zinc-200 align-top">${escapeHtml(f)}</td>

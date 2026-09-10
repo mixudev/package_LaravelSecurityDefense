@@ -75,7 +75,7 @@
 </section>
 
 @push('scripts')
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     document.addEventListener('DOMContentLoaded', function() {
         const url = @json(route('security-defense.live-events'));
         const tbody = document.getElementById('live-events-body');

@@ -10,6 +10,17 @@ use Mixudev\SecurityDefense\Tests\TestCase;
 
 class AlertDeduplicatorTest extends TestCase
 {
+    public function test_atomic_claim_suppresses_duplicate_across_instances(): void
+    {
+        $cache = app('cache')->store('array');
+        $first = new AlertDeduplicator($cache);
+        $second = new AlertDeduplicator($cache);
+        $threat = new SecurityThreat('high', 'brute_force', 'atomic-fingerprint');
+
+        $this->assertTrue($first->shouldAlert($threat));
+        $this->assertFalse($second->shouldAlert($threat));
+    }
+
     public function test_it_deduplicates_identical_threat_fingerprints(): void
     {
         $deduplicator = app(AlertDeduplicator::class);

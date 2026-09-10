@@ -46,6 +46,18 @@ class PruneAndCspArmorTest extends TestCase
         $cspHeader = $response->headers->get('Content-Security-Policy');
         $this->assertStringContainsString("default-src 'self'", $cspHeader);
         $this->assertStringContainsString('nonce-', $cspHeader);
+        $this->assertDoesNotMatchRegularExpression("/script-src[^;]*'unsafe-inline'/", $cspHeader);
+    }
+
+    public function test_audit_diff_escapes_stored_xss_values_before_inner_html(): void
+    {
+        $view = file_get_contents(dirname(__DIR__, 2) . '/resources/views/components/audits/audit-diff-modal.blade.php');
+
+        $this->assertIsString($view);
+        $this->assertStringContainsString('escapeHtml(JSON.stringify(oldVals[f]))', $view);
+        $this->assertStringContainsString('escapeHtml(JSON.stringify(newVals[f]))', $view);
+        $this->assertStringNotContainsString('${oldVals[f]}', $view);
+        $this->assertStringNotContainsString('${newVals[f]}', $view);
     }
 
     public function test_prune_command_runs_successfully(): void

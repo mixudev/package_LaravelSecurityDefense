@@ -37,34 +37,18 @@ class AlertDeduplicator implements AlertDeduplicatorInterface
     }
 
     /**
-     * Determine whether an alert should be emitted or suppressed.
+     * Atomically claim a fingerprint. This combines check and claim, preventing
+     * concurrent requests from both passing a check before either records it.
      */
     public function shouldAlert(SecurityThreat $threat): bool
     {
-        $enabled = (bool) config('security-defense.deduplication.enabled', true);
-        if (!$enabled) {
+        if (!(bool) config('security-defense.deduplication.enabled', true)) {
             return true;
         }
 
-        $cacheKey = $this->getCacheKey($threat->fingerprint);
+        $window = max(1, (int) config('security-defense.deduplication.window', 300));
 
-        return !$this->getCache()->has($cacheKey);
-    }
-
-    /**
-     * Record the threat fingerprint into cache for the configured window.
-     */
-    public function record(SecurityThreat $threat): void
-    {
-        $enabled = (bool) config('security-defense.deduplication.enabled', true);
-        if (!$enabled) {
-            return;
-        }
-
-        $window = (int) config('security-defense.deduplication.window', 300);
-        $cacheKey = $this->getCacheKey($threat->fingerprint);
-
-        $this->getCache()->put($cacheKey, [
+        return $this->getCache()->add($this->getCacheKey($threat->fingerprint), [
             'threat_type' => $threat->threatType,
             'severity' => $threat->severity,
             'recorded_at' => time(),
@@ -72,11 +56,25 @@ class AlertDeduplicator implements AlertDeduplicatorInterface
     }
 
     /**
-     * Forget a fingerprint to allow immediate alerting again.
+     * Record a claimed threat. Kept for API compatibility; shouldAlert already
+     * performs the atomic cache write, so this must not reset its TTL.
      */
+    public function record(SecurityThreat $threat): void
+    {
+        if (!(bool) config('security-defense.deduplication.enabled', true)) {
+            return;
+        }
+
+        $window = max(1, (int) config('security-defense.deduplication.window', 300));
+        $this->getCache()->add($this->getCacheKey($threat->fingerprint), [
+            'threat_type' => $threat->threatType,
+            'severity' => $threat->severity,
+            'recorded_at' => time(),
+        ], $window);
+    }
+
     public function forget(string $fingerprint): void
     {
-        $cacheKey = $this->getCacheKey($fingerprint);
-        $this->getCache()->forget($cacheKey);
+        $this->getCache()->forget($this->getCacheKey($fingerprint));
     }
 }

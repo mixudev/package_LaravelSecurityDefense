@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Rules;
 
+use Illuminate\Contracts\Cache\LockProvider;
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
 /**
@@ -49,22 +50,32 @@ class DistributedSprayRule extends AbstractDetectionRule
         $windowKey = $this->getCacheKey('ds_window:' . md5($target));
         $ipTrackingKey = $this->getCacheKey('ds_ips:' . md5($target));
 
-        // Atomic seed: only first request sets TTL, subsequent requests increment atomically
-        if (!$cache->has($windowKey)) {
-            $cache->put($windowKey, true, $window);
-            $cache->put($counterKey, 0, $window);
-            $cache->put($ipTrackingKey, [], $window);
-        }
-
-        // Track distinct IPs atomically (best-effort under concurrency)
         /** @var array<string, int> $probingIps */
-        $probingIps = (array) $cache->get($ipTrackingKey, []);
-        if (!isset($probingIps[$event->ip])) {
-            $probingIps[$event->ip] = time();
-            $cache->put($ipTrackingKey, $probingIps, $window);
-            $count = (int) $cache->increment($counterKey);
+        $probingIps = [];
+        $count = 0;
+        $update = function () use ($cache, $windowKey, $counterKey, $ipTrackingKey, $window, $event, &$probingIps, &$count): void {
+            if (!$cache->has($windowKey)) {
+                $cache->put($windowKey, true, $window);
+                $cache->put($counterKey, 0, $window);
+                $cache->put($ipTrackingKey, [], $window);
+            }
+
+            $probingIps = (array) $cache->get($ipTrackingKey, []);
+            if (!isset($probingIps[$event->ip])) {
+                $probingIps[$event->ip] = time();
+                $cache->put($ipTrackingKey, $probingIps, $window);
+                $count = (int) $cache->increment($counterKey);
+            } else {
+                $count = (int) $cache->get($counterKey, 0);
+            }
+        };
+
+        $store = method_exists($cache, 'getStore') ? $cache->getStore() : null;
+        if ($store instanceof LockProvider) {
+            $store->lock($this->getCacheKey('ds_lock:' . md5($target)), max(1, $window))->block(5, $update);
         } else {
-            $count = (int) $cache->get($counterKey, 0);
+            // Keep compatibility with legacy fake repositories without lock support.
+            $update();
         }
 
         if ($count >= $threshold) {

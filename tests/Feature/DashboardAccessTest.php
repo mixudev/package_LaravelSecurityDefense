@@ -70,6 +70,38 @@ class DashboardAccessTest extends TestCase
         $response->assertStatus(404);
     }
 
+    public function test_anonymous_remote_access_is_forbidden_when_dashboard_is_exposed(): void
+    {
+        $this->app['env'] = 'production';
+        config()->set('security-defense.dashboard.local_only', false);
+
+        $response = $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.88'])
+            ->get('/security-defense');
+
+        $response->assertStatus(403);
+        $response->assertSee('Forbidden.');
+    }
+
+    public function test_dashboard_probe_returns_generic_client_error(): void
+    {
+        $this->app['env'] = 'local';
+        $this->mock(\Mixudev\SecurityDefense\Services\ChannelTestService::class)
+            ->shouldReceive('testChannel')->once()->andThrow(new \RuntimeException('secret provider failure'));
+
+        $token = 'test-valid-csrf-token-error';
+        $response = $this->withSession(['_token' => $token])
+            ->withHeaders(['X-CSRF-TOKEN' => $token, 'Accept' => 'application/json'])
+            ->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->post('/security-defense/test-channel', [
+                'channel' => 'database',
+                '_token' => $token,
+            ]);
+
+        $response->assertStatus(500);
+        $response->assertJsonPath('message', 'Channel probe failed. Please check server logs.');
+        $response->assertJsonMissing(['message' => 'secret provider failure']);
+    }
+
     public function test_dashboard_allows_access_if_custom_gate_is_satisfied(): void
     {
         $this->app['env'] = 'production';

@@ -110,7 +110,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     function openChannelProbeModal() {
         const modal = document.getElementById('channelProbeModal');
         if (modal) modal.classList.remove('hidden');

@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
 use Mixudev\SecurityDefense\Services\ChannelTestService;
@@ -125,14 +126,20 @@ class DashboardController extends Controller
 
             return back()->with('test_results', $results)->with('status_message', 'Channel connectivity probe completed.');
         } catch (Throwable $e) {
+            Log::error('Security Defense dashboard channel probe failed.', [
+                'channel' => $channel,
+                'ip' => $request->ip(),
+                'exception' => $e,
+            ]);
+
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => $e->getMessage(),
-                ], 400);
+                    'message' => 'Channel probe failed. Please check server logs.',
+                ], 500);
             }
 
-            return back()->with('error_message', 'Test failed: ' . $e->getMessage());
+            return back()->with('error_message', 'Channel probe failed. Please check server logs.');
         }
     }
 

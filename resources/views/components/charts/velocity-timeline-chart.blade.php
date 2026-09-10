@@ -36,7 +36,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     document.addEventListener('DOMContentLoaded', function() {
         if (typeof Chart === 'undefined') return;
 

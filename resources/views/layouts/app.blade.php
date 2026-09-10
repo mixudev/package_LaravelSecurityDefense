@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
     <!-- Anti-Flash Dark Mode Initialization -->
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         (function() {
             try {
                 const stored = localStorage.getItem('security_defense_theme');
@@ -26,10 +26,10 @@
     </script>
 
     <!-- Standalone Tailwind CSS v4 Browser Runtime (Isolated to Dashboard) -->
-    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}" src="https://unpkg.com/@tailwindcss/browser@4"></script>
 
     <!-- Chart.js for High-Performance Telemetry Visualization -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
     <!-- Configure class-based dark mode (Tailwind v4 defaults to prefers-color-scheme;
          this makes the .dark class on <html> drive all dark: variants) -->
@@ -94,7 +94,7 @@
     </footer>
 
     <!-- Theme Switcher JavaScript -->
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         function toggleTheme() {
             const isDark = document.documentElement.classList.toggle('dark');
             localStorage.setItem('security_defense_theme', isDark ? 'dark' : 'light');

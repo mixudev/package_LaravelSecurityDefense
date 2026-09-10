@@ -55,7 +55,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     let currentRawTelemetry = '';
 
     function showMetadataModal(alertId, rawJson) {
