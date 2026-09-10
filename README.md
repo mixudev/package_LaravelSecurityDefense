@@ -2,7 +2,6 @@
 
 [![Versi Terbaru di Packagist](https://img.shields.io/packagist/v/mixudev/security-defense.svg?style=flat-square)](https://packagist.org/packages/mixudev/security-defense)
 [![Release GitHub](https://img.shields.io/github/v/tag/mixudev/package_LaravelSecurityDefense?label=release&style=flat-square)](https://github.com/mixudev/package_LaravelSecurityDefense/releases)
-[![Hasil Pengujian](https://img.shields.io/badge/tests-103%20passed-brightgreen.svg?style=flat-square)]()
 [![Versi PHP](https://img.shields.io/badge/PHP-%5E8.2-blue.svg?style=flat-square)]()
 [![Kompatibilitas Laravel](https://img.shields.io/badge/Laravel-10%20%7C%2011%20%7C%2012%20%7C%2013-red.svg?style=flat-square)]()
 [![Lisensi: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)

@@ -1,10 +1,10 @@
 # Epistemic Autonomous Security Defense
 
-Dokumen internal ini menjelaskan arsitektur analisis epistemik pada `mixudev/security-defense`. Fitur ini menambahkan penalaran berbasis bukti tanpa mengganti pipeline pertahanan lama.
+Dokumen internal ini menjelaskan arsitektur analisis epistemik pada `mixudev/security-defense`. Fitur ini eksperimental dan belum siap produksi. Fitur menambahkan penalaran berbasis bukti tanpa mengganti pipeline pertahanan lama; hasil tidak boleh menjadi satu-satunya dasar tindakan destruktif.
 
 ## Status dan batas opt-in
 
-Pipeline lama `record()` tetap menjadi jalur default dan tetap berjalan seperti sebelumnya. Analisis epistemik memakai jalur baru `analyze()` dan **tidak aktif secara default**.
+Pipeline lama `record()`/`processEvent()` tetap menjadi jalur default dan tetap berjalan seperti sebelumnya. Analisis epistemik memakai jalur baru `analyze()` dan **tidak aktif secara default**. Fitur ini eksperimental dan belum siap produksi.
 
 Aktifkan secara eksplisit melalui konfigurasi:
 
@@ -76,7 +76,7 @@ Bukti berasal dari `SecurityEvent`, bukti yang diberikan melalui `AnalysisContex
 
 ### Memory dan feedback
 
-Memory menyimpan pengalaman pola agar analisis berikutnya dapat belajar dari outcome. Jika belum ada method feedback publik pada manager, gunakan `FeedbackHandler` yang tersedia dan kirim `ThreatBelief` dari `hypotheses()`:
+Memory menyimpan pengalaman pola agar analisis berikutnya dapat belajar dari outcome. Gunakan `SecurityDefense::recordFeedback` sebagai API publik, atau `FeedbackHandler` untuk integrasi langsung, dan kirim `ThreatBelief` dari `hypotheses()`:
 
 ```php
 use Mixudev\SecurityDefense\Epistemic\Feedback\FeedbackHandler;
@@ -86,15 +86,17 @@ $feedback = new FeedbackHandler(app(ExperienceMemory::class));
 $hypotheses = $assessment->hypotheses();
 
 if ($hypotheses !== []) {
-    $feedback->record($hypotheses[0], 'confirmed');
+    $feedback->record($hypotheses[0], 'confirmed_attack');
 }
 ```
 
-Outcome string harus mengikuti vocabulary yang dipakai aplikasi. Contoh `'confirmed'` hanya contoh outcome yang dicatat; jangan menganggap feedback sebagai bukti baru tanpa proses validasi.
+`SecurityDefense::recordFeedback(ThreatBelief $belief, string $outcome, ?string $feedbackId = null): void` adalah API publik. Outcome yang valid hanya `'confirmed_attack'` dan `'false_positive'`; `'confirmed'` tidak valid. `feedbackId` opsional mencegah replay feedback selama retensi. Jangan menganggap feedback sebagai bukti baru tanpa proses validasi.
 
 ## Batas provider AI
 
-`AiEvidenceProviderInterface` hanya memasok evidence tambahan melalui `getEvidenceFor(AnalysisContext $context): array`. Provider default `NullAiProvider` tidak memasok bukti.
+`AiEvidenceProviderInterface` hanya memasok evidence tambahan melalui `getEvidenceFor(AnalysisContext $context): array`. Provider default `NullAiProvider` tidak memasok bukti. Evidence AI yang lolos validasi dapat ikut korelasi dan memengaruhi assessment, tetapi tetap advisory; AI bukan decision authority.
+
+`epistemic.response.enabled=false` secara default. Tidak ada enforcement tanpa konfigurasi `DecisionResponseAdapterInterface` dan opt-in eksplisit; `NoopResponseAdapter` tidak melakukan enforcement.
 
 AI berada di sisi **evidence source**, bukan decision authority. Provider tidak boleh:
 
@@ -115,6 +117,13 @@ Implementasi provider nyata harus didaftarkan melalui binding Service Provider a
 6. AI hanya pemasok bukti.
 7. Sanitization dan batas ukuran tetap berlaku pada input yang tidak tepercaya.
 
+## Batas implementasi
+
+- `AnalysisContext` membatasi maksimal 500 event dan 500 evidence; metadata dibatasi 4096 byte.
+- Graph dibatasi `max_depth=8`, `max_nodes=500`, dan `window_seconds=900`. Timestamp evidence AI lebih dari 60 detik ke masa depan ditolak.
+- Memory berbasis cache menyimpan maksimal 10000 pola dengan retensi 30 hari. Penyimpanan memakai cache lock; fallback memakai counter atomik bila lock tidak tersedia.
+- Batas dan timestamp dapat mengurangi cakupan korelasi; sistem bukan mesin replay bebas atas seluruh histori.
+
 ## Keterbatasan keamanan
 
 - Analisis dapat menghasilkan false positive dan false negative.
@@ -125,10 +134,15 @@ Implementasi provider nyata harus didaftarkan melalui binding Service Provider a
 - Bounded traversal membatasi cakupan analisis. Serangan dengan rantai bukti di luar jendela atau batas traversal dapat tidak terhubung.
 - Jangan memakai assessment sebagai satu-satunya dasar tindakan destruktif atau keputusan terhadap pengguna tanpa kontrol policy dan verifikasi tambahan.
 
+## API publik yang stabil untuk integrasi
+
+Gunakan `AnalysisContext`, `SecurityEvent`, `SecurityDefense::analyze`, accessor `ThreatAssessment` (`risk()`, `confidence()`, `hypotheses()`, `evidence()`, `decision()`, `toArray()`), dan `SecurityDefense::recordFeedback`. Gunakan `DecisionResponseAdapterInterface` hanya untuk integrasi response yang sengaja diaktifkan. Jangan membaca properti internal `src/Epistemic` sebagai kontrak.
+
 ## Catatan upgrade
 
-- Upgrade package tidak menghapus pipeline `record()`.
-- Pertahankan `epistemic.enabled=false` selama migrasi dan aktifkan bertahap setelah regression test.
-- Tinjau binding provider AI, sanitization, retention memory, dan policy setiap upgrade.
+- Upgrade package tidak menghapus pipeline `record()`/`processEvent()`.
+- Pertahankan `epistemic.enabled=false` dan `epistemic.response.enabled=false` selama migrasi; aktifkan bertahap setelah regression test dan audit adapter.
+- Jika aplikasi memakai config cache, jalankan `php artisan config:clear` sebelum mengubah konfigurasi, lalu `php artisan config:cache` setelah verifikasi.
+- Tinjau binding provider AI, sanitization, retention memory, cache lock, replay guard, dan policy setiap upgrade.
 - Jangan mengandalkan properti internal komponen `src/Epistemic`; gunakan API publik `AnalysisContext`, `SecurityEvent`, `SecurityDefense::analyze`, accessor `ThreatAssessment`, dan `FeedbackHandler` yang terdokumentasi.
 - Jika versi berikutnya mengubah bentuk `ThreatAssessment`, migrasikan pemanggilan accessor secara eksplisit; jangan membaca properti internal sebagai kontrak stabil.

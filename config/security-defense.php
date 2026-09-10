@@ -423,12 +423,19 @@ return [
         'confidence' => ['min' => 0.0, 'max' => 1.0],
         'risk' => ['epsilon' => 0.001, 'max_iterations' => 10, 'decay' => 0.95],
         'graph' => ['max_depth' => 8, 'max_nodes' => 500, 'window_seconds' => 900],
+        'limits' => ['max_events' => 500, 'max_evidence' => 500, 'max_metadata_bytes' => 4096],
+        'ai' => ['max_evidence' => 20, 'max_metadata_bytes' => 4096, 'allowed_future_seconds' => 60],
         'memory' => ['retention_days' => 30, 'max_patterns' => 10000],
         'policy' => [
             'block_threshold' => 0.85,
             'quarantine_threshold' => 0.70,
             'challenge_threshold' => 0.50,
             'monitor_threshold' => 0.30,
+        ],
+        // Assessment never enforces responses unless both flags and adapter are opted in.
+        'response' => [
+            'enabled' => false,
+            'adapter' => null,
         ],
     ],
 ];

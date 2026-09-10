@@ -10,6 +10,8 @@ use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
 use Mixudev\SecurityDefense\Epistemic\DTO\AnalysisContext;
 use Mixudev\SecurityDefense\Epistemic\DTO\ThreatAssessment;
+use Mixudev\SecurityDefense\Epistemic\Belief\ThreatBelief;
+use Mixudev\SecurityDefense\Epistemic\Feedback\FeedbackHandler;
 use Mixudev\SecurityDefense\Epistemic\EpistemicAnalyzer;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
 use Mixudev\SecurityDefense\Sources\GenericArraySource;
@@ -24,7 +26,8 @@ class SecurityDefenseManager
         protected AlertDispatcher $dispatcher,
         protected ?ThreatScoringEngine $scoringEngine = null,
         protected ?IpQuarantineService $quarantineService = null,
-        protected ?EpistemicAnalyzer $epistemicAnalyzer = null
+        protected ?EpistemicAnalyzer $epistemicAnalyzer = null,
+        protected ?FeedbackHandler $feedbackHandler = null
     ) {
     }
 
@@ -139,6 +142,20 @@ class SecurityDefenseManager
         }
 
         return $this->epistemicAnalyzer->analyze($context);
+    }
+
+    /**
+     * Record verified outcome for prior epistemic belief.
+     */
+    public function recordFeedback(ThreatBelief $belief, string $outcome, ?string $feedbackId = null): void
+    {
+        if ($this->feedbackHandler === null) {
+            throw new \RuntimeException(
+                'FeedbackHandler not available. Set epistemic.enabled = true in config/security-defense.php.'
+            );
+        }
+
+        $this->feedbackHandler->record($belief, $outcome, $feedbackId);
     }
 
     /**

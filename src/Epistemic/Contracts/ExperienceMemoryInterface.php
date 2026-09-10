@@ -9,5 +9,5 @@ interface ExperienceMemoryInterface
 {
     public function recall(string $patternKey): ?ThreatPattern;
     public function store(ThreatPattern $pattern): void;
-    public function recordFeedback(string $patternKey, string $outcome): void;
+    public function recordFeedback(string $patternKey, string $outcome, ?string $feedbackId = null): void;
 }

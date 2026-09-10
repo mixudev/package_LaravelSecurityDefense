@@ -1,6 +1,8 @@
 # Epistemic Autonomous Security Defense
 
-Fitur ini memberi analisis ancaman berbasis bukti, confidence, risk, policy, memory, dan provider AI opsional. Fitur bersifat opt-in.
+Fitur ini memberi analisis ancaman berbasis bukti, confidence, risk, policy, memory, dan provider AI opsional. Fitur bersifat opt-in, eksperimental, dan belum siap produksi. Jangan jadikan assessment sebagai satu-satunya dasar tindakan destruktif atau penolakan akses.
+
+Pipeline ini tidak menggantikan `record()`/`processEvent()`. Default `epistemic.enabled=false` dan `epistemic.response.enabled=false`; aplikasi lama tetap memakai jalur pertahanan lama.
 
 ## Aktivasi
 
@@ -16,7 +18,9 @@ Default `false` menjaga perilaku aplikasi lama. Pipeline `record()` tetap dipaka
 
 ## API analisis
 
-API publik baru menerima `AnalysisContext` atau array yang ditentukan implementasi rencana dan mengembalikan `ThreatAssessment`.
+API publik `SecurityDefense::analyze(AnalysisContext|array $context): ThreatAssessment` menerima `AnalysisContext`. Bentuk array publik juga didukung sebagai daftar event (`array<SecurityEvent|array<string, mixed>>`), bukan array dengan key `events`/`evidence`/`subject`/`windowSeconds`.
+
+Untuk konteks lengkap dan evidence tambahan, buat `AnalysisContext` secara eksplisit.
 
 ### Analisis dengan DTO
 
@@ -45,16 +49,19 @@ $assessment = SecurityDefense::analyze($context);
 
 ### Analisis dari array
 
-Gunakan bentuk array hanya untuk input yang mengikuti field `AnalysisContext` (`events`, `evidence`, `subject`, `windowSeconds`):
+Bentuk array menerima daftar event saja (`array<SecurityEvent|array<string, mixed>>`), bukan object `AnalysisContext`. Untuk menetapkan evidence, subject, atau windowSeconds, buat `AnalysisContext` secara eksplisit.
 
 ```php
 use Mixudev\SecurityDefense\Support\Facades\SecurityDefense;
 
 $assessment = SecurityDefense::analyze([
-    'events' => [],
-    'evidence' => [],
-    'subject' => 'user-42',
-    'windowSeconds' => 900,
+    [
+        'ip' => '203.0.113.10',
+        'identifier' => 'user-42',
+        'eventType' => 'LoginFailed',
+        'userAgent' => 'ExampleClient/1.0',
+        'metadata' => ['source' => 'auth'],
+    ],
 ]);
 ```
 
@@ -87,7 +94,7 @@ Jangan menyamakan risk tinggi dengan confidence tinggi. Sinyal kuat dapat tetap 
 
 ## Feedback terverifikasi
 
-Tidak ada asumsi tentang method feedback pada manager. Gunakan `FeedbackHandler` yang tersedia bersama `ThreatBelief` dari assessment:
+Gunakan API publik `SecurityDefense::recordFeedback` dengan `ThreatBelief` dari assessment. `FeedbackHandler` juga tersedia untuk integrasi langsung:
 
 ```php
 use Mixudev\SecurityDefense\Epistemic\Feedback\FeedbackHandler;
@@ -97,9 +104,11 @@ $hypotheses = $assessment->hypotheses();
 
 if ($hypotheses !== []) {
     $handler = new FeedbackHandler(app(ExperienceMemory::class));
-    $handler->record($hypotheses[0], 'confirmed');
+    $handler->record($hypotheses[0], 'confirmed_attack');
 }
 ```
+
+`SecurityDefense::recordFeedback(ThreatBelief $belief, string $outcome, ?string $feedbackId = null): void` adalah API publik. Outcome yang diterima hanya `'confirmed_attack'` dan `'false_positive'`; `'confirmed'` tidak valid. `feedbackId` opsional memberi deduplikasi feedback.
 
 Catat feedback hanya jika outcome sudah diverifikasi oleh proses aplikasi. Feedback salah dapat memengaruhi memory dan analisis berikutnya.
 
@@ -121,11 +130,18 @@ Korelasi menggunakan jendela `windowSeconds` dan traversal graph yang dibatasi. 
 
 ## Provider AI
 
-Provider AI adalah batas pemasok evidence. Provider menerima `AnalysisContext` dan mengembalikan bukti; provider tidak menjadi pemilik keputusan. Provider default adalah `NullAiProvider`, sehingga tidak menghasilkan evidence AI.
+Provider AI adalah batas pemasok evidence. Provider menerima `AnalysisContext` dan mengembalikan bukti; provider tidak menjadi pemilik keputusan. Provider default adalah `NullAiProvider`, sehingga tidak menghasilkan evidence AI. Evidence AI yang lolos validasi dapat ikut korelasi dan memengaruhi assessment, tetapi tetap advisory: AI tidak menjadi otoritas keputusan.
 
-Policy engine tetap menentukan `decision()`. AI tidak boleh langsung memblokir request, mengarantina IP, mengubah risk, atau melewati sanitization. Integrasi provider nyata harus memakai binding aplikasi, mengirim data minimum, membatasi timeout/retry, dan menangani kegagalan sebagai provider tidak tersedia.
+Policy engine tetap menentukan `decision()`. AI tidak boleh langsung memblokir request, mengarantina IP, mengubah risk secara langsung, atau melewati sanitization. Jika `epistemic.response.enabled=false` (default), tidak ada response enforcement. Enforcement memerlukan `DecisionResponseAdapterInterface` yang dikonfigurasi dan opt-in eksplisit; adapter default `NoopResponseAdapter` tidak melakukan enforcement. Integrasi provider nyata harus memakai binding aplikasi, mengirim data minimum, membatasi timeout/retry, dan menangani kegagalan sebagai provider tidak tersedia.
 
-Jangan menganggap package menyediakan endpoint AI, vendor, format credential, atau public method manager untuk feedback. Detail itu berada di luar kontrak API yang didokumentasikan.
+Package tidak menyediakan endpoint AI atau vendor tertentu. Feedback tersedia melalui `SecurityDefense::recordFeedback()` dan `SecurityDefenseManager::recordFeedback()`; keduanya menerima outcome terverifikasi `'confirmed_attack'` atau `'false_positive'` serta `feedbackId` opsional.
+
+## Batas implementasi
+
+- `AnalysisContext` membatasi `max_events=500` dan `max_evidence=500`; metadata dibatasi `max_metadata_bytes=4096`.
+- Graph dibatasi `max_depth=8`, `max_nodes=500`, dan `window_seconds=900` secara konfigurasi. `windowSeconds` pada konteks default 900 detik. Timestamp masa depan evidence AI lebih dari 60 detik ditolak.
+- Memory berbasis cache menyimpan paling banyak `max_patterns=10000` pola dengan retensi `retention_days=30`. Penyimpanan memakai cache lock; fallback memakai counter atomik bila lock tidak tersedia. `feedbackId` mencegah replay feedback selama retensi.
+- Batas dapat mengurangi cakupan; event/evidence di luar batas, timestamp kedaluwarsa, atau rantai graph yang terlalu dalam dapat tidak terhubung.
 
 ## Keterbatasan keamanan
 

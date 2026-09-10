@@ -15,10 +15,17 @@ use Mixudev\SecurityDefense\Contracts\AlertDeduplicatorInterface;
 use Mixudev\SecurityDefense\Contracts\ThreatDetector;
 use Mixudev\SecurityDefense\Epistemic\AI\NullAiProvider;
 use Mixudev\SecurityDefense\Epistemic\Contracts\AiEvidenceProviderInterface;
+use Mixudev\SecurityDefense\Epistemic\Contracts\EpistemicEngineInterface;
+use Mixudev\SecurityDefense\Epistemic\Contracts\ExperienceMemoryInterface;
+use Mixudev\SecurityDefense\Epistemic\Contracts\PolicyEngineInterface;
+use Mixudev\SecurityDefense\Epistemic\Contracts\DecisionResponseAdapterInterface;
+use Mixudev\SecurityDefense\Epistemic\Response\NoopResponseAdapter;
+use Mixudev\SecurityDefense\Epistemic\Contracts\RiskEngineInterface;
 use Mixudev\SecurityDefense\Epistemic\Correlation\ThreatCorrelator;
 use Mixudev\SecurityDefense\Epistemic\Engine\EpistemicEngine;
 use Mixudev\SecurityDefense\Epistemic\Engine\RiskEngine;
 use Mixudev\SecurityDefense\Epistemic\EpistemicAnalyzer;
+use Mixudev\SecurityDefense\Epistemic\Feedback\FeedbackHandler;
 use Mixudev\SecurityDefense\Epistemic\Memory\ExperienceMemory;
 use Mixudev\SecurityDefense\Epistemic\Policy\PolicyEngine;
 use Mixudev\SecurityDefense\Detection\AnomalyDetector;
@@ -154,8 +161,7 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         $this->app->singleton(\Mixudev\SecurityDefense\Services\ThreatTelemetryRecorder::class);
 
         // Epistemic subsystem (opt-in)
-        if ((bool) config('security-defense.epistemic.enabled', false)) {
-            $this->app->singleton(EpistemicEngine::class, function () {
+        $this->app->singleton(EpistemicEngine::class, function () {
                 $cfg = (array) config('security-defense.epistemic', []);
                 return new EpistemicEngine(
                     evidenceTtlSeconds: (float) ($cfg['graph']['window_seconds'] ?? 900),
@@ -163,6 +169,7 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                     confidenceMax: (float) ($cfg['confidence']['max'] ?? 1.0),
                 );
             });
+            $this->app->singleton(EpistemicEngineInterface::class, fn ($app) => $app->make(EpistemicEngine::class));
             $this->app->singleton(RiskEngine::class, function () {
                 $cfg = (array) config('security-defense.epistemic.risk', []);
                 return new RiskEngine(
@@ -171,6 +178,7 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                     maxIterations: (int) ($cfg['max_iterations'] ?? 10),
                 );
             });
+            $this->app->singleton(RiskEngineInterface::class, fn ($app) => $app->make(RiskEngine::class));
             $this->app->singleton(PolicyEngine::class, function () {
                 $cfg = (array) config('security-defense.epistemic.policy', []);
                 return new PolicyEngine(
@@ -180,6 +188,7 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                     monitorThreshold: (float) ($cfg['monitor_threshold'] ?? 0.30),
                 );
             });
+            $this->app->singleton(PolicyEngineInterface::class, fn ($app) => $app->make(PolicyEngine::class));
             $this->app->singleton(ExperienceMemory::class, function ($app) {
                 $cfg = (array) config('security-defense.epistemic.memory', []);
                 return new ExperienceMemory(
@@ -189,18 +198,28 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                     retentionDays: (int) ($cfg['retention_days'] ?? 30),
                 );
             });
+            $this->app->singleton(ExperienceMemoryInterface::class, fn ($app) => $app->make(ExperienceMemory::class));
+            $this->app->singleton(FeedbackHandler::class, fn ($app) => new FeedbackHandler($app->make(ExperienceMemoryInterface::class)));
             $this->app->singleton(AiEvidenceProviderInterface::class, NullAiProvider::class);
+            $this->app->singleton(DecisionResponseAdapterInterface::class, function ($app) {
+                $cfg = (array) config('security-defense.epistemic.response', []);
+                $adapter = $cfg['adapter'] ?? null;
+                return ((bool) ($cfg['enabled'] ?? false) && is_string($adapter) && $adapter !== '')
+                    ? $app->make($adapter)
+                    : new NoopResponseAdapter();
+            });
             $this->app->singleton(EpistemicAnalyzer::class, function ($app) {
                 return new EpistemicAnalyzer(
-                    epistemicEngine: $app->make(EpistemicEngine::class),
-                    riskEngine: $app->make(RiskEngine::class),
+                    epistemicEngine: $app->make(EpistemicEngineInterface::class),
+                    riskEngine: $app->make(RiskEngineInterface::class),
                     correlator: new ThreatCorrelator(),
-                    policyEngine: $app->make(PolicyEngine::class),
+                    policyEngine: $app->make(PolicyEngineInterface::class),
                     aiProvider: $app->make(AiEvidenceProviderInterface::class),
                     config: (array) config('security-defense.epistemic', []),
+                    memory: $app->make(ExperienceMemoryInterface::class),
+                    responseAdapter: $app->make(DecisionResponseAdapterInterface::class),
                 );
             });
-        }
 
         // Bind Security Defense Manager (coordinator)
         $this->app->singleton(SecurityDefenseManager::class, function ($app) {
@@ -212,6 +231,7 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                 scoringEngine: $app->make(ThreatScoringEngine::class),
                 quarantineService: $app->make(IpQuarantineService::class),
                 epistemicAnalyzer: $epistemic,
+                feedbackHandler: $epistemic === null ? null : $app->make(FeedbackHandler::class),
             );
         });
 

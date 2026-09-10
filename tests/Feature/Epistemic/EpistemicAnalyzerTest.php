@@ -14,6 +14,9 @@ use Mixudev\SecurityDefense\Epistemic\EpistemicAnalyzer;
 use Mixudev\SecurityDefense\Epistemic\Evidence\Evidence;
 use Mixudev\SecurityDefense\Epistemic\Policy\PolicyEngine;
 use Mixudev\SecurityDefense\Epistemic\Policy\DecisionAction;
+use Mixudev\SecurityDefense\Epistemic\Contracts\AiEvidenceProviderInterface;
+use Mixudev\SecurityDefense\Epistemic\Contracts\DecisionResponseAdapterInterface;
+use Mixudev\SecurityDefense\Epistemic\Response\ResponseResult;
 use Mixudev\SecurityDefense\Epistemic\ValueObjects\Confidence;
 use Mixudev\SecurityDefense\Epistemic\ValueObjects\EvidenceType;
 use Mixudev\SecurityDefense\Tests\TestCase;
@@ -102,5 +105,79 @@ class EpistemicAnalyzerTest extends TestCase
         $this->assertArrayHasKey('hypotheses', $arr);
         $this->assertArrayHasKey('evidence_count', $arr);
         $this->assertArrayHasKey('decision', $arr);
+    }
+
+    public function test_response_runs_for_distinct_evidence_with_same_decision(): void
+    {
+        $calls = 0;
+        $adapter = new class($calls) implements DecisionResponseAdapterInterface {
+            public function __construct(private int &$calls) {}
+            public function respond(\Mixudev\SecurityDefense\Epistemic\Policy\ThreatDecision $decision): ResponseResult
+            {
+                $this->calls++;
+                return new ResponseResult(true, $decision->id());
+            }
+        };
+        $analyzer = new EpistemicAnalyzer(new EpistemicEngine(), new RiskEngine(), new ThreatCorrelator(), new PolicyEngine(), new NullAiProvider(), ['response' => ['enabled' => true]], null, $adapter);
+        $first = $analyzer->analyze(new AnalysisContext(evidence: [$this->makeEvidence(EvidenceType::LOGIN_FAILED)]));
+        $second = $analyzer->analyze(new AnalysisContext(evidence: [$this->makeEvidence(EvidenceType::OTP_FAILED)]));
+
+        $this->assertNotNull($first->decision());
+        $this->assertNotNull($second->decision());
+        $this->assertSame($first->decision()->id(), $second->decision()->id());
+        $this->assertSame(2, $calls);
+        $this->assertNotNull($analyzer->responseResult($second->decision()->id()));
+    }
+
+    public function test_ai_evidence_alone_cannot_authorize_policy(): void
+    {
+        $ai = new class implements AiEvidenceProviderInterface {
+            public function getEvidenceFor(AnalysisContext $context): array
+            {
+                return [new Evidence(EvidenceType::LOGIN_FAILED, 'ai:model', new DateTimeImmutable(), Confidence::from(1.0), ['provenance' => 'model'])];
+            }
+        };
+        $analyzer = new EpistemicAnalyzer(new EpistemicEngine(), new RiskEngine(), new ThreatCorrelator(), new PolicyEngine(), $ai);
+
+        $this->assertNull($analyzer->analyze(new AnalysisContext())->decision());
+    }
+
+    public function test_ai_cannot_complete_support_with_one_trusted_event(): void
+    {
+        $ai = new class implements AiEvidenceProviderInterface {
+            public function getEvidenceFor(AnalysisContext $context): array
+            {
+                return [new Evidence(EvidenceType::NEW_DEVICE, 'ai:model', new DateTimeImmutable(), Confidence::from(1.0), ['provenance' => 'model'])];
+            }
+        };
+        $analyzer = new EpistemicAnalyzer(new EpistemicEngine(), new RiskEngine(), new ThreatCorrelator(), new PolicyEngine(), $ai);
+
+        $this->assertNull($analyzer->analyze(new AnalysisContext(evidence: [$this->makeEvidence(EvidenceType::LOGIN_FAILED)]))->decision());
+    }
+
+    public function test_ai_advisory_signal_remains_usable_with_enough_trusted_evidence(): void
+    {
+        $ai = new class implements AiEvidenceProviderInterface {
+            public function getEvidenceFor(AnalysisContext $context): array
+            {
+                return [new Evidence(EvidenceType::NEW_DEVICE, 'ai:model', new DateTimeImmutable(), Confidence::from(1.0), ['provenance' => 'model'])];
+            }
+        };
+        $analyzer = new EpistemicAnalyzer(new EpistemicEngine(), new RiskEngine(), new ThreatCorrelator(), new PolicyEngine(), $ai);
+        $assessment = $analyzer->analyze(new AnalysisContext(evidence: [
+            $this->makeEvidence(EvidenceType::LOGIN_FAILED),
+            $this->makeEvidence(EvidenceType::OTP_FAILED),
+        ]));
+
+        $this->assertNotNull($assessment->decision());
+        $this->assertNotEmpty($assessment->hypotheses());
+    }
+
+    public function test_malformed_events_are_skipped(): void
+    {
+        $assessment = $this->makeAnalyzer()->analyze(new AnalysisContext(events: [[], 'invalid', new SecurityEvent('1.2.3.4', 'user1', 'LoginFailed')]));
+
+        $this->assertNotNull($assessment);
+        $this->assertCount(1, $assessment->evidence());
     }
 }

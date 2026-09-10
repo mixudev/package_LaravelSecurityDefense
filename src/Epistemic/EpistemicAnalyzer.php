@@ -3,17 +3,27 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Epistemic;
 
+use DateTimeImmutable;
 use Mixudev\SecurityDefense\Epistemic\Contracts\AiEvidenceProviderInterface;
+use Mixudev\SecurityDefense\Epistemic\Contracts\ExperienceMemoryInterface;
 use Mixudev\SecurityDefense\Epistemic\Contracts\PolicyEngineInterface;
+use Mixudev\SecurityDefense\Epistemic\Contracts\DecisionResponseAdapterInterface;
+use Mixudev\SecurityDefense\Epistemic\Response\ResponseResult;
 use Mixudev\SecurityDefense\Epistemic\Correlation\ThreatCorrelator;
 use Mixudev\SecurityDefense\Epistemic\DTO\AnalysisContext;
 use Mixudev\SecurityDefense\Epistemic\DTO\ThreatAssessment;
 use Mixudev\SecurityDefense\Epistemic\Engine\EpistemicEngine;
 use Mixudev\SecurityDefense\Epistemic\Engine\RiskEngine;
+use Mixudev\SecurityDefense\Epistemic\Evidence\Evidence;
 use Mixudev\SecurityDefense\Epistemic\Evidence\EvidenceBuilder;
 use Mixudev\SecurityDefense\Epistemic\Evidence\EvidenceCollection;
+use Mixudev\SecurityDefense\Epistemic\Graph\GraphEdge;
+use Mixudev\SecurityDefense\Epistemic\Graph\GraphNode;
+use Mixudev\SecurityDefense\Epistemic\Graph\ThreatGraph;
+use Mixudev\SecurityDefense\Epistemic\Memory\ThreatPattern;
 use Mixudev\SecurityDefense\Epistemic\ValueObjects\Confidence;
 use Mixudev\SecurityDefense\Epistemic\ValueObjects\RiskScore;
+use Mixudev\SecurityDefense\DTO\SecurityEvent;
 
 /** Full epistemic analysis pipeline orchestrator. */
 final class EpistemicAnalyzer
@@ -25,25 +35,66 @@ final class EpistemicAnalyzer
         private readonly PolicyEngineInterface $policyEngine,
         private readonly AiEvidenceProviderInterface $aiProvider,
         private readonly array $config = [],
-    ) {}
+        private readonly ?ExperienceMemoryInterface $memory = null,
+        private readonly ?DecisionResponseAdapterInterface $responseAdapter = null,
+    ) {
+        $this->responseResults = [];
+    }
+
+    /** @var array<string, ResponseResult> */
+    private array $responseResults;
+
+    /** @var array<string, true> */
+    private array $responseExecutionKeys = [];
+
+    public function responseResult(string $decisionId): ?ResponseResult
+    {
+        return $this->responseResults[$decisionId] ?? null;
+    }
 
     public function analyze(AnalysisContext $context): ThreatAssessment
     {
+        $graph = $this->buildGraph($context);
         $collection = new EvidenceCollection();
-        foreach ($context->events as $event) {
+        foreach (array_slice($context->events, 0, $this->maxEvents()) as $event) {
+            if (!$event instanceof SecurityEvent) continue;
             if (($e = EvidenceBuilder::fromSecurityEvent($event)) !== null) $collection->add($e);
         }
-        foreach ($context->evidence as $e) $collection->add($e);
-        foreach ($this->aiProvider->getEvidenceFor($context) as $e) $collection->add($e);
+        foreach (array_slice($context->evidence, 0, $this->maxEvidence()) as $e) {
+            if ($e instanceof Evidence) $collection->add($e);
+        }
+        foreach ($this->validatedAiEvidence($context) as $e) $collection->add($e);
+        $trustedEvidence = array_values(array_filter($collection->all(), fn (Evidence $e) => !$this->isAiEvidence($e)));
 
-        $beliefs = $this->correlator->correlate($collection->all(), $context->windowSeconds);
+        // AI is advisory only: it cannot independently authorize a response.
+        $correlationEvidence = $trustedEvidence;
+        if (count($trustedEvidence) >= 2) {
+            $correlationEvidence = array_merge($trustedEvidence, array_values(array_filter(
+                $collection->all(), fn (Evidence $e) => $this->isAiEvidence($e)
+            )));
+        }
+        $beliefs = $this->correlator->correlate($correlationEvidence, $context->windowSeconds);
+        if (count($trustedEvidence) < 2 && count($trustedEvidence) < $collection->count()) {
+            $beliefs = [];
+        }
         $computedBeliefs = [];
         $maxRisk = RiskScore::zero();
         foreach ($beliefs as $belief) {
-            $belief = $belief->withConfidence($this->epistemicEngine->computeConfidence(
+            $confidence = $this->epistemicEngine->computeConfidence(
                 $belief->supportingEvidence, $belief->contradictingEvidence
-            ));
+            );
+            $pattern = $this->recallPattern($context, $belief->hypothesis->value);
+            $adjustment = $this->memoryAdjustment($pattern);
+            // Graph signal stays bounded and cannot override evidence-derived confidence.
+            if ($graph->nodeCount() > 1 && count($graph->reachableFrom($this->subjectNodeId($context), (int) ($this->config['graph']['max_depth'] ?? 8))) > 1) {
+                $adjustment += 0.02;
+            }
+            $confidence = Confidence::from(max(0.0, min(1.0, $confidence->toFloat() + $adjustment)));
+            $belief = $belief->withConfidence($confidence);
             $risk = $this->riskEngine->calculate($belief, RiskScore::zero(), $this->config['risk'] ?? []);
+            if ($adjustment !== 0.0) {
+                $risk = RiskScore::from(max(0.0, min(1.0, $risk->toFloat() + $adjustment)));
+            }
             if ($risk->isHigherThan($maxRisk)) $maxRisk = $risk;
             $computedBeliefs[] = $belief;
         }
@@ -51,6 +102,138 @@ final class EpistemicAnalyzer
             ? Confidence::from(array_sum(array_map(fn($b) => $b->confidence->toFloat(), $computedBeliefs)) / count($computedBeliefs))
             : Confidence::from(0.0);
         $assessment = new ThreatAssessment(risk: $maxRisk, confidence: $aggConfidence, hypotheses: $computedBeliefs, evidence: $collection->all());
-        return new ThreatAssessment(risk: $maxRisk, confidence: $aggConfidence, hypotheses: $computedBeliefs, evidence: $collection->all(), decision: $this->policyEngine->decide($assessment));
+        $aiPresent = count($trustedEvidence) < $collection->count();
+        $decision = ($collection->count() > 0 && ($trustedEvidence === [] || ($aiPresent && count($trustedEvidence) < 2)))
+            ? null
+            : $this->policyEngine->decide($assessment);
+        if (($this->config['response']['enabled'] ?? false) && $this->responseAdapter !== null && $decision !== null) {
+            $decisionId = $decision->id();
+            $executionKey = $this->responseExecutionKey($decisionId, $context, $collection);
+            if (!isset($this->responseExecutionKeys[$executionKey])) {
+                $this->responseExecutionKeys[$executionKey] = true;
+                try {
+                    $this->responseResults[$decisionId] = $this->responseAdapter->respond($decision);
+                } catch (\Throwable) {
+                    $this->responseResults[$decisionId] = new ResponseResult(false, $decisionId, 'Response adapter failed.');
+                }
+            }
+        }
+        return new ThreatAssessment(risk: $maxRisk, confidence: $aggConfidence, hypotheses: $computedBeliefs, evidence: $collection->all(), decision: $decision);
+    }
+
+    /** @param Evidence[] $all @param Evidence[] $trusted @return Evidence[] */
+    private function advisoryAiEvidence(array $all, array $trusted): array
+    {
+        if ($trusted === []) return [];
+        $trustedTypes = array_map(fn (Evidence $e) => $e->type->value, $trusted);
+        return array_values(array_filter($all, fn (Evidence $e) => $this->isAiEvidence($e)
+            && in_array($e->type->value, $trustedTypes, true)));
+    }
+
+    private function responseExecutionKey(string $decisionId, AnalysisContext $context, EvidenceCollection $collection): string
+    {
+        return hash('sha256', $decisionId . ':' . $context->subject . ':' . $context->windowSeconds . ':' . implode(',', array_map(
+            fn (Evidence $e) => $e->id, $collection->all()
+        )));
+    }
+
+    /** @return Evidence[] */
+    private function validatedAiEvidence(AnalysisContext $context): array
+    {
+        $cfg = (array) ($this->config['ai'] ?? []);
+        $max = max(0, (int) ($cfg['max_evidence'] ?? 20));
+        $maxMetadata = max(0, (int) ($cfg['max_metadata_bytes'] ?? 4096));
+        $futureSkew = max(0, (int) ($cfg['allowed_future_seconds'] ?? 60));
+        try {
+            $items = $this->aiProvider->getEvidenceFor($context);
+        } catch (\Throwable) {
+            return [];
+        }
+        if (!is_array($items)) return [];
+        $valid = [];
+        $now = time();
+        foreach (array_slice($items, 0, $max) as $e) {
+            if (!$e instanceof Evidence || $e->id === '' || $e->source === '' || !str_starts_with($e->source, 'ai')) continue;
+            if (!isset($e->metadata['provenance']) || !is_string($e->metadata['provenance']) || $e->metadata['provenance'] === '') continue;
+            if ($e->occurredAt->getTimestamp() > $now + $futureSkew) continue;
+            $json = json_encode($e->metadata);
+            if ($json === false || strlen($json) > $maxMetadata) continue;
+            $valid[] = $e;
+        }
+        return $valid;
+    }
+
+    private function maxEvents(): int
+    {
+        return max(0, (int) (($this->config['limits']['max_events'] ?? 500)));
+    }
+
+    private function maxEvidence(): int
+    {
+        return max(0, (int) (($this->config['limits']['max_evidence'] ?? 500)));
+    }
+
+    private function isAiEvidence(Evidence $e): bool
+    {
+        return str_starts_with($e->source, 'ai');
+    }
+
+    private function buildGraph
+(AnalysisContext $context): ThreatGraph
+    {
+        $cfg = (array) ($this->config['graph'] ?? []);
+        $graph = new ThreatGraph((int) ($cfg['max_nodes'] ?? 500));
+        $subjectId = $this->subjectNodeId($context);
+        $graph->addNode(new GraphNode($subjectId, 'subject', substr($context->subject, 0, 256)));
+        $windowStart = time() - max(1, (int) ($cfg['window_seconds'] ?? $context->windowSeconds));
+        $previousId = $subjectId;
+        foreach (array_slice($context->events, 0, (int) ($cfg['max_nodes'] ?? 500)) as $i => $event) {
+            if (!$event instanceof SecurityEvent) continue;
+            $id = 'event:' . $i . ':' . hash('sha256', serialize($event));
+            if (!$this->addGraphNode($graph, new GraphNode($id, 'event', substr((string) ($event->eventType ?? 'event'), 0, 256)))) break;
+            $occurredAt = $this->eventTimestamp($event);
+            if ($occurredAt >= $windowStart) {
+                $graph->addEdge(new GraphEdge($previousId, $id, 'RELATED_TO', $occurredAt));
+                $previousId = $id;
+            }
+        }
+        foreach (array_slice($context->evidence, 0, (int) ($cfg['max_nodes'] ?? 500)) as $evidence) {
+            if (!$evidence instanceof Evidence) continue;
+            $id = 'evidence:' . $evidence->id;
+            if (!$this->addGraphNode($graph, new GraphNode($id, 'evidence', substr($evidence->type->value, 0, 256))) ) break;
+            $occurredAt = $evidence->occurredAt->getTimestamp();
+            if ($occurredAt >= $windowStart) $graph->addEdge(new GraphEdge($previousId, $id, 'SUPPORTS', $occurredAt));
+        }
+        return $graph;
+    }
+
+    private function addGraphNode(ThreatGraph $graph, GraphNode $node): bool
+    {
+        return $graph->hasNode($node->id) || $graph->addNode($node);
+    }
+
+    private function subjectNodeId(AnalysisContext $context): string
+    {
+        return 'subject:' . hash('sha256', substr($context->subject, 0, 256));
+    }
+
+    private function eventTimestamp(object $event): int
+    {
+        try { return (new DateTimeImmutable((string) ($event->timestamp ?? 'now')))->getTimestamp(); }
+        catch (\Throwable) { return 0; }
+    }
+
+    private function recallPattern(AnalysisContext $context, string $hypothesis): ?ThreatPattern
+    {
+        if ($this->memory === null || $context->subject === '') return null;
+        return $this->memory->recall($context->subject . ':' . $hypothesis)
+            ?? $this->memory->recall($context->subject);
+    }
+
+    private function memoryAdjustment(?ThreatPattern $pattern): float
+    {
+        if ($pattern === null) return 0.0;
+        $signal = (($pattern->confidence + $pattern->precision()) / 2.0) - 0.5;
+        return max(-0.10, min(0.10, $signal * 0.20));
     }
 }

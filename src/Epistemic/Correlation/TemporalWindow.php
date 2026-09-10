@@ -8,10 +8,16 @@ use Mixudev\SecurityDefense\Epistemic\ValueObjects\EvidenceType;
 
 final class TemporalWindow
 {
-    public static function filter(array $evidence, int $windowSeconds): array
+    public static function filter(array $evidence, int $windowSeconds, int $allowedClockSkewSeconds = 60, ?int $now = null): array
     {
-        $cutoff = time() - $windowSeconds;
-        return array_values(array_filter($evidence, fn(Evidence $e) => $e->occurredAt->getTimestamp() >= $cutoff));
+        $now ??= time();
+        $cutoff = $now - $windowSeconds;
+        $upperBound = $now + max(0, $allowedClockSkewSeconds);
+        return array_values(array_filter(
+            $evidence,
+            fn(Evidence $e) => $e->occurredAt->getTimestamp() >= $cutoff
+                && $e->occurredAt->getTimestamp() <= $upperBound
+        ));
     }
 
     public static function sortChronological(array $evidence): array

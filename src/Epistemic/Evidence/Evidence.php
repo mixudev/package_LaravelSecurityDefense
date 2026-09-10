@@ -22,8 +22,39 @@ final class Evidence
         public readonly array             $metadata = [],
         ?string                           $id = null,
     ) {
-        $bucket    = $occurredAt->format('YmdHi');
-        $this->id  = $id ?? hash('sha256', "{$type->value}:{$source}:{$bucket}");
+        if ($id !== null && $id !== '') {
+            $this->id = $id;
+            return;
+        }
+
+        $canonicalMetadata = $metadata;
+        $this->sortMetadata($canonicalMetadata);
+        $metadataJson = json_encode($canonicalMetadata, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $identity = implode(':', [
+            $type->value,
+            $source,
+            $occurredAt->format('Y-m-d\\TH:i:s.uP'),
+            hash('sha256', $metadataJson === false ? '' : $metadataJson),
+        ]);
+        $this->id = hash('sha256', $identity);
+    }
+
+    /** @param array<string, mixed> $metadata */
+    private function sortMetadata(array &$metadata, int $depth = 0): void
+    {
+        if ($depth > 4) {
+            $metadata = ['__truncated' => true];
+            return;
+        }
+        ksort($metadata);
+        foreach ($metadata as &$value) {
+            if (is_array($value)) {
+                $this->sortMetadata($value, $depth + 1);
+            } elseif (!is_scalar($value) && $value !== null) {
+                $value = get_debug_type($value);
+            }
+        }
+        unset($value);
     }
 
     /**

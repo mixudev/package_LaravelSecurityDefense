@@ -6,6 +6,14 @@ Format berbasis pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Changed
+- Dokumentasi epistemic diperbarui untuk API array `SecurityDefense::analyze`, outcome feedback `confirmed_attack`/`false_positive`, batas input dan graph, memory cache, replay guard, cache lock, provider AI advisory, response adapter default-off, API publik, migrasi, dan config cache.
+- Status epistemic ditegaskan sebagai eksperimental dan belum siap produksi.
+
+---
+
 ## [1.2.0] - 2026-09-04
 
 ### Enterprise Scale & Aggressive Bot Hunting

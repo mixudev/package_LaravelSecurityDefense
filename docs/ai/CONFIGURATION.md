@@ -1,5 +1,7 @@
 # Configuration Reference — `mixudev/security-defense`
 
+Bagian `epistemic` bersifat eksperimental dan belum siap produksi. Default `epistemic.enabled=false` dan `epistemic.response.enabled=false`; jangan mengaktifkan enforcement tanpa adapter yang diaudit.
+
 File konfigurasi utama terletak pada:
 `config/security-defense.php`
 
@@ -8,6 +10,30 @@ Konfigurasi ini bertindak sebagai **single source of control**. Tidak ada nilai 
 ---
 
 ## Rincian Opsi Konfigurasi Lengkap
+
+### Opsi `epistemic`
+
+| Kunci | Default | Fungsi |
+|---|---:|---|
+| `epistemic.enabled` | `false` | Mengaktifkan analisis epistemik eksperimental. |
+| `epistemic.graph.max_depth` | `8` | Batas kedalaman traversal graph. |
+| `epistemic.graph.max_nodes` | `500` | Batas node graph. |
+| `epistemic.graph.window_seconds` | `900` | Jendela waktu graph. |
+| `epistemic.limits.max_events` | `500` | Batas event per analisis. |
+| `epistemic.limits.max_evidence` | `500` | Batas evidence non-AI per analisis. |
+| `epistemic.limits.max_metadata_bytes` | `4096` | Batas metadata. |
+| `epistemic.ai.max_evidence` | `20` | Batas evidence dari provider AI. |
+| `epistemic.ai.allowed_future_seconds` | `60` | Toleransi timestamp AI ke masa depan. |
+| `epistemic.memory.max_patterns` | `10000` | Batas pola memory berbasis cache. |
+| `epistemic.memory.retention_days` | `30` | Retensi pola dan replay guard feedback. |
+| `epistemic.response.enabled` | `false` | Enforcement response; default off. |
+| `epistemic.response.adapter` | `null` | Adapter response eksplisit; tanpa adapter tidak ada enforcement. |
+
+Evidence AI yang tervalidasi dapat ikut korelasi dan memengaruhi assessment, tetapi tetap advisory. `NoopResponseAdapter` tidak melakukan enforcement. Fitur epistemic belum siap produksi.
+
+### Konfigurasi cache dan upgrade
+
+Setelah mengubah `config/security-defense.php` pada aplikasi dengan config cache, jalankan `php artisan config:clear` saat migrasi, lalu `php artisan config:cache` setelah verifikasi. Jangan mengaktifkan `epistemic.enabled` atau `epistemic.response.enabled` hanya karena file konfigurasi sudah dipublish. Pastikan cache store mendukung lock bila deployment mengandalkan serialisasi memory; fallback counter atomik tetap berlaku bila lock tidak tersedia.
 
 ```php
 return [

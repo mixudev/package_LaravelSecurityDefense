@@ -20,6 +20,7 @@ use Mixudev\SecurityDefense\Services\SecurityDefenseManager;
  * @method static ThreatDetector detector()
  * @method static AlertDispatcher dispatcher()
  * @method static \Mixudev\SecurityDefense\Epistemic\DTO\ThreatAssessment analyze(\Mixudev\SecurityDefense\Epistemic\DTO\AnalysisContext|array $context)
+ * @method static void recordFeedback(\Mixudev\SecurityDefense\Epistemic\Belief\ThreatBelief $belief, string $outcome, ?string $feedbackId = null)
  * @method static \Mixudev\SecurityDefense\Epistemic\EpistemicAnalyzer|null epistemic()
  *
  * @see SecurityDefenseManager

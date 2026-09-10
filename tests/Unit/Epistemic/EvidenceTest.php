@@ -44,6 +44,19 @@ class EvidenceTest extends TestCase
         $this->assertEquals($e1->id, $e2->id);
     }
 
+    public function test_id_differs_for_distinct_events_in_same_minute(): void
+    {
+        $e1 = new Evidence(EvidenceType::OTP_FAILED, 'rule', new DateTimeImmutable('2026-01-01 10:30:01'), Confidence::from(0.9));
+        $e2 = new Evidence(EvidenceType::OTP_FAILED, 'rule', new DateTimeImmutable('2026-01-01 10:30:59'), Confidence::from(0.9));
+        $this->assertNotEquals($e1->id, $e2->id);
+    }
+
+    public function test_explicit_id_is_preserved(): void
+    {
+        $e = new Evidence(EvidenceType::OTP_FAILED, 'rule', new DateTimeImmutable(), Confidence::from(0.9), [], 'caller-event-id');
+        $this->assertSame('caller-event-id', $e->id);
+    }
+
     public function test_id_differs_for_different_type(): void
     {
         $at = new DateTimeImmutable('2026-01-01 10:30:00');

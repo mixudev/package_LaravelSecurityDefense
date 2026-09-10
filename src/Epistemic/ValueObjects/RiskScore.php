@@ -13,7 +13,7 @@ final class RiskScore
     {
         if (!is_finite($value) || $value < 0.0 || $value > 1.0) {
             throw new InvalidArgumentException(
-                "RiskScore must be in [0.0, 1.0], got: {$value}"
+                sprintf('RiskScore must be in [0.0, 1.0], got: %s', var_export($value, true))
             );
         }
         return new self(round($value, 6));

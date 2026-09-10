@@ -1,6 +1,6 @@
 # Implementation Details — `mixudev/security-defense`
 
-Dokumen ini mencatat rincian teknis dari seluruh komponen package `mixudev/security-defense`.
+Dokumen ini mencatat rincian teknis dari seluruh komponen package `mixudev/security-defense`. Bagian epistemic bersifat eksperimental dan belum siap produksi.
 
 ---
 
