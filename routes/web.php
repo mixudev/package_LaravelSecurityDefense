@@ -29,10 +29,9 @@ if (config('security-defense.dashboard.enabled', true)) {
     $dashboardPrefix = $opaqueEnabled ? '{opaque}' : $configuredPath;
     $segment = static fn (string $routeName, string $legacy): string => $opaqueEnabled ? OpaqueRouteAliases::path($routeName) : $legacy;
     $alertAction = static fn (string $routeName, string $legacy): string => $opaqueEnabled ? OpaqueRouteAliases::path($routeName) . '/{alert}' : $legacy;
-    $dashboardMiddleware = ['web', EnsureLocalAccess::class];
-    if ($opaqueEnabled) {
-        $dashboardMiddleware[] = ValidateOpaqueDashboardPath::class;
-    }
+    $dashboardMiddleware = $opaqueEnabled
+        ? ['web', ValidateOpaqueDashboardPath::class, EnsureLocalAccess::class]
+        : ['web', EnsureLocalAccess::class];
 
     Route::prefix($dashboardPrefix)
         ->where(['opaque' => DashboardCapability::ROUTE_PATTERN])

@@ -5,14 +5,20 @@ declare(strict_types=1);
 namespace Mixudev\SecurityDefense\Support;
 
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
-use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 
-/** One-time, session-bound dashboard entry capability. */
+/**
+ * One-time, session-bound dashboard entry capability.
+ *
+ * Format URL (150 karakter, muat di route pattern {64,160}):
+ *   encrypted . signature
+ * encrypted = base64url(IV . AES-256-CBC(nonce|expires))  -> ~107 char
+ * signature = base64url(HMAC-SHA256(encrypted))           -> ~43 char
+ */
 final class DashboardCapability
 {
-    public const ROUTE_PATTERN = '[A-Za-z0-9_-]++';
+    /** Hanya cocok dengan token capability (150 char) / sessionPath (64 char). */
+    public const ROUTE_PATTERN = '[A-Za-z0-9_-]{64,160}';
 
     private const CACHE_PREFIX = 'dashboard-capability:';
 
@@ -22,19 +28,25 @@ final class DashboardCapability
 
     public function issue(string $sessionId): string
     {
-        $nonce = Str::random(64);
-        $now = time();
-        $payload = json_encode([
-            'purpose' => 'security-defense.dashboard.entry',
-            'nonce' => $nonce,
-            'session' => hash('sha256', $sessionId),
-            'issued_at' => $now,
-            'expires_at' => $now + $this->ttl(),
-        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $nonce = bin2hex(random_bytes(24));
+        $expires = time() + $this->ttl();
+        $plaintext = $nonce . '|' . $expires;
 
-        $encrypter = $this->encrypter();
-        $encrypted = $this->encode($encrypter->encryptString($payload));
+        $iv = random_bytes(16);
+        $cipher = openssl_encrypt(
+            $plaintext,
+            'AES-256-CBC',
+            $this->encryptionKey(),
+            OPENSSL_RAW_DATA,
+            $iv
+        );
+        if ($cipher === false) {
+            throw new \RuntimeException('Failed to encrypt dashboard capability.');
+        }
+
+        $encrypted = $this->encode($iv . $cipher);
         $signature = $this->sign($encrypted);
+
         $this->cache()->put($this->key($nonce), hash('sha256', $sessionId), $this->ttl());
 
         return $encrypted . $signature;
@@ -47,23 +59,35 @@ final class DashboardCapability
         if (strlen($value) <= $signatureLength) {
             return null;
         }
+
         $encrypted = substr($value, 0, -$signatureLength);
         $signature = substr($value, -$signatureLength);
-        if ($encrypted === '' || !hash_equals($this->sign($encrypted), $signature)) {
+        if ($encrypted === '' || ! hash_equals($this->sign($encrypted), $signature)) {
             return null;
         }
 
         try {
-            $encrypter = $this->encrypter();
-            $payload = json_decode($encrypter->decryptString($this->decode($encrypted)), true, 8, JSON_THROW_ON_ERROR);
+            $decoded = $this->decode($encrypted);
+            if (strlen($decoded) < 17) { // IV (16) + minimal 1 byte cipher
+                return null;
+            }
+
+            $iv = substr($decoded, 0, 16);
+            $cipher = substr($decoded, 16);
+            $plaintext = openssl_decrypt($cipher, 'AES-256-CBC', $this->encryptionKey(), OPENSSL_RAW_DATA, $iv);
         } catch (\Throwable) {
             return null;
         }
 
-        $nonce = is_string($payload['nonce'] ?? null) ? $payload['nonce'] : '';
-        $expires = (int) ($payload['expires_at'] ?? 0);
+        if ($plaintext === false || ! str_contains($plaintext, '|')) {
+            return null;
+        }
+
+        [$nonce, $expiresRaw] = explode('|', $plaintext, 2);
+        $expires = (int) $expiresRaw;
         $sessionHash = hash('sha256', $sessionId);
-        if ($nonce === '' || $expires < time() || !hash_equals((string) ($payload['session'] ?? ''), $sessionHash)) {
+
+        if (! ctype_xdigit($nonce) || strlen($nonce) !== 48 || $expires < time()) {
             return null;
         }
 
@@ -71,10 +95,11 @@ final class DashboardCapability
         $lock = method_exists($cache, 'lock') ? $cache->lock($this->key($nonce) . ':lock', 5) : null;
         $consume = function () use ($cache, $nonce, $sessionHash): bool {
             $stored = $cache->get($this->key($nonce));
-            if (!is_string($stored) || !hash_equals($stored, $sessionHash)) {
+            if (! is_string($stored) || ! hash_equals($stored, $sessionHash)) {
                 return false;
             }
             $cache->forget($this->key($nonce));
+
             return true;
         };
 
@@ -98,23 +123,14 @@ final class DashboardCapability
         return $this->encode(hash_hmac('sha256', 'security-defense:' . $value, $this->hmacKey(), true));
     }
 
-    private function encrypter(): Encrypter
-    {
-        return new Encrypter($this->encryptionKey(), 'AES-256-CBC');
-    }
-
     private function encryptionKey(): string
     {
-        $raw = $this->rawRootKey();
-
-        return hash_hkdf('sha256', $raw, 32, 'security-defense:dashboard:encryption:v1');
+        return hash_hkdf('sha256', $this->rawRootKey(), 32, 'security-defense:dashboard:encryption:v1');
     }
 
     private function hmacKey(): string
     {
-        $raw = $this->rawRootKey();
-
-        return hash_hkdf('sha256', $raw, 32, 'security-defense:dashboard:hmac:v1');
+        return hash_hkdf('sha256', $this->rawRootKey(), 32, 'security-defense:dashboard:hmac:v1');
     }
 
     private function rawRootKey(): string

@@ -89,3 +89,61 @@ Setelah masuk melalui gate, subrute fungsional dashboard tidak menggunakan kata 
 | Aksi Karantina IP | `/security-defense/quarantine/*` | `/<session_path>/q5b2/*` |
 
 Penyerang atau alat pemindai tidak akan dapat menyimpulkan fungsi halaman dari URL yang dikunjungi.
+
+---
+
+## 5. Simulasi Akses Publik Tanpa Hosting (via Secure Tunnel)
+
+Anda dapat menguji apakah gate dan rute opaque berfungsi dari internet publik tanpa perlu membeli VPS/hosting, menggunakan tunnel gratis seperti **ngrok** atau **Cloudflare Tunnel (`cloudflared`)**.
+
+> **Peringatan Keamanan:** Jangan pernah melakukan Port Forwarding router langsung ke laptop/PC Anda untuk simulasi publik. Menggunakan tunnel jauh lebih aman karena lalu lintas dienkripsi melalui TLS edge dan IP publik rumah Anda terlindungi.
+
+### Langkah 1: Pengaturan Environment `.env`
+Buka file `.env` aplikasi Anda dan sesuaikan switch dashboard:
+
+```env
+# Matikan mode strictly local agar cabang public dievaluasi
+SECURITY_DEFENSE_DASHBOARD_LOCAL_ONLY=false
+
+# Aktifkan akses publik terkontrol
+SECURITY_DEFENSE_DASHBOARD_PUBLIC_ENABLED=true
+
+# Masukkan IP publik Anda (cek di https://api.ipify.org)
+# Pisahkan dengan koma jika ada lebih dari 1 IP yang diizinkan
+SECURITY_DEFENSE_DASHBOARD_PUBLIC_IPS=36.68.52.210
+```
+
+### Langkah 2: Daftarkan Trusted Proxies (Laravel 11+)
+Agar Laravel dapat membaca IP asli klien dari header `X-Forwarded-For` yang dikirim oleh tunnel, tambahkan konfigurasi loopback proxy pada `bootstrap/app.php`:
+
+```php
+->withMiddleware(function (Middleware $middleware): void {
+    // Mempercayai header proxy HANYA dari loopback (tunnel lokal forward ke 127.0.0.1)
+    $middleware->trustProxies(at: ['127.0.0.1', '::1']);
+})
+```
+
+### Langkah 3: Jalankan Tunnel
+Jalankan salah satu perkakas tunnel berikut:
+
+**Opsi A: Menggunakan ngrok**
+```bash
+ngrok http 8000
+```
+Salin URL publik HTTPS yang diberikan oleh ngrok (misal `https://a1b2-c3d4.ngrok-free.app`).
+
+**Opsi B: Menggunakan Cloudflare Tunnel (Tanpa Akun)**
+```bash
+cloudflared tunnel --url http://127.0.0.1:8000
+```
+Salin URL publik trycloudflare (misal `https://random-name.trycloudflare.com`).
+
+### Langkah 4: Pengujian Skenario Keamanan
+1. **Skenario 1 - IP Diizinkan (Operator Sah)**:
+   - Akses URL tunnel dari browser Anda: `https://<tunnel-url>/security-defense`
+   - Jika Anda sudah login (`require_authenticated_user = true`) dan IP Anda terdaftar di `allowed_ips`, halaman gate terbuka dengan status **200 OK**.
+   - Klik tombol **"Enter Dashboard"** untuk masuk ke dashboard capability.
+2. **Skenario 2 - IP Asing / Penyerang**:
+   - Coba buka URL gate menggunakan koneksi internet lain (misal tethering seluler berbeda yang IP-nya tidak didaftarkan).
+   - Hasil: Langsung ditolak dengan status **`403 Forbidden`** (fail-closed) dan denial dicatat ke log telemetri dengan rate limiting.
+

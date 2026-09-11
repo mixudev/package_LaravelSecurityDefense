@@ -60,4 +60,26 @@ final class DashboardCapabilityTest extends TestCase
         $url2 = $capability->issue('session-x');
         self::assertSame($capability->sessionPath('session-x'), $capability->consume($url2, 'session-x'));
     }
+
+    public function test_capability_and_session_path_fit_route_pattern(): void
+    {
+        $capability = app(DashboardCapability::class);
+        $url = $capability->issue('session-route');
+        $sessionPath = $capability->sessionPath('session-route');
+
+        // Capability URL + session path must both match ROUTE_PATTERN length
+        // range so ordinary short paths (e.g. /login, /dsafsafaf) never match.
+        $supports = static fn (string $v): bool => preg_match('/^' . DashboardCapability::ROUTE_PATTERN . '$/', $v) === 1;
+
+        self::assertTrue($supports($url), 'Capability URL must match ROUTE_PATTERN');
+        self::assertTrue($supports($sessionPath), 'Session path must match ROUTE_PATTERN');
+        self::assertGreaterThanOrEqual(64, strlen($url));
+        self::assertLessThanOrEqual(160, strlen($url));
+        self::assertSame(64, strlen($sessionPath));
+
+        // Short random URL must NOT match the route pattern (404 instead of 403).
+        self::assertFalse($supports('dsafsafaf'));
+        self::assertFalse($supports('security-defense-test'));
+        self::assertFalse($supports('login'));
+    }
 }

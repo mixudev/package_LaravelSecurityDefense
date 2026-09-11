@@ -30,15 +30,17 @@ Package mendukung dua cara pengaturan:
 | `middleware.user_agent_anomaly.block_headless_clients` | bool | `false` | Blokir browser headless otomatis (Puppeteer, Playwright non-human) |
 
 ### B. Dashboard & Akses Opaque
-| Kunci | Tipe | Default | Keterangan |
-|---|---|---:|---|
+| Kunci | Tipe | Default / Env | Keterangan |
+|---|---|---|---|
 | `dashboard.enabled` | bool | `true` | Mengaktifkan endpoint dashboard internal |
 | `dashboard.path` | string | `'security-defense'` | Rute portal gate awal untuk verifikasi |
-| `dashboard.local_only` | bool | `true` | Membatasi akses strictly hanya untuk IP loopback (`127.0.0.1`, `::1`) dan `APP_ENV=local` |
+| `dashboard.local_only` | bool | `env('SECURITY_DEFENSE_DASHBOARD_LOCAL_ONLY', true)` | Membatasi akses strictly hanya untuk IP loopback (`127.0.0.1`, `::1`) dan `APP_ENV=local` |
 | `dashboard.allowed_ips` | array | `['127.0.0.1', '::1']` | Daftar IP yang diizinkan mengakses di mode lokal |
-| `dashboard.opaque_path.enabled` | bool | `true` (default pabrik) | Menyamarkan rute dashboard menjadi token capability acak sekali pakai |
+| `dashboard.opaque_path.enabled` | bool | `true` | Menyamarkan rute dashboard menjadi token capability acak sekali pakai |
 | `dashboard.opaque_path.ttl_seconds` | int | `60` | Masa berlaku URL capability sebelum hangus (detik, minimal 10s) |
 | `dashboard.key` | string | `env('SECURITY_DEFENSE_KEY')` | Kunci khusus enkripsi dashboard. Jika kosong, diturunkan otomatis via HKDF dari `APP_KEY` |
+| `dashboard.public.enabled` | bool | `env('SECURITY_DEFENSE_DASHBOARD_PUBLIC_ENABLED', false)` | Opt-in eksposur publik terkontrol (fail-closed bila false) |
+| `dashboard.public.allowed_ips` | array | `env('SECURITY_DEFENSE_DASHBOARD_PUBLIC_IPS')` | Daftar IP publik yang diizinkan (format koma di env) |
 
 ### C. Mesin Deteksi & Karantina IP Otomatis
 | Kunci | Tipe | Default | Keterangan |
