@@ -15,7 +15,7 @@ yang berdiri sendiri sebagai pengganti autentikasi.
 | Lapisan | Komponen | Tanggung Jawab |
 |---|---|---|
 | Transport | HTTPS/TLS (host) | Mencegah sniffing secret path & session cookie di jaringan |
-| Discovery barrier | Opaque path (`SECURITY_DEFENSE_DASHBOARD_PATH`) | Membuat URL dashboard sulit ditebak; **bukan autentikasi** |
+| Discovery barrier | Opaque capability path | URL terenkripsi AES-256-CBC + HMAC (kunci khusus HKDF atau `SECURITY_DEFENSE_KEY`), one-time nonce, session-bound; **bukan autentikasi** |
 | Network boundary | `EnsureLocalAccess` (IP/CIDR allowlist) | Hanya klien dari alamat terpercaya yang bisa memulai |
 | Session boundary | Require authenticated user (mode publik) | Hanya user host yang sudah login |
 | Authorization | Laravel Gate (`viewSecurityDefenseDashboard`) | Hanya user yang diizinkan yang bisa membuka |
@@ -32,7 +32,7 @@ yang berdiri sendiri sebagai pengganti autentikasi.
 ```
 [Client Browser] --TLS--> [Proxy/LB/Web Server] --REMOTE_ADDR--> [Laravel App]
                                               |
-                                              +-- env SECURITY_DEFENSE_DASHBOARD_PATH
+                                              +-- APP_KEY (secret, host)
                                               +-- config (bukan secret)
 ```
 
@@ -40,7 +40,7 @@ yang berdiri sendiri sebagai pengganti autentikasi.
 - `REMOTE_ADDR` sebagai alamat klien sebenarnya. **Header apa pun** (`X-Forwarded-For`,
   `X-Real-IP`, `Client-IP`, `CF-Connecting-IP`) **tidak pernah dipercaya** — selalu bisa
   dipalsukan kecuali proxy host dikonfigurasi trusted-proxy.
-- Nilai `SECURITY_DEFENSE_DASHBOARD_PATH` dari environment host.
+- `APP_KEY` host — kunci untuk enkripsi + HMAC capability.
 - Route name `security-defense.*` sebagai penanda aman untuk redaksi telemetry.
 
 ### 2.2 Yang TIDAK DIPERCAYA
@@ -52,9 +52,9 @@ yang berdiri sendiri sebagai pengganti autentikasi.
 | Aset | Pemilik | Catatan |
 |---|---|---|
 | TLS certificate & termination | Host/proxy | Wajib HTTPS saat non-loopback |
-| Access log server (nginx/apache) | Host | `SECURITY_DEFENSE_DASHBOARD_PATH` akan muncul di access log — perlakukan log sebagai sensitif |
-| Browser history operator | Browser | Path secret bertahan di history; logoff/private mode untuk sesi sensitif |
-| `route:cache` & `config:cache` artifacts | Deploy proses | Cache berisi path secret; jangan expose `bootstrap/cache/` |
+| `APP_KEY` | Host | Jika bocor, semua capability + session encryption bisa didekripsi. Rotasi APP_KEY membatalkan semua URL capability lama + semua sesi terenkripsi. |
+| Browser history operator | Browser | Capability opaque bersifat one-time dan kedaluwarsa 60 detik; tetap gunakan private mode untuk sesi sensitif |
+| `route:cache` & `config:cache` artifacts | Deploy proses | Jangan expose `bootstrap/cache/`; capability tidak pernah di-freeze di route cache |
 | VPN/network boundary | Host | Paling disarankan: akses dashboard hanya via VPN, public mode jarang diperlukan |
 
 ---
@@ -62,39 +62,38 @@ yang berdiri sendiri sebagai pengganti autentikasi.
 ## 3. Prosedur Operasional Wajib
 
 ### 3.1 Aktivasi Opaque Path
-1. Generate secret (43+ karakter, base64url, tanpa `/` dan `=`):
-   ```bash
-   php -r "echo rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '='), PHP_EOL;"
-   ```
-2. Set di environment host deployment:
-   ```env
-   SECURITY_DEFENSE_DASHBOARD_PATH=<hasil generate>
-   ```
-3. Aktifkan di `config/security-defense.php`:
-   ```php
-   'opaque_path' => ['enabled' => true],
-   ```
-4. Rebuild cache karena route prefix di-freeze saat boot:
-   ```bash
-   php artisan route:cache
-   php artisan config:cache   # jika memakai config cache
-   ```
-5. Verifikasi: URL lama `/security-defense` → 404; URL baru `/<token>` → dashboard.
+Aktifkan melalui command install atau config langsung:
+```bash
+php artisan security-defense:install --with-opaque-path
+```
+Tidak ada secret manual. `APP_KEY` Laravel host dipakai sebagai kunci enkripsi + HMAC capability; route capability di-generate per request.
+```php
+// config/security-defense.php
+'opaque_path' => ['enabled' => true, 'ttl_seconds' => 60],
+```
+Rebuild cache aman kapan saja (capability tidak dibekukan):
+```bash
+php artisan route:cache
+```
+Verifikasi: URL lama `/security-defense` → gate portal; URL `/<capability>` → dashboard sekali pakai; URL acak → 404.
 
-### 3.2 Prosedur Rotasi Secret (revoke)
-1. Generate secret baru (script §3.1).
-2. Update environment host.
-3. Rebuild cache: `php artisan route:cache` + `php artisan config:cache`.
-4. Restart worker (Octane/queue) agar prefix baru dipakai.
-5. Hapus secret lama dari history shell/host.
-6. Catat waktu rotasi; anggap URL lama **masih hidup** sampai restart selesai.
+### 3.2 Prosedur Rotasi (revoke)
+1. Rotasi kunci dashboard: set `SECURITY_DEFENSE_KEY` baru, atau omit (fallback kembali ke derivasi `APP_KEY` baru).
+2. Rebuild cache: `php artisan route:cache` + `php artisan config:cache`.
+3. Restart worker (Octane/queue).
+4. URL capability lama otomatis kedaluwarsa (TTL) tanpa perlu langkah manual.
 
-**Alasan wajib rebuild + restart:** `route:cache` men-freeze prefix ke `bootstrap/cache/routes-*.php`.
-Tanpa rebuild, URL lama tetap aktif meski env sudah berubah (berlaku fail-closed, bukan open).
+> Penting: dengan `SECURITY_DEFENSE_KEY`, rotasi hanya menonaktifkan URL dashboard lama.
+> Enkripsi database klien (`casts = ['encrypted']`), session cookie, dan signed URLs tetap
+> memakai `APP_KEY` dan **tidak terpengaruh**. Untuk insiden `APP_KEY` bocor (root trust),
+> rotasi tetap butuh re-encrypt database dan force-logout — itu di luar lingkup package ini.
 
-### 3.3 Jika Secret Bocor
-1. Rotasi segera mengikuti §3.2.
-2. Pindai telemetry/log/alert yang mungkin menyimpan path lama; redaktor otomatis
+**Catatan route cache:** prefix route ability berupa wildcard `{opaque}` — tidak bergantung
+pada secret, sehingga `route:cache` aman kapan saja dan tidak membekukan capability.
+
+### 3.3 Jika APP_KEY Bocor
+1. Rotasi `APP_KEY` segera mengikuti §3.2 (ini membatalkan semua session terenkripsi + signed cookies + capability lama).
+2. Pindai telemetry/log/alert yang mungkin menyimpan URL capability lama; redaktor otomatis
    menyensor di log baru, tapi artefak lama tetap ada.
 3. Hapus sesi host yang mungkin di-replay (regenerate session, revoke tokens).
 
@@ -121,7 +120,8 @@ Tanpa rebuild, URL lama tetap aktif meski env sudah berubah (berlaku fail-closed
 ### 4.3 Attacker menebak URL (brute force path)
 - `route:cache` + rate limit: probing ke path salah → 404 identik (tanpa oracle),
   denial ter-rate-limit (429), log redaksi path.
-- Opaque path 256-bit entropy membuat tebakan praktis mustahil.
+- Capability tidak bisa ditebak: 256-bit nonce terenkripsi + HMAC `APP_KEY`; selain itu
+  one-time nonce server-side membuat replay setelah konsumsi mustahil.
 
 ### 4.4 Credential host (password admin) bocor
 - Sesi host tetap aman bila MFA/step-up aktif; Gate kedua menahan.

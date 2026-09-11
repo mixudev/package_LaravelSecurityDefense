@@ -14,11 +14,13 @@ Aktifkan setup aman dengan satu command:
 php artisan security-defense:install --with-opaque-path
 ```
 
-Command menyimpan secret path pada `SECURITY_DEFENSE_DASHBOARD_PATH` di `.env` jika belum ada. Secret tidak disimpan pada `config/security-defense-overrides.php`, tidak dicetak ke terminal, dan tidak boleh masuk source control.
+Command mengaktifkan `dashboard.opaque_path.enabled` via overrides runtime. Tidak ada secret yang disimpan di `.env` — URL capability diturunkan dinamis dari `APP_KEY` (enkripsi AES-256-CBC + HMAC-SHA256), sekali pakai, dan terikat sesi.
 
 | Kunci | Default | Fungsi |
 |---|---:|---|
-| `dashboard.opaque_path.enabled` | `false` | Mengganti prefix default dengan path base64url 43–88 karakter |
+| `dashboard.opaque_path.enabled` | `false` | Mengaktifkan gate `/security-defense` + route dashboard capability opaque |
+| `dashboard.opaque_path.ttl_seconds` | `60` | Masa berlaku capability sekali pakai (detik) |
+| `dashboard.key` | `null` (HKDF dari `APP_KEY`) | Kunci khusus dashboard; rotasi kunci ini TIDAK merusak enkripsi DB / sesi host |
 | `dashboard.local_only` | `true` | Membatasi akses ke environment local + IP allowlist |
 | `dashboard.public.enabled` | `false` | Opt-in exposure publik; fail-closed bila false |
 | `dashboard.public.allowed_ips` / `allowed_cidrs` | `[]` | Allowlist network publik |
@@ -26,7 +28,7 @@ Command menyimpan secret path pada `SECURITY_DEFENSE_DASHBOARD_PATH` di `.env` j
 | `dashboard.public.authorization_gate` | `viewSecurityDefenseDashboard` | Gate authorization host |
 | `dashboard.public.require_step_up` | `false` | Gate verifikasi kedua opsional |
 
-Opaque path bukan autentikasi. Saat public mode, tetap gunakan HTTPS, secure session cookie, authenticated user, IP/CIDR allowlist, Gate, CSRF, dan step-up untuk action sensitif. Setelah rotasi secret, rebuild `route:cache` dan restart worker/Octane.
+Opaque path bukan autentikasi. Saat public mode, tetap gunakan HTTPS, secure session cookie, authenticated user, IP/CIDR allowlist, Gate, CSRF, dan step-up untuk action sensitif.
 
 ---
 

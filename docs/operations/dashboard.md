@@ -22,14 +22,18 @@ Pengaturan di `config/security-defense.php` (`dashboard`):
 - `public.require_authenticated_user`: Wajibkan user terautentikasi (default `true`).
 - `public.require_step_up` / `public.step_up_gate`: Verifikasi lanjutan opsional.
 - `public.rate_limit`: Batas percobaan akses gagal per IP (default `max_attempts=10` / `decay_seconds=60`).
-- `opaque_path.enabled`: Sembunyikan prefix default dan gunakan path opaque host-managed (default `false`). Ini hanya discovery barrier, bukan autentikasi.
-- `SECURITY_DEFENSE_DASHBOARD_PATH`: Secret host environment berupa 43+ karakter base64url tanpa `/`, `=`, atau query token. Jangan simpan di config overrides, source, log, atau URL query.
+- `opaque_path.enabled`: Sembunyikan prefix default dan gunakan alur gate + capability opaque (default `false`). Ini adalah discovery barrier, bukan autentikasi.
+- `opaque_path.ttl_seconds`: Masa berlaku capability sekali pakai dalam detik (default `60`).
 
-Opaque path memakai static secret dari environment agar kompatibel dengan `route:cache`. Saat aktif, `/security-defense` menjadi portal verifikasi minimal; portal memakai middleware `EnsureLocalAccess` yang sama, lalu mengirim relative `Location` ke path opaque setelah POST CSRF berhasil. Portal tidak menampilkan token, tidak memakai layout dashboard/CDN, dan tidak boleh dianggap autentikasi. Saat nonaktif, `/security-defense` tetap dashboard.
+Alur Opaque Path:
+1. Akses awal `/security-defense` bertindak sebagai verification gate minimal yang dilindungi middleware `EnsureLocalAccess`.
+2. Klik tombol "Proceed to dashboard" (POST CSRF `/security-defense/enter`) menerbitkan token capability terenkripsi (AES-256-CBC) dan ditandatangani HMAC-SHA256 menggunakan `APP_KEY`.
+3. URL capability tidak mengandung nama rute maupun kata "dashboard".
+4. Capability bersifat sekali pakai (one-time nonce server-side) dan terikat pada ID sesi pemohon. Replay URL atau akses dari sesi berbeda langsung mengembalikan HTTP 404.
+5. Setelah dikonsumsi, browser diarahkan ke path dashboard internal yang terikat sesi. Suffix rute (`sessions`, `epistemic`, `data-audits`) disamarkan via alias acak.
+6. Tidak ada token yang perlu disimpan di `.env`, dan tidak memerlukan scheduled command untuk rotasi (rotasi otomatis via expiration TTL).
 
-Rotasi berarti ubah secret pada deployment, rebuild config/route cache, lalu revoke session host bila ada indikasi kebocoran. Cache-backed atau per-request rotation tidak dipakai: bisa membuat node berbeda, route cache stale, dan open tab mati mendadak.
-
-URL opaque tetap bearer capability sampai secret dirotasi. TLS/HTTPS, secure session cookie, host authentication, Gate, IP/CIDR, CSRF, dan step-up tetap wajib.
+TLS/HTTPS, secure session cookie, host authentication, Gate, IP/CIDR, CSRF, dan step-up tetap wajib.
 
 Uji production-like di playground/host staging:
 ```bash

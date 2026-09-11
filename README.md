@@ -80,7 +80,7 @@ protected $middleware = [
 php artisan security-defense:install --with-opaque-path
 ```
 
-Command idempotent ini menjaga config custom, membuat `SECURITY_DEFENSE_DASHBOARD_PATH` secara aman jika belum ada, menyimpan secret hanya di `.env`, menjalankan migrasi, dan rebuild route cache. Token tidak pernah dicetak. Lihat [panduan instalasi](./docs/getting-started/installation.md) untuk semua opsi command dan [threat model](./docs/operations/security-threat-model.md) untuk rotasi secret.
+Command idempotent ini menjaga config custom, mengaktifkan flow opaque dashboard, menjalankan migrasi, dan me-rebuild route cache. URL dashboard diturunkan dari `APP_KEY` via HKDF (AES-256-CBC + HMAC-SHA256), sekali pakai (one-time nonce), dan terikat sesi — tanpa token manual di `.env`. Untuk isolasi total dari enkripsi database host, set `SECURITY_DEFENSE_KEY` (opsional): rotasi kunci dashboard lalu tidak menyentuh data terenkripsi / sesi klien. Lihat [panduan instalasi](./docs/getting-started/installation.md) untuk detail dan [threat model](./docs/operations/security-threat-model.md).
 
 ### 4. Hubungkan Telemetri Autentikasi
 

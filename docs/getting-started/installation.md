@@ -33,17 +33,15 @@ php artisan security-defense:install --with-opaque-path
 
 Perintah ini:
 - menjaga config yang sudah dipublish; gunakan `--force` hanya untuk overwrite config;
-- membuat `SECURITY_DEFENSE_DASHBOARD_PATH` dengan 32 random bytes (base64url 43 karakter) jika belum ada;
-- menyimpan token hanya di `.env`, tidak menampilkan token, dan tidak menulis token ke config overrides;
-- mengaktifkan `dashboard.opaque_path.enabled` tanpa mengubah autentikasi/Gate;
+- mengaktifkan `dashboard.opaque_path.enabled` via runtime overrides;
+- tidak membutuhkan token manual di `.env` (URL diturunkan dinamis via `APP_KEY` + HMAC);
 - menjalankan migrasi dan rebuild route cache;
-- tidak menjalankan `config:cache` saat opaque path aktif karena secret dibaca runtime.
+- tidak mengubah autentikasi, firewall IP, atau Gate host.
 
 Opsi:
 ```text
 --force             overwrite published config
---with-opaque-path  enable opaque dashboard path and generate token if absent
---token=VALUE       use supplied 43-88 character base64url token
+--with-opaque-path  enable opaque dashboard capability mode
 --no-migrate        skip migrations
 --no-cache          skip cache clear/rebuild
 --dry-run           show action without changing files
