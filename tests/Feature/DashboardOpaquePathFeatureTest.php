@@ -81,7 +81,7 @@ class DashboardOpaquePathFeatureTest extends TestCase
 
         $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])
             ->get('/' . self::TOKEN)
-            ->assertNotFound();
+            ->assertForbidden();
     }
 
     public function test_all_dashboard_subroutes_share_opaque_prefix_via_aliases(): void

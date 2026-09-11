@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 /** One-time, session-bound dashboard entry capability. */
 final class DashboardCapability
 {
-    public const ROUTE_PATTERN = '[A-Za-z0-9_-]{64,2048}';
+    public const ROUTE_PATTERN = '[A-Za-z0-9_-]++';
 
     private const CACHE_PREFIX = 'dashboard-capability:';
 
