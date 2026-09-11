@@ -188,6 +188,11 @@ class EnsureLocalAccess
 
         $path = $request->path();
 
+        // Mask opaque capability tokens (150 char) and session paths (64 hex)
+        // so they never land in application logs. The pattern tolerates a
+        // leading slash in $request->path() and a trailing segment boundary.
+        $path = preg_replace('~(^|/)([A-Za-z0-9_-]{64,160})(/|$)~', '$1[redacted]$3', $path) ?? $path;
+
         return substr($path, 0, 200);
     }
 
