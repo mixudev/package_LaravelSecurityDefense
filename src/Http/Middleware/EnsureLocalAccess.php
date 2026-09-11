@@ -179,6 +179,17 @@ class EnsureLocalAccess
             abort(429, 'Too Many Requests.');
         }
 
+        // For JSON/API requests, return a clean 403 response
+        if ($request->expectsJson()) {
+            abort(403, 'Forbidden.');
+        }
+
+        // Render an informative, unified warning page for browsers (fail-closed,
+        // no internal policy oracle or client IP reflected).
+        if (view()->exists('security-defense::error-403')) {
+            abort(response()->view('security-defense::error-403', [], 403));
+        }
+
         abort(403, 'Forbidden.');
     }
 }

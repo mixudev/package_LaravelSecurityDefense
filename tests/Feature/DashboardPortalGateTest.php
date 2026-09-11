@@ -44,7 +44,7 @@ final class DashboardPortalGateTest extends TestCase
             ->post('/security-defense/enter', ['_token' => $csrf]);
 
         // Relative Location — capability is opaque and never the env token.
-        self::assertMatchesRegularExpression('#^/[A-Za-z0-9_.-]{64,2048}$#', (string) $response->headers->get('Location'));
+        self::assertMatchesRegularExpression('#^/[A-Za-z0-9_-]{64,160}$#', (string) $response->headers->get('Location'));
         self::assertStringNotContainsString(self::TOKEN, (string) $response->headers->get('Location'));
         self::assertSame('', (string) $response->getContent());
     }
@@ -59,7 +59,7 @@ final class DashboardPortalGateTest extends TestCase
                 'redirect' => 'https://attacker.test/leak',
             ]);
 
-        self::assertMatchesRegularExpression('#^/[A-Za-z0-9_.-]{64,2048}$#', (string) $response->headers->get('Location'));
+        self::assertMatchesRegularExpression('#^/[A-Za-z0-9_-]{64,160}$#', (string) $response->headers->get('Location'));
         self::assertStringNotContainsString(self::TOKEN, (string) $response->headers->get('Location'));
         self::assertStringNotContainsString('attacker.test', (string) $response->headers->get('Location'));
     }
@@ -72,6 +72,9 @@ final class DashboardPortalGateTest extends TestCase
             ->post('/security-defense/enter', ['_token' => $csrf]);
 
         $response->assertForbidden();
+        $response->assertSee('Akses Ditolak');
+        $response->assertSee('403 Forbidden.');
+        $response->assertDontSee('203.0.113.10');
         $response->assertDontSee(self::TOKEN);
     }
 
