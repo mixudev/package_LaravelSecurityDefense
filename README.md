@@ -5,7 +5,7 @@
 [![Versi PHP](https://img.shields.io/badge/PHP-%5E8.2-blue.svg?style=flat-square)]()
 [![Kompatibilitas Laravel](https://img.shields.io/badge/Laravel-10%20%7C%2011%20%7C%2012%20%7C%2013-red.svg?style=flat-square)]()
 [![Lisensi: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-361%20%7C%201078%20assertions-brightgreen.svg?style=flat-square)]()
+|![Tests](https://img.shields.io/badge/tests-406%20%7C%201289%20assertions-brightgreen.svg?style=flat-square)()|
 
 **`mixudev/security-defense`** adalah package pertahanan keamanan tingkat enterprise untuk aplikasi Laravel. Bertindak sebagai **"kamera pengawas, perisai proaktif, dan integritas data"** yang mendeteksi ancaman secara real-time, mengorelasikan pola serangan multi-vektor, mengisolasi penyerang (Fail2Ban IP Quarantine), memantau mutasi data & mendeteksi manipulasi parameter Burp Suite, melindungi sesi terautentikasi dari pencurian cookie malware, serta mengirimkan alert ter-deduplikasi ke berbagai saluran.
 
@@ -80,7 +80,7 @@ protected $middleware = [
 php artisan security-defense:install --with-opaque-path
 ```
 
-Command idempotent ini menjaga config custom, mengaktifkan flow opaque dashboard, menjalankan migrasi, dan me-rebuild route cache. URL dashboard diturunkan dari `APP_KEY` via HKDF (AES-256-CBC + HMAC-SHA256), sekali pakai (one-time nonce), dan terikat sesi — tanpa token manual di `.env`. Untuk isolasi total dari enkripsi database host, set `SECURITY_DEFENSE_KEY` (opsional): rotasi kunci dashboard lalu tidak menyentuh data terenkripsi / sesi klien. Lihat [panduan instalasi](./docs/getting-started/installation.md) untuk detail dan [threat model](./docs/operations/security-threat-model.md).
+Command idempotent ini menjaga config custom, mengaktifkan flow opaque dashboard, menjalankan migrasi, dan me-rebuild route cache. URL dashboard diturunkan dari `APP_KEY` via HKDF (AES-256-CBC + HMAC-SHA256), sekali pakai (one-time nonce), dan terikat sesi — tanpa token manual di `.env`. Untuk isolasi total dari enkripsi database host, set `SECURITY_DEFENSE_KEY` (opsional): rotasi kunci dashboard lalu tidak menyentuh data terenkripsi / sesi klien. Lihat [panduan instalasi](./docs/01-instalasi.md) untuk detail dan [operasi & troubleshooting](./docs/06-operasi-dan-troubleshooting.md).
 
 ### 4. Hubungkan Telemetri Autentikasi
 
@@ -181,7 +181,7 @@ Dokumentasi lengkap telah diringkas secara modular menjadi 6 panduan utama berba
 
 1. **[01. Panduan Instalasi](./docs/01-instalasi.md)** — Instalasi satu perintah `php artisan security-defense:install --with-opaque-path`, migrasi, dan penerbitan view opsional.
 2. **[02. Panduan Konfigurasi](./docs/02-konfigurasi.md)** — Tabel referensi lengkap konfigurasi `config/security-defense.php` dan sistem runtime override.
-3. **[03. Portal & Dashboard Opaque](./docs/03-dashboard.md)** — Arsitektur gate verifikasi, capability URL sekali pakai (AES-256 + HMAC), isolasi kunci HKDF dari `APP_KEY`, dan perlindungan database klien.
+3. **[03. Portal & Dashboard Opaque](./docs/03-dashboard.md)** — Arsitektur gate verifikasi, rotasi path sesi non-deterministik, idle timeout, anti-replay, Trusted Proxies, dan log redaction.
 4. **[04. Integrasi Laravel Authentication](./docs/04-integrasi-auth.md)** — Menghubungkan 12 domain event otentikasi via perintah `php artisan auth:sync` dan auto-injeksi middleware WAF.
 5. **[05. Fitur Keamanan & Mesin Deteksi](./docs/05-fitur-keamanan.md)** — WAF preventif, kalkulasi risiko kumulatif, Epistemic SIEM Analyzer, sistem karantina IP, dan alert interaktif Telegram/Webhook.
 6. **[06. Operasi, Hardening, dan Troubleshooting](./docs/06-operasi-dan-troubleshooting.md)** — Checklist pengerasan production, solusi kendala 403/404, dan panduan pemeliharaan rutin.

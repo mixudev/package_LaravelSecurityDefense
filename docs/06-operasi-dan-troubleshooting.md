@@ -49,6 +49,32 @@ php -S 127.0.0.1:8000 -t public
 
 ---
 
+### D. Muncul Halaman "Portal Akses Dibatasi" (403) saat Mengakses via IP LAN Laptop
+**Penyebab:**
+Alamat IP LAN laptop (misalnya `192.168.1.178`) bukan loopback (`127.0.0.1`). Middleware keamanan menolaknya karena IP belum terdaftar di whitelist atau environment diset ke `production`.
+
+**Solusi:**
+1. Tambahkan IP laptop Anda ke array `allowed_ips` di file `config/security-defense.php`:
+   ```php
+   'dashboard' => [
+       'allowed_ips' => ['127.0.0.1', '::1', '192.168.1.178'],
+   ],
+   ```
+2. Pastikan file `.env` bernilai `APP_ENV=local`.
+3. Jalankan `php artisan config:clear && php artisan route:clear`.
+4. Jika server PHP sedang berjalan, matikan lalu jalankan ulang agar memuat environment baru.
+
+---
+
+### E. Dashboard Tiba-tiba Menghasilkan 404 Setelah Ditinggal Beberapa Saat
+**Penyebab:**
+Fitur **Idle Timeout** (`dashboard.opaque_path.session_ttl_seconds`, bawaan 15 menit / 900 detik) telah kedaluwarsa demi keamanan. Fitur ini memastikan jika laptop ditinggal tanpa pengawasan, URL dashboard tidak dapat disalahgunakan oleh pihak lain.
+
+**Solusi:**
+Buka kembali portal gate (`/security-defense`) dan klik **"Enter Dashboard"** untuk menerbitkan sesi dan rute acak yang baru.
+
+---
+
 ## 2. Checklist Hardening Sebelum Rilis Production
 
 Sebelum meluncurkan aplikasi ke lingkungan production:
@@ -76,7 +102,17 @@ Sebelum meluncurkan aplikasi ke lingkungan production:
        ],
    ],
    ```
-4. **Perbarui Cache Rute dan Konfigurasi**:
+4. **Daftarkan Trusted Proxies (Jika di Belakang Reverse Proxy / Load Balancer)**:
+   Jika server Anda menerima lalu lintas melalui Nginx, Cloudflare, atau AWS ALB, daftarkan IP proxy tersebut di `dashboard.trusted_proxies` agar header `X-Forwarded-For` diproses dengan benar dan upaya spoofing dari koneksi langsung diabaikan:
+   ```php
+   'dashboard' => [
+       'trusted_proxies' => [
+           '127.0.0.1', '::1',
+           '10.0.0.1', // IP internal load balancer / Nginx
+       ],
+   ],
+   ```
+5. **Perbarui Cache Rute dan Konfigurasi**:
    Setiap kali melakukan deployment di production:
    ```bash
    php artisan config:cache
