@@ -106,6 +106,55 @@ class DashboardOpaquePathFeatureTest extends TestCase
         }
     }
 
+    public function test_session_path_expires_after_idle_ttl(): void
+    {
+        $this->app['session']->setId('fixed-test-session');
+        config()->set('security-defense.dashboard.opaque_path.session_ttl_seconds', 60);
+        $sessionPath = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+
+        $this->withSession([
+            'security-defense.dashboard-authorized' => true,
+            'security-defense.dashboard-session-path' => $sessionPath,
+            'security-defense.dashboard-authorized-at' => time() - 120,
+            '_token' => 't',
+        ])
+            ->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->get('/' . $sessionPath)
+            ->assertNotFound();
+    }
+
+    public function test_session_path_within_idle_ttl_is_allowed(): void
+    {
+        $this->app['session']->setId('fixed-test-session');
+        config()->set('security-defense.dashboard.opaque_path.session_ttl_seconds', 60);
+        $sessionPath = 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+
+        $this->withSession([
+            'security-defense.dashboard-authorized' => true,
+            'security-defense.dashboard-session-path' => $sessionPath,
+            'security-defense.dashboard-authorized-at' => time(),
+            '_token' => 't',
+        ])
+            ->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->get('/' . $sessionPath)
+            ->assertOk();
+    }
+
+    public function test_legacy_sessions_without_authorized_at_are_allowed(): void
+    {
+        $this->app['session']->setId('fixed-test-session');
+        $sessionPath = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+
+        $this->withSession([
+            'security-defense.dashboard-authorized' => true,
+            'security-defense.dashboard-session-path' => $sessionPath,
+            '_token' => 't',
+        ])
+            ->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->get('/' . $sessionPath)
+            ->assertOk();
+    }
+
     public function test_legacy_literal_suffix_has_no_route_in_opaque_mode(): void
     {
         foreach (['/data-audits', '/sessions', '/epistemic', '/live-events'] as $subpath) {

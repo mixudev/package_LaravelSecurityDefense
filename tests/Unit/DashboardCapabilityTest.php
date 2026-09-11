@@ -24,8 +24,23 @@ final class DashboardCapabilityTest extends TestCase
 
         self::assertFalse(str_contains($url, 'security-defense.dashboard.entry'));
         self::assertNull($capability->consume($url, 'session-b'));
-        self::assertSame($capability->sessionPath('session-a'), $capability->consume($url, 'session-a'));
+
+        $consumed = $capability->consume($url, 'session-a');
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]{64}$/', $consumed);
+        self::assertNotSame($capability->sessionPath('session-a'), $consumed);
         self::assertNull($capability->consume($url, 'session-a'));
+    }
+
+    public function test_consumed_path_rotates_per_entry_and_is_not_deterministic(): void
+    {
+        $capability = app(DashboardCapability::class);
+
+        $first = $capability->consume($capability->issue('session-a'), 'session-a');
+        $second = $capability->consume($capability->issue('session-a'), 'session-a');
+
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]{64}$/', $first);
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]{64}$/', $second);
+        self::assertNotSame($first, $second);
     }
 
     public function test_tampered_capability_is_rejected(): void
@@ -56,9 +71,9 @@ final class DashboardCapabilityTest extends TestCase
         config()->set('security-defense.dashboard.key', 'base64:' . base64_encode(random_bytes(32)));
         self::assertNull($capability->consume($url1, 'session-x'));
 
-        // Issue under dedicated key and consume successfully.
+        // Issue under dedicated key and consume successfully (rotated path).
         $url2 = $capability->issue('session-x');
-        self::assertSame($capability->sessionPath('session-x'), $capability->consume($url2, 'session-x'));
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]{64}$/', $capability->consume($url2, 'session-x'));
     }
 
     public function test_capability_and_session_path_fit_route_pattern(): void

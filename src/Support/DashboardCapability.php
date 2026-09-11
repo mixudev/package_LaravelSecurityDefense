@@ -105,7 +105,14 @@ final class DashboardCapability
 
         $ok = $lock !== null ? (bool) $lock->block(2, $consume) : $consume();
 
-        return $ok ? $this->sessionPath($sessionId) : null;
+        if (!$ok) {
+            return null;
+        }
+
+        // Session path is a per-entry random value (64 hex), NOT a
+        // deterministic function of the session id. A URL leaked in an access
+        // log no longer grants persistent access for the whole session life.
+        return bin2hex(random_bytes(32));
     }
 
     public function sessionPath(string $sessionId): string

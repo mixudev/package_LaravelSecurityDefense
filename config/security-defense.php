@@ -413,6 +413,9 @@ return [
             'enabled' => true,
             // Duration a one-time capability stays valid, in seconds.
             'ttl_seconds' => 60,
+            // Idle timeout for the session-bound dashboard path (seconds).
+            // After this window the operator must re-enter via the gate.
+            'session_ttl_seconds' => 900,
         ],
         // Public exposure is opt-in and fail-closed. Prefer VPN/private network.
         'public' => [
