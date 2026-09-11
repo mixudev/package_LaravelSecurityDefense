@@ -32,7 +32,7 @@ class EnsureLocalAccess
             abort(404);
         }
 
-        $clientIp = (string) $request->ip();
+        $clientIp = $this->resolveClientIp($request);
         $localOnly = (bool) config('security-defense.dashboard.local_only', true);
         $allowedIps = array_values(array_filter((array) config('security-defense.dashboard.allowed_ips', ['127.0.0.1', '::1']), 'is_string'));
 
@@ -158,6 +158,25 @@ class EnsureLocalAccess
         RateLimiter::hit($rateKey, $decaySeconds);
 
         return RateLimiter::tooManyAttempts($rateKey, $maxAttempts);
+    }
+
+    /**
+     * Resolve the authentic client IP. If a direct TCP peer is not listed
+     * in trusted_proxies, any forwarded header (e.g. X-Forwarded-For) is
+     * attacker-controlled and MUST be ignored in favor of the socket peer.
+     */
+    private function resolveClientIp(Request $request): string
+    {
+        $peer = (string) ($request->server->get('REMOTE_ADDR') ?? '');
+        $trustedProxies = (array) config('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1']);
+
+        // When the TCP peer is loopback or a configured trusted proxy, let
+        // Symfony/Laravel resolve the forwarded IP. Otherwise, lock down to the peer.
+        if ($peer !== '' && !in_array($peer, $trustedProxies, true)) {
+            return $peer;
+        }
+
+        return (string) $request->ip();
     }
 
     private function safeLogPath(Request $request): string

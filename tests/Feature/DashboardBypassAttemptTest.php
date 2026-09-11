@@ -524,4 +524,41 @@ class DashboardBypassAttemptTest extends TestCase
             ->put('/security-defense', ['_token' => $token])
             ->assertStatus(405);
     }
+
+    public function test_forged_forwarded_headers_from_untrusted_peer_are_ignored(): void
+    {
+        $this->app['env'] = 'local';
+        config()->set('security-defense.dashboard.local_only', true);
+        config()->set('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1']);
+
+        // Simulate a HOST app that trusts ALL proxies (misconfiguration):
+        // Laravel will resolve $request->ip() from the forwarded header,
+        // so we must verify OUR middleware still blocks the untrusted peer.
+        $symfonyRequest = $this->app['request'];
+        $symfonyRequest::setTrustedProxies(['203.0.113.88'], -1); // trust all
+
+        $this->withServerVariables([
+            'REMOTE_ADDR' => '203.0.113.88',
+            'HTTP_X_FORWARDED_FOR' => '127.0.0.1',
+        ])
+            ->get('/security-defense')
+            ->assertForbidden();
+    }
+
+    public function test_forwarded_headers_from_trusted_proxy_are_honored(): void
+    {
+        $this->app['env'] = 'local';
+        config()->set('security-defense.dashboard.local_only', true);
+        config()->set('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1']);
+
+        // Trusted loopback proxy forwards an allowlisted LAN client.
+        config()->set('security-defense.dashboard.allowed_ips', ['127.0.0.1', '::1', '192.168.1.50']);
+
+        $this->withServerVariables([
+            'REMOTE_ADDR' => '127.0.0.1',
+            'HTTP_X_FORWARDED_FOR' => '192.168.1.50',
+        ])
+            ->get('/security-defense')
+            ->assertOk();
+    }
 }

@@ -395,6 +395,10 @@ return [
         'path' => 'security-defense',
         'local_only' => true,
         'allowed_ips' => ['127.0.0.1', '::1'],
+        // Reverse proxies trusted to forward operator IP (loopback tunnels like
+        // ngrok/cloudflared by default). Direct connections from untrusted peers
+        // have their X-Forwarded-For ignored to prevent spoofing.
+        'trusted_proxies' => ['127.0.0.1', '::1'],
         'cache' => [
             'enabled' => true,
             'ttl' => 30,
