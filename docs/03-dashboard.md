@@ -67,11 +67,14 @@ Jika kunci enkripsi dashboard bercampur langsung dengan `APP_KEY` utama, merotas
 
 ---
 
-## 3. Anti-Replay & Kedaluwarsa Otomatis
+## 3. Anti-Replay, Rotasi Sesi & Kedaluwarsa Otomatis
 
-- **Satu Kali Pakai (One-Time Only)**: URL token hanya berlaku tepat 1 kali. Begitu token diklik dan berhasil membuka dashboard, noncenya langsung dihapus dari cache server. Membuka ulang link dari riwayat peramban atau tab lain akan menghasilkan `404 Not Found`.
-- **Batas Waktu Cepat (TTL)**: Token memiliki masa kedaluwarsa bawaan selama 60 detik (`dashboard.opaque_path.ttl_seconds`). Jika tidak diklik dalam 60 detik, token hangus otomatis.
-- **Terikat Sesi (Session-Bound)**: Token yang dibuat di sesi peramban A tidak dapat dibuka di peramban B meskipun URL disalin secara utuh.
+- **Satu Kali Pakai (One-Time Only)**: URL token hanya berlaku tepat 1 kali. Begitu token dikonsumsi, noncenya langsung dihapus dari cache server. Membuka ulang link dari riwayat peramban akan menghasilkan `404 Not Found`.
+- **Rotasi Path per Akses (Non-Deterministik)**: Setiap kali operator masuk melalui gate, path sesi (`sessionPath`) dibuat acak baru (64 karakter hex) yang berbeda. URL yang bocor di log web server di masa lalu tidak dapat digunakan kembali untuk sesi saat ini.
+- **Batas Waktu Cepat Token (TTL 60 Detik)**: Token capability memiliki masa kedaluwarsa 60 detik (`dashboard.opaque_path.ttl_seconds`). Jika tidak diklik, token hangus otomatis.
+- **Idle Timeout Sesi (Bawaan 15 Menit / 900 Detik)**: Akses ke rute tersamar dibatasi batas waktu idle (`dashboard.opaque_path.session_ttl_seconds`). Jika sesi tidak aktif melampaui batas ini, operator harus masuk kembali melalui portal gate.
+- **Pembersihan Log Otomatis (Log Redaction)**: Segmen URL capability (150 karakter) maupun session path (64 karakter) otomatis disamarkan menjadi `[redacted]` pada log aplikasi untuk mencegah kebocoran riwayat.
+- **Proteksi Header Proxy (Anti-Spoofing)**: Header `X-Forwarded-For` hanya diproses jika koneksi TCP berasal dari proxy yang didaftarkan di `dashboard.trusted_proxies` (bawaan: loopback `127.0.0.1`). Upaya spoofing header dari internet publik diabaikan.
 
 ---
 
@@ -98,19 +101,31 @@ Anda dapat menguji apakah gate dan rute opaque berfungsi dari internet publik ta
 
 > **Peringatan Keamanan:** Jangan pernah melakukan Port Forwarding router langsung ke laptop/PC Anda untuk simulasi publik. Menggunakan tunnel jauh lebih aman karena lalu lintas dienkripsi melalui TLS edge dan IP publik rumah Anda terlindungi.
 
-### Langkah 1: Pengaturan Environment `.env`
-Buka file `.env` aplikasi Anda dan sesuaikan switch dashboard:
+### Langkah 1: Pengaturan di File Konfigurasi PHP
+Buka file `config/security-defense.php` (atau `config/security-defense-overrides.php`) dan sesuaikan pengaturan dashboard secara langsung (ingat: aturan keamanan package ini menetapkan seluruh pengaturan switch boolean berada murni di file konfigurasi PHP, bukan di file `.env`):
 
-```env
-# Matikan mode strictly local agar cabang public dievaluasi
-SECURITY_DEFENSE_DASHBOARD_LOCAL_ONLY=false
+```php
+'dashboard' => [
+    'enabled' => true,
+    // Matikan mode strictly local agar cabang public dievaluasi
+    'local_only' => false,
 
-# Aktifkan akses publik terkontrol
-SECURITY_DEFENSE_DASHBOARD_PUBLIC_ENABLED=true
+    'public' => [
+        // Aktifkan akses publik terkontrol (fail-closed secara default)
+        'enabled' => true,
 
-# Masukkan IP publik Anda (cek di https://api.ipify.org)
-# Pisahkan dengan koma jika ada lebih dari 1 IP yang diizinkan
-SECURITY_DEFENSE_DASHBOARD_PUBLIC_IPS=36.68.52.210
+        // Masukkan IP publik Anda (cek di https://api.ipify.org)
+        'allowed_ips' => [
+            '36.68.52.210',
+        ],
+
+        // Operator wajib login terlebih dahulu ke sistem aplikasi
+        'require_authenticated_user' => true,
+
+        // Otorisasi Gate Laravel
+        'authorization_gate' => 'viewSecurityDefenseDashboard',
+    ],
+],
 ```
 
 ### Langkah 2: Daftarkan Trusted Proxies (Laravel 11+)
