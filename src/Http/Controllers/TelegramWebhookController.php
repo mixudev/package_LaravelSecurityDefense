@@ -28,7 +28,7 @@ class TelegramWebhookController extends Controller
         $expectedSecret = $botService->getWebhookSecret();
         if (filled($expectedSecret)) {
             $incomingSecret = $request->header('X-Telegram-Bot-Api-Secret-Token');
-            if ($incomingSecret !== $expectedSecret) {
+            if (!is_string($incomingSecret) || !hash_equals($expectedSecret, $incomingSecret)) {
                 Log::warning('SecurityDefense: Invalid Telegram webhook secret token received.');
                 return response()->json(['ok' => false, 'error' => 'Unauthorized'], 401);
             }

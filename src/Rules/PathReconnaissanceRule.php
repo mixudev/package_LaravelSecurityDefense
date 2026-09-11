@@ -64,11 +64,9 @@ class PathReconnaissanceRule extends AbstractDetectionRule
         $counterKey = $this->getCacheKey('probes_count:' . md5($ip));
         $windowKey = $this->getCacheKey('probes_window:' . md5($ip));
 
-        // Atomic seed: only first request sets TTL, subsequent requests increment atomically
-        if (!$cache->has($windowKey)) {
-            $cache->put($windowKey, true, $window);
-            $cache->put($counterKey, 0, $window);
-        }
+        // Atomic seed: add() cannot zero-out an incremented counter under concurrency.
+        $cache->add($counterKey, 0, $window);
+        $cache->add($windowKey, true, $window);
         $count = (int) $cache->increment($counterKey);
 
         if ($count >= $threshold) {

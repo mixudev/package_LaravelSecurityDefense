@@ -19,12 +19,10 @@ class DashboardTelemetryLeakTest extends TestCase
         parent::defineEnvironment($app);
         $app['config']->set('app.key', 'base64:' . base64_encode(random_bytes(32)));
         $app['env'] = 'local';
-        putenv('SECURITY_DEFENSE_DASHBOARD_PATH=' . self::TOKEN);
     }
 
     protected function tearDown(): void
     {
-        putenv('SECURITY_DEFENSE_DASHBOARD_PATH');
         parent::tearDown();
     }
 
@@ -67,6 +65,29 @@ class DashboardTelemetryLeakTest extends TestCase
         $serialized = serialize($captured);
         self::assertStringNotContainsString(self::TOKEN, $serialized, 'Opaque token leaked into session telemetry.');
         self::assertStringContainsString('[dashboard-route:security-defense.dashboard]', $serialized);
+    }
+
+    public function test_request_url_does_not_trust_forwarded_host(): void
+    {
+        config()->set('security-defense.data_audit.enabled', true);
+        config()->set('app.url', 'https://trusted.example.test');
+
+        $request = Request::create('/normal-path', 'GET', [], [], [], [
+            'HTTP_HOST' => 'attacker.example.test',
+            'HTTP_X_FORWARDED_HOST' => 'attacker.example.test',
+        ]);
+
+        $probe = \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->create([
+            'event' => 'created',
+            'auditable_type' => 'probe',
+            'auditable_id' => '43',
+        ]);
+
+        $audit = (new DataAuditService($request))->recordMutation($probe, 'created');
+
+        self::assertNotNull($audit);
+        self::assertStringNotContainsString('attacker.example.test', $audit->request_url ?? '');
+        self::assertStringContainsString('trusted.example.test', $audit->request_url ?? '');
     }
 
     public function test_data_audit_service_request_url_never_contains_opaque_token(): void

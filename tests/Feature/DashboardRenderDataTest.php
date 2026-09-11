@@ -66,7 +66,7 @@ class DashboardRenderDataTest extends TestCase
         config()->set('security-defense.epistemic.enabled', false);
 
         // Seed cache with a realistic last_analysis payload (serialised belief shapes).
-        Cache::put('security-defense:epistemic:last_analysis', [
+        Cache::put((string) config('security-defense.cache_prefix', 'security_defense:') . 'epistemic:last_analysis', [
             'risk' => 0.62,
             'confidence' => 0.41,
             'hypotheses' => [

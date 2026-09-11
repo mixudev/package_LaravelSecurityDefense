@@ -40,8 +40,8 @@ final class TelegramAlertFormatter
         $lines = [
             sprintf('%s *%s*', $label, $title),
             '',
-            sprintf('• *Threat Type:* `%s`', $alert->threat_type),
-            sprintf('• *Rule:* `%s`', $alert->rule_identifier ?: 'unknown'),
+            sprintf('• *Threat Type:* `%s`', self::sanitizeCodeField((string) $alert->threat_type)),
+            sprintf('• *Rule:* `%s`', self::sanitizeCodeField((string) ($alert->rule_identifier ?: 'unknown'))),
         ];
 
         if (filled($alert->fingerprint)) {
@@ -81,5 +81,16 @@ final class TelegramAlertFormatter
     protected static function severityLabel(string $severity): string
     {
         return self::SEVERITY_LABELS[strtolower($severity)] ?? self::SEVERITY_LABELS['low'];
+    }
+
+    /**
+     * Escape Telegram Markdown control characters in dynamic values.
+     */
+    protected static function sanitizeCodeField(string $value): string
+    {
+        // Inside a Telegram code span, backticks are the only control that can
+        // close the span; newlines are also structural. Defang both, keep the
+        // rest literal so underscores/asterisks display as written.
+        return str_replace(["`", "\r\n", "\n"], ["'", ' ', ' '], $value);
     }
 }

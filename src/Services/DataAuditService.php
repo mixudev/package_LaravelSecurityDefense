@@ -246,7 +246,7 @@ class DataAuditService
             return '[dashboard-route:' . $routeName . ']';
         }
 
-        return substr($request->getSchemeAndHttpHost() . '/' . ltrim($request->path(), '/'), 0, 1000);
+        return RequestLocationRedactor::url($request);
     }
 
     /**

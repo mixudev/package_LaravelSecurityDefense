@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Mixudev\SecurityDefense\Services\DashboardAccessPolicy;
-use Mixudev\SecurityDefense\Support\OpaqueDashboardPathResolver;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -163,10 +162,6 @@ class EnsureLocalAccess
         }
 
         $path = $request->path();
-        $configuredToken = OpaqueDashboardPathResolver::token();
-        if (is_string($configuredToken) && $configuredToken !== '') {
-            $path = str_replace($configuredToken, '[REDACTED]', $path);
-        }
 
         return substr($path, 0, 200);
     }

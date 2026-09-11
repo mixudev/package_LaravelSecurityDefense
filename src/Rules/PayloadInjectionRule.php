@@ -35,7 +35,7 @@ class PayloadInjectionRule extends AbstractDetectionRule
         'command_injection' => '/(;|\&|\||\`|\$\()\s*(cat\s+[\/.]|ls\s+-|whoami|id|uname\s+-|netstat|curl\s+https?|wget\s+https?|cmd\.exe|powershell|bash\s+-c|nc\s+-e|ping\s+-c|(?:(?:\/)?bin\/)?bash\s+-c)\b|(^|[;|&])\s*(phpinfo|shell_exec|system|exec)\(/is',
         'eval_based' => '/(\beval\s*\(|\bbase64_decode\s*\(|\bpassthru\s*\(|\bshell_exec\s*\(|\bsystem\s*\(|\bphpinfo\s*\()/is',
         'php_code_execution' => '/(\b(include|require|include_once|require_once)\s*\(?\s*[\'"](?:https?:|php:|data:|file:)|<\?php\b|\b(assert|create_function|call_user_func|preg_replace)\s*\(\s*[\'"][\/]?.*(e|eval)|(?:@)?\s*\$\_(GET|POST|REQUEST|COOKIE|FILES|SERVER)\b)/is',
-        'ssrf' => '/(\b(gopher|dict|file|ftp|ldap|tftp|scgi)\s*:\/\/|(?:https?:\/\/)?(?:169\.254\.169\.254|0\.0\.0\.0|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?::\d{1,5})?[\/\s"\'])/is',
+        'ssrf' => '/(\b(gopher|dict|file|ftp|ldap|tftp|scgi)\s*:\/\/|(?:https?:\/\/)?(?:169\.254\.169\.254|0\.0\.0\.0|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?::\d{1,5})?[\/\s"\'])/is',
                 // localhost/127.0.0.1 SSRF is OFF by default: apps legitimately reference
                 // their own origin (e.g. browser telemetry posting http://localhost:8000/).
                 // Opt back in via detection.rules.payload_injection.patterns.ssrf_localhost
@@ -177,6 +177,10 @@ class PayloadInjectionRule extends AbstractDetectionRule
 
         if (isset($event->metadata['raw_payload']) && is_string($event->metadata['raw_payload'])) {
             $payloads['raw_payload'] = $event->metadata['raw_payload'];
+        }
+
+        if (isset($event->metadata['raw_content']) && is_string($event->metadata['raw_content'])) {
+            $payloads['raw_content'] = $event->metadata['raw_content'];
         }
 
         if (isset($event->metadata['path']) && is_string($event->metadata['path'])) {

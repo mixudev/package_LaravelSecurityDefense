@@ -7,13 +7,14 @@ use Mixudev\SecurityDefense\Http\Controllers\DashboardController;
 use Mixudev\SecurityDefense\Http\Controllers\PortalController;
 use Mixudev\SecurityDefense\Http\Controllers\TelegramWebhookController;
 use Mixudev\SecurityDefense\Http\Middleware\EnsureLocalAccess;
-use Mixudev\SecurityDefense\Support\OpaqueDashboardPathResolver;
+use Mixudev\SecurityDefense\Http\Middleware\ValidateOpaqueDashboardPath;
+use Mixudev\SecurityDefense\Support\OpaqueRouteAliases;
+use Mixudev\SecurityDefense\Support\DashboardCapability;
 
 // Dashboard Routes (Local Only)
 if (config('security-defense.dashboard.enabled', true)) {
     $opaqueEnabled = (bool) config('security-defense.dashboard.opaque_path.enabled', false);
     $configuredPath = (string) config('security-defense.dashboard.path', 'security-defense');
-    $path = OpaqueDashboardPathResolver::resolvePath($opaqueEnabled, $configuredPath);
 
     if ($opaqueEnabled) {
         Route::prefix($configuredPath)
@@ -25,22 +26,31 @@ if (config('security-defense.dashboard.enabled', true)) {
             });
     }
 
-    Route::prefix($path)
-        ->middleware(['web', EnsureLocalAccess::class])
+    $dashboardPrefix = $opaqueEnabled ? '{opaque}' : $configuredPath;
+    $segment = static fn (string $routeName, string $legacy): string => $opaqueEnabled ? OpaqueRouteAliases::path($routeName) : $legacy;
+    $alertAction = static fn (string $routeName, string $legacy): string => $opaqueEnabled ? OpaqueRouteAliases::path($routeName) . '/{alert}' : $legacy;
+    $dashboardMiddleware = ['web', EnsureLocalAccess::class];
+    if ($opaqueEnabled) {
+        $dashboardMiddleware[] = ValidateOpaqueDashboardPath::class;
+    }
+
+    Route::prefix($dashboardPrefix)
+        ->where(['opaque' => DashboardCapability::ROUTE_PATTERN])
+        ->middleware($dashboardMiddleware)
         ->name('security-defense.')
-        ->group(function () {
+        ->group(function () use ($segment, $alertAction) {
             Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
-            Route::get('/data-audits', [DashboardController::class, 'dataAudits'])->name('data-audits');
-            Route::get('/sessions', [DashboardController::class, 'sessionIntelligence'])->name('sessions');
-            Route::get('/epistemic', [DashboardController::class, 'epistemic'])->name('epistemic');
-            Route::post('/epistemic/feedback', [DashboardController::class, 'epistemicFeedback'])->name('epistemic.feedback');
-            Route::post('/test-channel', [DashboardController::class, 'testChannel'])->name('test-channel');
-            Route::post('/alerts/{alert}/acknowledge', [DashboardController::class, 'acknowledge'])->name('alerts.acknowledge');
-            Route::post('/alerts/{alert}/resolve', [DashboardController::class, 'resolve'])->name('alerts.resolve');
-            Route::post('/quarantine/pardon', [DashboardController::class, 'pardonIp'])->name('quarantine.pardon');
-            Route::post('/quarantine/whitelist', [DashboardController::class, 'whitelistIp'])->name('quarantine.whitelist');
-            Route::get('/live-events', [DashboardController::class, 'liveEvents'])->name('live-events');
-            Route::post('/toggle-setting', [DashboardController::class, 'toggleSetting'])->name('toggle-setting');
+            Route::get('/' . $segment('security-defense.data-audits', 'data-audits'), [DashboardController::class, 'dataAudits'])->name('data-audits');
+            Route::get('/' . $segment('security-defense.sessions', 'sessions'), [DashboardController::class, 'sessionIntelligence'])->name('sessions');
+            Route::get('/' . $segment('security-defense.epistemic', 'epistemic'), [DashboardController::class, 'epistemic'])->name('epistemic');
+            Route::post('/' . $segment('security-defense.epistemic.feedback', 'epistemic/feedback'), [DashboardController::class, 'epistemicFeedback'])->name('epistemic.feedback');
+            Route::post('/' . $segment('security-defense.test-channel', 'test-channel'), [DashboardController::class, 'testChannel'])->name('test-channel');
+            Route::post('/' . $alertAction('security-defense.alerts.acknowledge', 'alerts/{alert}/acknowledge'), [DashboardController::class, 'acknowledge'])->name('alerts.acknowledge');
+            Route::post('/' . $alertAction('security-defense.alerts.resolve', 'alerts/{alert}/resolve'), [DashboardController::class, 'resolve'])->name('alerts.resolve');
+            Route::post('/' . $segment('security-defense.quarantine.pardon', 'quarantine/pardon'), [DashboardController::class, 'pardonIp'])->name('quarantine.pardon');
+            Route::post('/' . $segment('security-defense.quarantine.whitelist', 'quarantine/whitelist'), [DashboardController::class, 'whitelistIp'])->name('quarantine.whitelist');
+            Route::get('/' . $segment('security-defense.live-events', 'live-events'), [DashboardController::class, 'liveEvents'])->name('live-events');
+            Route::post('/' . $segment('security-defense.toggle-setting', 'toggle-setting'), [DashboardController::class, 'toggleSetting'])->name('toggle-setting');
         });
 }
 

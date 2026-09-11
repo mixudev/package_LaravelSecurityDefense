@@ -38,21 +38,21 @@ class Sec007MetadataLeakageTest extends TestCase
         $this->assertStringNotContainsString('token=', $json);
     }
 
-    public function test_request_source_redacts_opaque_dashboard_token_from_path_and_url(): void
+    public function test_request_source_redacts_dashboard_route_identifiers(): void
     {
-        $token = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCde';
-        putenv('SECURITY_DEFENSE_DASHBOARD_PATH=' . $token);
+        config()->set('app.key', 'base64:' . base64_encode(random_bytes(32)));
+        $capability = app(\Mixudev\SecurityDefense\Support\DashboardCapability::class)->issue('test-session');
 
-        try {
-            $request = \Illuminate\Http\Request::create('/' . $token . '/epistemic', 'GET');
-            $event = (new RequestThreatSource($request))->toSecurityEvent();
-            $json = json_encode($event->toArray());
+        $request = \Illuminate\Http\Request::create('/' . $capability . '/epistemic', 'GET');
+        $request->setRouteResolver(fn () => new class {
+            public function getName(): string { return 'security-defense.epistemic'; }
+            public function parameter($k) { return null; }
+        });
+        $event = (new RequestThreatSource($request))->toSecurityEvent();
+        $json = json_encode($event->toArray());
 
-            $this->assertStringNotContainsString($token, $json);
-            $this->assertStringContainsString('[REDACTED]', $json);
-        } finally {
-            putenv('SECURITY_DEFENSE_DASHBOARD_PATH');
-        }
+        $this->assertStringNotContainsString($capability, $json);
+        $this->assertStringContainsString('[dashboard-route', $json);
     }
 
     public function test_request_source_hashes_identifier_from_email(): void

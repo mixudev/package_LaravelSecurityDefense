@@ -58,7 +58,9 @@ class DashboardController extends Controller
         $quarantinedIps = $this->analyticsService->getActiveQuarantines($refresh);
         $channelsStatus = ($testService ?? $this->channelTestService)->getChannelsStatus();
         $postureScore = $this->analyticsService->calculatePostureScore($stats);
-        $lastAnalysis = Cache::get('security-defense:epistemic:last_analysis');
+        $lastAnalysis = Cache::store(config('security-defense.cache_store'))->get(
+            (string) config('security-defense.cache_prefix', 'security_defense:') . 'epistemic:last_analysis'
+        );
         $epistemicSummary = [
             'enabled' => (bool) config('security-defense.epistemic.enabled', false),
             'patterns' => $this->epistemicFeedbackCount(),
@@ -99,7 +101,9 @@ class DashboardController extends Controller
     {
         $recent = SecurityAlert::query()->latest()->limit(100)->get(['metadata']);
         $scores = $recent->map(fn (SecurityAlert $alert) => $this->epistemicScores($alert->metadata))->filter();
-        $lastAnalysis = Cache::get('security-defense:epistemic:last_analysis');
+        $lastAnalysis = Cache::store(config('security-defense.cache_store'))->get(
+            (string) config('security-defense.cache_prefix', 'security_defense:') . 'epistemic:last_analysis'
+        );
 
         $analysis = is_array($lastAnalysis) ? $lastAnalysis : [];
         $hypotheses = $this->normaliseHypotheses($analysis['hypotheses'] ?? []);

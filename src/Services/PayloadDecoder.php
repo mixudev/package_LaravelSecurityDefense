@@ -27,7 +27,12 @@ class PayloadDecoder
     {
         $decoded = [];
         $rawContent = $inputs['raw_content'] ?? '';
+        $maxLength = max(1, (int) config('security-defense.hardening.max_inspection_length', 4096));
         if (is_string($rawContent) && $rawContent !== '') {
+            // Bound attacker-controlled bytes before decoding or regex work.
+            $rawContent = strlen($rawContent) > $maxLength
+                ? substr($rawContent, 0, $maxLength)
+                : $rawContent;
             $decoded['raw_decoded'] = rawurldecode($rawContent);
             // Normalize CRLF/CR/LF to spaces so CRLF injection shows as literal pattern
             $decoded['raw_crlf_normalized'] = str_replace(["\r\n", "\r", "\n"], ' ', $rawContent);

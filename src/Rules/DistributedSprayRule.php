@@ -92,7 +92,7 @@ class DistributedSprayRule extends AbstractDetectionRule
                 threatType: 'distributed_spray',
                 fingerprint: $fingerprint,
                 metadata: [
-                    'identifier' => $target,
+                    'target_hash' => hash('sha256', $target),
                     'distinct_ips_count' => $count,
                     'sample_ips_hashed' => array_slice($hashedIps, 0, 10),
                     'threshold' => $threshold,

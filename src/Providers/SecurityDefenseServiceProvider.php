@@ -80,6 +80,9 @@ class SecurityDefenseServiceProvider extends ServiceProvider
             }
         }
 
+        // Bind dashboard entry capability (APP_KEY-backed, one-time, session-bound)
+        $this->app->singleton(\Mixudev\SecurityDefense\Support\DashboardCapability::class);
+
         // Bind Alert Deduplicator
         $this->app->singleton(AlertDeduplicatorInterface::class, AlertDeduplicator::class);
 
@@ -273,6 +276,10 @@ class SecurityDefenseServiceProvider extends ServiceProvider
                 \Mixudev\SecurityDefense\Console\Commands\TelegramWebhookCommand::class,
                 \Mixudev\SecurityDefense\Console\Commands\PruneSecurityDataCommand::class,
             ]);
+        }
+
+        if ($this->app->runningInConsole()) {
+            // Rotation is implicit: capabilities expire via TTL; no scheduler.
         }
 
         // Auto-watch models for data audit if configured

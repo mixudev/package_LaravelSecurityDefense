@@ -43,10 +43,9 @@ class BehavioralVelocityRule extends AbstractDetectionRule
         $counterKey = $this->getCacheKey(md5($target) . ':velocity:count');
         $windowKey = $this->getCacheKey(md5($target) . ':velocity:window');
 
-        if (! $cache->has($windowKey)) {
-            $cache->put($windowKey, true, $window);
-            $cache->put($counterKey, 0, $window);
-        }
+        // Atomic seed: add() cannot zero-out an incremented counter under concurrency.
+        $cache->add($counterKey, 0, $window);
+        $cache->add($windowKey, true, $window);
 
         $count = (int) $cache->increment($counterKey);
 

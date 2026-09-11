@@ -43,11 +43,11 @@ class BruteForceRule extends AbstractDetectionRule
         $counterKey = $this->getCacheKey(md5($target) . ':count');
         $windowKey = $this->getCacheKey(md5($target) . ':window');
 
-        // Atomic seed: only first request sets TTL, subsequent requests increment atomically
-        if (!$cache->has($windowKey)) {
-            $cache->put($windowKey, true, $window);
-            $cache->put($counterKey, 0, $window);
-        }
+        // Atomic seed: first request sets TTL; subsequent requests increment atomically.
+        // add() instead of has()+put() so concurrent requests cannot zero-out an
+        // already-incremented counter window.
+        $cache->add($counterKey, 0, $window);
+        $cache->add($windowKey, true, $window);
         $count = (int) $cache->increment($counterKey);
 
         if ($count >= $threshold) {

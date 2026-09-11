@@ -55,11 +55,9 @@ class RateLimitBypassRule extends AbstractDetectionRule
 
         $cache = $this->getCache();
 
-        // Atomic seed: only first request sets TTL, subsequent requests increment atomically
-        if (!$cache->has($windowKey)) {
-            $cache->put($windowKey, true, $window);
-            $cache->put($counterKey, 0, $window);
-        }
+        // Atomic seed: add() cannot zero-out an incremented counter under concurrency.
+        $cache->add($counterKey, 0, $window);
+        $cache->add($windowKey, true, $window);
         $count = (int) $cache->increment($counterKey);
 
         if ($hasHeaderSpoof || $count >= $threshold) {

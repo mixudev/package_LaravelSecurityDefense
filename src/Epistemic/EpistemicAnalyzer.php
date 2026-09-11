@@ -115,12 +115,11 @@ final class EpistemicAnalyzer
             if ($cacheClaimed) {
                 try {
                     $this->responseResults[$decisionId] = $this->responseAdapter->respond($decision);
-                } catch (\Throwable $e) {
-                    try {
-                        $this->responseResults[$decisionId] = $this->responseAdapter->respond($decision);
-                    } catch (\Throwable) {
-                        $this->responseResults[$decisionId] = new ResponseResult(false, $decisionId, 'Response adapter failed.');
-                    }
+                } catch (\Throwable) {
+                    // Single attempt only. Adapters may produce non-idempotent
+                    // side effects; retrying could duplicate them. Explicit
+                    // idempotent adapters should handle their own retry policy.
+                    $this->responseResults[$decisionId] = new ResponseResult(false, $decisionId, 'Response adapter failed.');
                 }
             }
         }
@@ -133,7 +132,8 @@ final class EpistemicAnalyzer
     {
         if ($this->cache === null) return;
 
-        $this->cache->put('security-defense:epistemic:last_analysis', [
+        $cachePrefix = (string) ($this->config['cache_prefix'] ?? config('security-defense.cache_prefix', 'security_defense:'));
+        $this->cache->put($cachePrefix . 'epistemic:last_analysis', [
             'risk' => $assessment->risk->toFloat(),
             'confidence' => $assessment->confidence->toFloat(),
             'hypotheses' => array_map(function ($belief) use ($assessment): array {

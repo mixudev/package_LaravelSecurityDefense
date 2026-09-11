@@ -16,12 +16,10 @@ final class DashboardPortalGateTest extends TestCase
         $app['config']->set('app.key', 'base64:7VzK9gG2e+x8UfXoN9uC7x/2j6yD8Hw0Z1A2B3C4D5E=');
         $app['env'] = 'local';
         $app['config']->set('security-defense.dashboard.opaque_path.enabled', true);
-        putenv('SECURITY_DEFENSE_DASHBOARD_PATH=' . self::TOKEN);
     }
 
     protected function tearDown(): void
     {
-        putenv('SECURITY_DEFENSE_DASHBOARD_PATH');
         parent::tearDown();
     }
 
@@ -45,8 +43,9 @@ final class DashboardPortalGateTest extends TestCase
             ->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
             ->post('/security-defense/enter', ['_token' => $csrf]);
 
-        // Relative Location — never an absolute URL derived from Host header.
-        self::assertSame('/' . self::TOKEN, $response->headers->get('Location'));
+        // Relative Location — capability is opaque and never the env token.
+        self::assertMatchesRegularExpression('#^/[A-Za-z0-9_.-]{64,2048}$#', (string) $response->headers->get('Location'));
+        self::assertStringNotContainsString(self::TOKEN, (string) $response->headers->get('Location'));
         self::assertSame('', (string) $response->getContent());
     }
 
@@ -60,7 +59,8 @@ final class DashboardPortalGateTest extends TestCase
                 'redirect' => 'https://attacker.test/leak',
             ]);
 
-        self::assertSame('/' . self::TOKEN, $response->headers->get('Location'));
+        self::assertMatchesRegularExpression('#^/[A-Za-z0-9_.-]{64,2048}$#', (string) $response->headers->get('Location'));
+        self::assertStringNotContainsString(self::TOKEN, (string) $response->headers->get('Location'));
         self::assertStringNotContainsString('attacker.test', (string) $response->headers->get('Location'));
     }
 

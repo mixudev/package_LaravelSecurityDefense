@@ -199,17 +199,17 @@ return [
         | Telegram Bot Alerting & Interactive Control Panel
         */
         'telegram' => [
-            'enabled' => true,
+            'enabled' => false,
             'bot_token' => env('SECURITY_TELEGRAM_BOT_TOKEN'),
             'chat_id' => env('SECURITY_TELEGRAM_CHAT_ID'),
             'timeout' => 5,
             'interactive' => [
-                'enabled' => true,
+                'enabled' => false,
             ],
         ],
 
         'discord' => [
-            'enabled' => true,
+            'enabled' => false,
             'webhook_url' => env('SECURITY_DISCORD_WEBHOOK'),
             'timeout' => 5,
         ],
@@ -399,24 +399,20 @@ return [
             'enabled' => true,
             'ttl' => 30,
         ],
+        // Dedicated dashboard key (optional). If empty, derived from APP_KEY via HKDF.
+        // Rotating this key does NOT affect database encryption or user sessions.
+        'key' => env('SECURITY_DEFENSE_KEY', null),
         'rate_limit' => [
             'enabled' => true,
             'max_probes_per_minute' => 30,
         ],
-        // Opaque dashboard URL: opt-in discovery barrier, never an authenticator.
-        // Server-side capability with bounded entropy, TTL and rotation support.
-        // Query-string tokens are forbidden; leaks through logs/history/referrers.
+        // Opaque dashboard URL: discovery barrier, never an authenticator.
+        // Capability is a one-time, session-bound encrypted+HMAC token derived
+        // from APP_KEY (Laravel Crypt). TTL expires it; rotation is implicit.
         'opaque_path' => [
-            'enabled' => false,
-            // Secret host-managed base64url path is read at runtime from
-            // SECURITY_DEFENSE_DASHBOARD_PATH; never put it in config cache or overrides.
-            // When enabled and env value is empty/malformed -> fail closed (404).
-            // Static token has no sliding TTL; these keys are reserved for a
-            // future cache-backed rotation. Keep disabled.
-            'length_bytes' => 32,
-            'ttl_seconds' => 900,
-            'rotate_on_success' => false,
-            'allow_query_token' => false,
+            'enabled' => true,
+            // Duration a one-time capability stays valid, in seconds.
+            'ttl_seconds' => 60,
         ],
         // Public exposure is opt-in and fail-closed. Prefer VPN/private network.
         'public' => [

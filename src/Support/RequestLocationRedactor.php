@@ -18,7 +18,7 @@ final class RequestLocationRedactor
             return '[dashboard-route:' . $routeName . ']';
         }
 
-        return self::replaceToken(substr($request->path(), 0, 500));
+        return substr($request->path(), 0, 500);
     }
 
     public static function url(Request $request): string
@@ -28,17 +28,16 @@ final class RequestLocationRedactor
             return '[dashboard-route:' . $routeName . ']';
         }
 
-        // Never retain query strings in telemetry. They commonly carry signed
-        // URLs, reset tokens, and provider credentials.
-        return self::replaceToken(substr($request->getSchemeAndHttpHost() . '/' . ltrim($request->path(), '/'), 0, 1000));
-    }
+        // Never trust request Host or forwarded headers in persisted telemetry.
+        // They are attacker-controlled unless host app explicitly configures app.url.
+        $configured = parse_url((string) config('app.url', ''), PHP_URL_SCHEME)
+            && parse_url((string) config('app.url', ''), PHP_URL_HOST)
+            ? rtrim((string) config('app.url'), '/')
+            : '';
+        $location = ($configured !== '' ? $configured : '[untrusted-host]')
+            . '/' . ltrim($request->path(), '/');
 
-    private static function replaceToken(string $value): string
-    {
-        $token = OpaqueDashboardPathResolver::token();
-
-        return is_string($token) && $token !== ''
-            ? str_replace($token, '[REDACTED]', $value)
-            : $value;
+        // Never retain query strings: signed URLs, reset tokens, credentials.
+        return substr($location, 0, 1000);
     }
 }

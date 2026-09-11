@@ -76,4 +76,20 @@ class MessageFormatterTest extends TestCase
         $this->assertStringNotContainsString('🚨', $message);
         $this->assertStringNotContainsString('⚠️', $message);
     }
+
+    public function test_telegram_dynamic_fields_escape_markdown_controls(): void
+    {
+        $alert = $this->makeAlert();
+        $alert->threat_type = 'bad_*_[link]';
+        $alert->rule_identifier = 'rule`\nInjected';
+
+        $message = TelegramAlertFormatter::message($alert);
+
+        // Values inside code spans stay literal; only span-closing backticks
+        // and structural newlines are defanged.
+        $this->assertStringContainsString('bad_*_[link]', $message);
+        $this->assertStringNotContainsString('bad`', $message);
+        $this->assertStringNotContainsString('rule`', $message);
+        $this->assertStringNotContainsString("\nInjected", $message);
+    }
 }

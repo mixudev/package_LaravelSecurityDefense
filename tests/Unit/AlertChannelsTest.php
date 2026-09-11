@@ -150,13 +150,20 @@ class AlertChannelsTest extends TestCase
             'metadata' => ['note' => 'test'],
         ]);
 
+        $captured = null;
         Http::fake([
-            'siem.internal/*' => function ($request) {
-                $this->assertTrue($request->hasHeader('X-Security-Defense-Signature'));
+            'siem.internal/*' => function ($request) use (&$captured) {
+                $captured = $request;
                 return Http::response(['status' => 'received'], 200);
             },
         ]);
 
         $this->assertTrue($channel->send($alert));
+        $this->assertNotNull($captured);
+        $this->assertTrue($captured->hasHeader('X-Security-Defense-Signature'));
+        $this->assertSame(
+            hash_hmac('sha256', $captured->body(), 'my-secret-key'),
+            $captured->header('X-Security-Defense-Signature')[0] ?? null
+        );
     }
 }

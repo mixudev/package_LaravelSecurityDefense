@@ -129,6 +129,38 @@ class EpistemicAnalyzerTest extends TestCase
         $this->assertNotNull($analyzer->responseResult($second->decision()->id()));
     }
 
+    public function test_adapter_exception_is_not_retried_automatically(): void
+    {
+        $calls = 0;
+        $adapter = new class($calls) implements DecisionResponseAdapterInterface {
+            public function __construct(private int &$calls) {}
+            public function respond(\Mixudev\SecurityDefense\Epistemic\Policy\ThreatDecision $decision): ResponseResult
+            {
+                $this->calls++;
+                throw new \RuntimeException('adapter transient failure');
+            }
+        };
+        $analyzer = new EpistemicAnalyzer(
+            new EpistemicEngine(),
+            new RiskEngine(),
+            new ThreatCorrelator(),
+            new PolicyEngine(),
+            new NullAiProvider(),
+            ['response' => ['enabled' => true]],
+            null,
+            $adapter
+        );
+
+        $assessment = $analyzer->analyze(new AnalysisContext(evidence: [$this->makeEvidence(EvidenceType::LOGIN_FAILED)]));
+
+        $this->assertNotNull($assessment->decision());
+        $this->assertSame(1, $calls, 'Adapter must be invoked exactly once on failure; auto-retry can duplicate side effects.');
+        $result = $analyzer->responseResult($assessment->decision()->id());
+        $this->assertNotNull($result);
+        $this->assertFalse($result->handled);
+        $this->assertStringContainsString('Response adapter failed', (string) $result->error);
+    }
+
     public function test_ai_evidence_alone_cannot_authorize_policy(): void
     {
         $ai = new class implements AiEvidenceProviderInterface {

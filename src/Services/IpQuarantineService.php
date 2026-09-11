@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Services;
 
+use Closure;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Support\Facades\Cache;
 use Mixudev\SecurityDefense\Models\SecurityQuarantine;
@@ -144,6 +145,11 @@ class IpQuarantineService
      */
     public function jail(string $ip, ?int $duration = null, string $reason = 'Security policy violation'): bool
     {
+        return $this->withIpLock($ip, fn (): bool => $this->jailUnlocked($ip, $duration, $reason));
+    }
+
+    private function jailUnlocked(string $ip, ?int $duration, string $reason): bool
+    {
         if (!$this->isValidIp($ip)) {
             return false;
         }
@@ -192,18 +198,33 @@ class IpQuarantineService
      */
     public function pardon(string $ip): void
     {
-        if (!$this->isValidIp($ip)) {
-            return;
+        $this->withIpLock($ip, function () use ($ip): void {
+            if (!$this->isValidIp($ip)) {
+                return;
+            }
+
+            $this->getCache()->forget($this->getCacheKey($ip));
+            if ($this->persistToDatabase()) {
+                try {
+                    SecurityQuarantine::query()->forIp($ip)->delete();
+                } catch (\Throwable) {
+                    // Ignore; cache already cleared
+                }
+            }
+        });
+    }
+
+    /**
+     * Serialize jail/pardon mutations per IP when cache store supports locks.
+     */
+    private function withIpLock(string $ip, Closure $operation): mixed
+    {
+        $cache = $this->getCache();
+        if (!method_exists($cache, 'lock')) {
+            return $operation();
         }
 
-        $this->getCache()->forget($this->getCacheKey($ip));
-        if ($this->persistToDatabase()) {
-            try {
-                SecurityQuarantine::query()->forIp($ip)->delete();
-            } catch (\Throwable) {
-                // Ignore; cache already cleared
-            }
-        }
+        return $cache->lock($this->getCacheKey($ip) . ':mutation', 10)->block(3, $operation);
     }
 
     /**

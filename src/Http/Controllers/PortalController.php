@@ -6,7 +6,7 @@ namespace Mixudev\SecurityDefense\Http\Controllers;
 
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
-use Mixudev\SecurityDefense\Support\OpaqueDashboardPathResolver;
+use Mixudev\SecurityDefense\Support\DashboardCapability;
 
 /**
  * Verification gate shown at the predictable dashboard entry point
@@ -15,6 +15,10 @@ use Mixudev\SecurityDefense\Support\OpaqueDashboardPathResolver;
  */
 class PortalController extends Controller
 {
+    public function __construct(private readonly DashboardCapability $capability)
+    {
+    }
+
     /**
      * Render the secure-entry verification gate.
      */
@@ -29,14 +33,12 @@ class PortalController extends Controller
      */
     public function enter(): Response
     {
-        $token = OpaqueDashboardPathResolver::token();
-        if ($token === null) {
+        $sessionId = (string) request()->session()->getId();
+        if ($sessionId === '') {
             abort(404);
         }
 
-        // Relative Location — never absolutize via request Host (Host header
-        // poisoning would turn this into an open redirect shipping the token
-        // to an attacker-controlled origin).
-        return new Response('', 302, ['Location' => '/' . $token]);
+        // Relative Location — never absolutize via request Host.
+        return new Response('', 302, ['Location' => '/' . $this->capability->issue($sessionId)]);
     }
 }

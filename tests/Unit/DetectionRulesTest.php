@@ -71,7 +71,8 @@ class DetectionRulesTest extends TestCase
 
         $this->assertNotNull($threat);
         $this->assertEquals('distributed_spray', $threat->threatType);
-        $this->assertEquals('admin', $threat->metadata['identifier']);
+        $this->assertArrayNotHasKey('identifier', $threat->metadata);
+        $this->assertSame(hash('sha256', 'admin'), $threat->metadata['target_hash']);
         $this->assertEquals(3, $threat->metadata['distinct_ips_count']);
     }
 

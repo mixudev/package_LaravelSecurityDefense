@@ -69,11 +69,14 @@ class WebhookChannel implements AlertChannel
         }
 
         try {
-            $response = Http::timeout($timeout)->withHeaders($headers)->post($url, $payload);
+            $response = Http::timeout($timeout)
+                ->withHeaders($headers)
+                ->withBody($jsonPayload, 'application/json')
+                ->post($url);
 
             if (!$response->successful()) {
                 Log::warning('SecurityDefense: Webhook alert delivery returned non-2xx response.', [
-                    'url' => $url,
+                    'url' => $this->redactUrl($url),
                     'status' => $response->status(),
                 ]);
                 return false;
@@ -82,10 +85,27 @@ class WebhookChannel implements AlertChannel
             return true;
         } catch (Throwable $e) {
             Log::warning('SecurityDefense: Exception occurred while sending Webhook alert.', [
-                'url' => $url,
-                'error' => $e->getMessage(),
+                'url' => $this->redactUrl($url),
             ]);
             return false;
         }
+    }
+
+    /**
+     * Strip query string and credentials from a URL before logging.
+     */
+    protected function redactUrl(string $url): string
+    {
+        $parsed = parse_url($url);
+        if ($parsed === false) {
+            return '[invalid-url]';
+        }
+
+        $scheme = $parsed['scheme'] ?? '';
+        $host = $parsed['host'] ?? '';
+        $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+        $path = $parsed['path'] ?? '';
+
+        return sprintf('%s://%s%s%s', $scheme, $host, $port, $path);
     }
 }
