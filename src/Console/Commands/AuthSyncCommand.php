@@ -90,17 +90,22 @@ class AuthSyncCommand extends Command
     {
         $methodBodies = [];
         $handlers = [];
+        $useStatements = [];
 
         foreach ($events as $key => $mapping) {
             $eventClass = $mapping['event'];
+            $shortClass = class_basename($eventClass);
             $handler = $this->subscriberMethodName($key);
-            $method = $this->buildHandlerMethod($eventClass, $key, $mapping['eventType'], $mapping['fields']);
+            $method = $this->buildHandlerMethod($shortClass, $key, $mapping['eventType'], $mapping['fields']);
             if ($method !== null) {
                 $methodBodies[] = $method;
-                $handlers[] = "            {$eventClass}::class => '{$handler}',";
+                $handlers[] = "            {$shortClass}::class => '{$handler}',";
+                $useStatements[] = "use {$eventClass};";
             }
         }
 
+        sort($useStatements);
+        $useImports = implode("\n", $useStatements);
         $subscribeMap = implode("\n", $handlers);
         $methods = implode("\n", $methodBodies);
 
@@ -113,6 +118,7 @@ namespace App\\Listeners;
 
 use Illuminate\\Events\\Dispatcher;
 use Mixudev\\SecurityDefense\\Support\\Facades\\SecurityDefense;
+{$useImports}
 
 class AuthenticationSecuritySubscriber
 {
@@ -139,13 +145,13 @@ PHP;
 
         return <<<PHP
 
-    public function {$this->subscriberMethodName($key)}({$eventClass} \${$key}): void
+    public function {$this->subscriberMethodName($key)}({$eventClass} \$event): void
     {
         SecurityDefense::record([
-            'ip' => \${$key}->context->ipAddress,
+            'ip' => \$event->context->ipAddress,
             'identifier' => {$identifier},
             'eventType' => '{$eventType}',
-            'userAgent' => \${$key}->context->userAgent,
+            'userAgent' => \$event->context->userAgent,
             'metadata' => [
                 {$metadata}
             ],

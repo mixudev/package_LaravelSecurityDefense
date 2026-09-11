@@ -177,40 +177,14 @@ $score = SecurityDefense::scoring()->getScore(request()->ip());
 
 ## Daftar Isi Dokumentasi Lengkap
 
-Untuk panduan konfigurasi mendalam, detail arsitektur, dan operasional tingkat lanjut, silakan baca dokumentasi di folder [`docs/`](./docs/README.md):
+Dokumentasi lengkap telah diringkas secara modular menjadi 6 panduan utama berbahasa Indonesia pada folder [`docs/`](./docs/README.md):
 
-### 1. Memulai (Getting Started)
-- [docs/getting-started/installation.md](./docs/getting-started/installation.md) — Panduan instalasi langkah demi langkah, rincian migrasi database, dan penjelasan perlakuan konfigurasi vs kredensial `.env`.
-- [docs/getting-started/quickstart.md](./docs/getting-started/quickstart.md) — Panduan integrasi kilat 5 menit untuk menyambungkan WAF middleware, listener telemetri auth, dan pengujian saluran.
-- [docs/getting-started/configuration.md](./docs/getting-started/configuration.md) — Referensi lengkap setiap kunci konfigurasi pada file `config/security-defense.php` beserta nilai default-nya.
-
-### 2. Fitur Keamanan (Features)
-- [docs/features/detection-rules.md](./docs/features/detection-rules.md) — Penjelasan 11 aturan deteksi modular (Brute force, Stuffing, Spray, Bypass, Injection, Travel, Recon, Scanner UA, Session Fingerprint, Behavioral Velocity, Header Consistency).
-- [docs/features/dashboard.md](./docs/features/dashboard.md) — Fitur dashboard monitoring: KPI, quick-action toggle, IP quarantine management, live WAF events, date range filter.
-- [docs/features/waf-middleware.md](./docs/features/waf-middleware.md) — Penjelasan pipeline inspeksi middleware `RequestThreatScanner`, proteksi request flood, dan Fail2Ban auto-jailing.
-- [docs/features/threat-scoring.md](./docs/features/threat-scoring.md) — Mekanisme kalkulasi skor risiko kumulatif multi-vektor dan eskalasi otomatis ke status compound threat.
-- [docs/features/alert-channels.md](./docs/features/alert-channels.md) — Konfigurasi 5 saluran alert (Database, Telegram, Discord, Webhook HMAC, Email), deduplikasi fingerprint, dan antrean asinkron (queue).
-- [docs/features/epistemic-security.md](./docs/features/epistemic-security.md) — Analisis threat berbasis evidence, confidence, risk, policy, graph, memory, feedback, dan provider AI advisory.
-
-### 3. Integrasi Sistem (Integrations)
-- [docs/integrations/data-audit.md](./docs/integrations/data-audit.md) — Panduan audit mutasi database, masking kredensial, dan deteksi manipulasi parameter Burp Suite.
-- [docs/integrations/session-intelligence.md](./docs/integrations/session-intelligence.md) — Perlindungan session cookie dari infostealer malware, deteksi pembajakan sesi, dan scraping velocity.
-- [docs/integrations/csp-armor-and-pruning.md](./docs/integrations/csp-armor-and-pruning.md) — Proteksi Content Security Policy (CSP) transparan penangkal XSS dan pruning log database untuk skala jutaan pengguna.
-- [docs/integrations/telemetry-ingestion.md](./docs/integrations/telemetry-ingestion.md) — Cara menghubungkan event login dari Breeze, Fortify, Sanctum, Jetstream, atau custom JWT ke method `record()`.
-- [docs/integrations/telegram-bot.md](./docs/integrations/telegram-bot.md) — Panduan lengkap kontrol panel bot Telegram: setup Webhook (server/cPanel tanpa daemon) vs Polling (localhost), menu health check, dan remote pardon.
-- [docs/integrations/laravel-auth-package.md](./docs/integrations/laravel-auth-package.md) — Panduan integrasi khusus via Event Subscriber dengan package `mixudev/laravel-authentication`.
-- [docs/integrations/auth-sync-command.md](./docs/integrations/auth-sync-command.md) — Command `auth:sync`: generate bridge subscriber agar defense mendengarkan semua event package `mixudev/laravel-authentication`, plus inject middleware WAF bila belum terdaftar.
-
-### 4. Operasional & Pemeliharaan (Operations)
-- [docs/operations/dashboard.md](./docs/operations/dashboard.md) — Cara mengakses web dashboard SIEM bawaan, pengamanan rute produksi via Laravel Gate, metrik, dan toggle tema.
-- [docs/operations/security-threat-model.md](./docs/operations/security-threat-model.md) — Threat model & perimeter: trust boundaries, prosedur rotasi secret opaque path, dan skenario serangan lintas-batas (session theft, manipulasi jaringan, brute-force URL).
-- [docs/operations/hardening.md](./docs/operations/hardening.md) — Panduan pengerasan produksi: konfigurasi Redis cache, persistensi karantina database, fast-path scanning, dan parameter self-defense.
-- [docs/operations/testing-and-diagnostics.md](./docs/operations/testing-and-diagnostics.md) — Panduan eksekusi pengujian otomatis PHPUnit dan diagnostic probe saluran alert melalui Artisan CLI.
-- [docs/operations/troubleshooting.md](./docs/operations/troubleshooting.md) — Solusi mengatasi kendala umum seperti error 403 dashboard, pesan alert tidak terkirim, dan penanganan cache flush.
-
-### 5. Arsitektur & Prinsip Desain
-- [docs/architecture/overview.md](./docs/architecture/overview.md) — Filosofi pemisahan tugas (Auth vs Defense), diagram pipeline keamanan, dan kebijakan privasi Zero-Leakage Sanitizer.
-- [docs/ai/README.md](./docs/ai/README.md) — Dokumentasi living internal engineering (Architecture Decision Records, detail class implementasi, dan catatan perubahan versi).
+1. **[01. Panduan Instalasi](./docs/01-instalasi.md)** — Instalasi satu perintah `php artisan security-defense:install --with-opaque-path`, migrasi, dan penerbitan view opsional.
+2. **[02. Panduan Konfigurasi](./docs/02-konfigurasi.md)** — Tabel referensi lengkap konfigurasi `config/security-defense.php` dan sistem runtime override.
+3. **[03. Portal & Dashboard Opaque](./docs/03-dashboard.md)** — Arsitektur gate verifikasi, capability URL sekali pakai (AES-256 + HMAC), isolasi kunci HKDF dari `APP_KEY`, dan perlindungan database klien.
+4. **[04. Integrasi Laravel Authentication](./docs/04-integrasi-auth.md)** — Menghubungkan 12 domain event otentikasi via perintah `php artisan auth:sync` dan auto-injeksi middleware WAF.
+5. **[05. Fitur Keamanan & Mesin Deteksi](./docs/05-fitur-keamanan.md)** — WAF preventif, kalkulasi risiko kumulatif, Epistemic SIEM Analyzer, sistem karantina IP, dan alert interaktif Telegram/Webhook.
+6. **[06. Operasi, Hardening, dan Troubleshooting](./docs/06-operasi-dan-troubleshooting.md)** — Checklist pengerasan production, solusi kendala 403/404, dan panduan pemeliharaan rutin.
 
 ---
 

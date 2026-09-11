@@ -1,39 +1,40 @@
 # Dokumentasi Laravel Security Defense
 
-Dokumentasi lengkap untuk integrasi, konfigurasi, operasional, dan arsitektur package `mixudev/security-defense`.
+Selamat datang di dokumentasi resmi **mixudev/security-defense**. Package ini menyediakan sistem pertahanan keamanan aplikasi lapis ganda (defense-in-depth) untuk ekosistem Laravel: WAF adaptif, deteksi anomali perilaku (brute force, credential stuffing, impossible travel, distributed spray), analisis epistemik SIEM, karantina IP otomatis, channel alert real-time (Telegram, Webhook, Log), serta portal dashboard bertopeng dengan URL capability sekali pakai.
 
 ---
 
-## Struktur Dokumentasi
+## Daftar Isi Dokumentasi
 
-### 1. Memulai (Getting Started)
-- [Instalasi](./getting-started/installation.md) - Persyaratan sistem, instalasi via Composer, publish file config/migrasi, dan kredensial `.env`.
-- [Quickstart](./getting-started/quickstart.md) - Panduan integrasi 5 menit (pendaftaran middleware WAF, listener telemetri auth, dan pengujian).
-- [Referensi Konfigurasi](./getting-started/configuration.md) - Panduan lengkap setiap opsi pada `config/security-defense.php`.
+1. **[01. Panduan Instalasi](./01-instalasi.md)**
+   - Persyaratan sistem & dependensi
+   - Instalasi satu perintah via `php artisan security-defense:install`
+   - Opsi instalasi (`--with-opaque-path`, `--force`, `--dry-run`)
+   - Penerbitan views opsional
 
-### 2. Fitur Utama (Features)
-- [Aturan Deteksi Ancaman](./features/detection-rules.md) - Penjelasan 11 aturan deteksi modular (Brute force, Stuffing, Spray, Injection, Travel, Recon, Scanner UA, Session Hijack, Velocity, Header Consistency).
-- [Dashboard Monitoring & Quick Actions](./features/dashboard.md) - KPI, toggle live (persist overrides), IP quarantine management, live WAF events, date range filter.
-- [Middleware WAF & Karantina IP](./features/waf-middleware.md) - Cara kerja `RequestThreatScanner`, mitigasi ReDoS, proteksi request flood, dan Fail2Ban auto-jailing.
-- [Compound Threat Scoring](./features/threat-scoring.md) - Engine korelasi risiko multi-vektor dan eskalasi otomatis ke alert kritis.
-- [Notifikasi Multi-Channel & Deduplikasi](./features/alert-channels.md) - Pengaturan channel Database, Telegram, Discord, Webhook (HMAC), Mail, serta deduplikasi alert.
+2. **[02. Panduan Konfigurasi](./02-konfigurasi.md)**
+   - Struktur konfigurasi utama `config/security-defense.php`
+   - Mekanisme runtime override `config/security-defense-overrides.php`
+   - Tabel referensi switch fitur penting
 
-### 3. Integrasi (Integrations)
-- [Audit Perubahan Database & Deteksi Tamper](./integrations/data-audit.md) - Panduan penggunaan Trait `HasSecurityAudit`, masking kredensial, proteksi Mass Assignment, dan deteksi manipulasi parameter Burp Suite.
-- [Session Intelligence & Pertahanan Klien](./integrations/session-intelligence.md) - Mitigasi pencurian cookie akibat malware infostealer (RedLine/Lumma), deteksi pembajakan sesi, dan post-auth scraping velocity.
-- [CSP Armor & Data Hygiene](./integrations/csp-armor-and-pruning.md) - Proteksi Content Security Policy (CSP) transparan penangkal XSS dan pruning database skala jutaan user.
-- [Security Events & Graduated Response](./integrations/security-events.md) - Panduan mendengarkan event resmi (Session Compromised, Parameter Tampered, IP Quarantined) dan async queueing.
-- [Ingesti Telemetri Autentikasi](./integrations/telemetry-ingestion.md) - Menghubungkan telemetri dari Laravel Breeze, Fortify, Sanctum, Passport, atau sistem kustom.
-- [Bot Telegram Interaktif](./integrations/telegram-bot.md) - Setup Webhook produksi vs Polling lokal, menu kontrol panel, health check, dan remote pardon.
-- [Integrasi Package mixudev/laravel-authentication](./integrations/laravel-auth-package.md) - Panduan subscriber event bridge dengan package autentikasi enterprise.
-- [Sinkronisasi Otomatis `auth:sync`](./integrations/auth-sync-command.md) - Generate bridge subscriber agar defense mendengarkan semua event package autentikasi (instalasi package auth tetap lewat `authentication:install`), plus inject WAF middleware.
+3. **[03. Portal & Dashboard Opaque](./03-dashboard.md)**
+   - Konsep keamanan gate `/security-defense`
+   - One-time capability token terenkripsi AES-256-CBC + HMAC
+   - Isolasi kunci via HKDF dari `APP_KEY` dan opsi `SECURITY_DEFENSE_KEY` (aman untuk DB klien)
+   - Alias rute acak & proteksi local vs production
 
-### 4. Operasional & Pemeliharaan (Operations)
-- [Dashboard SIEM](./operations/dashboard.md) - Cara membuka dan mengamankan web dashboard pemantauan keamanan lokal, metrik, dan toggle tema.
-- [Hardening Produksi](./operations/hardening.md) - Rekomendasi setup Redis, durabilitas karantina database, fast-path scanning, dan parameter self-defense.
-- [Pengujian & Diagnostik](./operations/testing-and-diagnostics.md) - Menjalankan suite PHPUnit dan testing konektivitas channel via Artisan CLI.
-- [Troubleshooting & FAQ](./operations/troubleshooting.md) - Solusi masalah umum (HTTP 403, tema Tailwind, antrean notifikasi, bypass karantina).
+4. **[04. Integrasi Laravel Authentication](./04-integrasi-auth.md)**
+   - Jembatan event otomatis via `php artisan auth:sync`
+   - 12 domain event yang dipantau (Login, Lockout, OTP, Device, Password, Session)
+   - Auto-injeksi WAF middleware ke pipeline HTTP
 
-### 5. Arsitektur & Spesifikasi
-- [Arsitektur & Prinsip Desain](./architecture/overview.md) - Pemisahan tanggung jawab (Auth vs Defense), alur pipeline data, dan privasi data.
-- [Living Docs Internal Tim](./ai/README.md) - Catatan ADR (Architecture Decision Records), rincian implementasi class, dan changelog internal.
+5. **[05. Fitur Keamanan & Mesin Deteksi](./05-fitur-keamanan.md)**
+   - Preventive WAF (SQLi, XSS, Path Traversal, Command Injection, User-Agent Scanner Anomaly)
+   - Behavioral Velocity & Brute Force Engine
+   - Epistemic SIEM Analyzer (Bayesian correlation)
+   - Sistem Karantina IP Otomatis & Saluran Alert (Telegram bot dua arah, Webhook)
+
+6. **[06. Operasi, Hardening, dan Pemecahan Masalah](./06-operasi-dan-troubleshooting.md)**
+   - Checklist hardening sebelum rilis production
+   - Pemecahan masalah umum (403 Forbidden di local/production, route cache)
+   - Perintah diagnosa dan pembersihan data berkala
