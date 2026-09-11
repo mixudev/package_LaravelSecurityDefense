@@ -72,7 +72,7 @@ final class DashboardPortalGateTest extends TestCase
             ->post('/security-defense/enter', ['_token' => $csrf]);
 
         $response->assertForbidden();
-        $response->assertSee('Akses Ditolak');
+        $response->assertSee('Portal Akses Dibatasi');
         $response->assertSee('403 Forbidden.');
         $response->assertDontSee('203.0.113.10');
         $response->assertDontSee(self::TOKEN);

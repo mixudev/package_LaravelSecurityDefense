@@ -36,6 +36,12 @@ class EnsureLocalAccess
         $localOnly = (bool) config('security-defense.dashboard.local_only', true);
         $allowedIps = array_values(array_filter((array) config('security-defense.dashboard.allowed_ips', ['127.0.0.1', '::1']), 'is_string'));
 
+        // If the operator registered their LAN/public IP under the public
+        // whitelist, honour it in local mode too so a single whitelist array
+        // is not silently ignored just because local_only is still true.
+        $publicAllowedIps = array_filter((array) config('security-defense.dashboard.public.allowed_ips', []), 'is_string');
+        $whitelist = array_values(array_unique(array_merge($allowedIps, $publicAllowedIps)));
+
         $authorized = false;
         $denyReason = 'policy';
 
@@ -45,7 +51,7 @@ class EnsureLocalAccess
             // local dashboard: local access always requires a local env AND a
             // loopback/configured-local client address.
             $isLocalEnv = app()->environment('local');
-            $ipPolicy = new DashboardAccessPolicy($allowedIps, []);
+            $ipPolicy = new DashboardAccessPolicy($whitelist, []);
             $authorized = $isLocalEnv && $ipPolicy->allows($clientIp);
             $denyReason = (!$isLocalEnv) ? 'environment' : 'ip';
         } else {
@@ -184,10 +190,12 @@ class EnsureLocalAccess
             abort(403, 'Forbidden.');
         }
 
-        // Render an informative, unified warning page for browsers (fail-closed,
-        // no internal policy oracle or client IP reflected).
-        if (view()->exists('security-defense::error-403')) {
-            abort(response()->view('security-defense::error-403', [], 403));
+        // Return the Security Defense portal's own "access restricted" page.
+        // This is NOT a framework error template: we render a package view so
+        // the host app's custom errors/403.blade.php is never triggered and no
+        // generic framework error page replaces the gate's visual identity.
+        if (view()->exists('security-defense::portal-denied')) {
+            abort(response()->view('security-defense::portal-denied', [], 403));
         }
 
         abort(403, 'Forbidden.');
