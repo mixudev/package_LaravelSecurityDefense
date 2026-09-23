@@ -128,6 +128,22 @@ class AppServiceProvider extends ServiceProvider
 }
 ```
 
+#### Integrasi Otomatis dengan `mixudev/laravel-authentication`
+
+Jika menggunakan package autentikasi enterprise `mixudev/laravel-authentication`, integrasi bridge event dapat di-generate otomatis:
+
+```bash
+composer require mixudev/laravel-authentication
+php artisan authentication:install
+# → Hint: "mixudev/security-defense terdeteksi! Jalankan: php artisan auth:sync"
+
+php artisan auth:sync
+# → Generates app/Listeners/AuthenticationSecuritySubscriber.php (12 handlers)
+# → Wires LoginFailed, LoginSucceeded, AccountLocked, 2FA, device, password, session events
+```
+
+Subscriber yang ter-generate otomatis meneruskan 12 domain auth event ke `SecurityDefense::record()` tanpa kode manual. Dokumentasi lengkap: [mixudev/laravel-authentication → integration guide](https://github.com/mixudev/package_LaravelAuthentication/blob/main/docs/operations/integration-security-defense.md).
+
 ### 5. Masukkan Kredensial Channel di `.env` (Opsional)
 
 Aktivasi channel dilakukan di `config/security-defense.php`. File `.env` hanya digunakan untuk menyimpan kredensial:
