@@ -74,7 +74,9 @@ class PortalController extends Controller
         );
 
         // Burst limiter: attacker cannot exhaust the email/Telegram rate limit.
-        if (! $this->otpService->canRequestCode($clientIp)) {
+        // Reserve the slot atomically so concurrent requests cannot all pass a
+        // read-then-write check and overshoot the per-IP quota.
+        if (! $this->otpService->acquireRequestSlot($clientIp)) {
             abort(429, 'Too many authorization code requests. Please wait before retrying.');
         }
 
@@ -86,11 +88,12 @@ class PortalController extends Controller
         $delivered = $this->otpDispatcher->send($code);
 
         if (! $delivered) {
+            // Discard so an undelivered code is not left guessable. The burst
+            // slot is still consumed (it was already reserved atomically):
+            // a failing transport must not become a free retry loop.
             $this->otpService->discard($binding);
             abort(503, 'Failed to deliver the authorization code. Please retry.');
         }
-
-        $this->otpService->incrementBurst($clientIp);
 
         $request->session()->put('security-defense.otp-pending', true);
 

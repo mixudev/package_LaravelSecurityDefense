@@ -87,6 +87,16 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         $this->app->singleton(\Mixudev\SecurityDefense\Services\DashboardOtpService::class);
         $this->app->singleton(\Mixudev\SecurityDefense\Services\DashboardOtpDispatcher::class);
 
+        // Route dashboard OTP brute force into the normal alert pipeline so it
+        // lands in the SIEM and reaches the operator's channels. Registered via
+        // resolving() (NOT make()) because make() inside register() would force
+        // the cache store to resolve before Laravel's own providers are ready.
+        $this->app->resolving(\Mixudev\SecurityDefense\Services\DashboardOtpService::class, function ($otp): void {
+            $otp->onBruteForce(function ($threat): void {
+                $this->app->make(AlertDispatcher::class)->dispatch($threat);
+            });
+        });
+
         // Bind Alert Deduplicator
         $this->app->singleton(AlertDeduplicatorInterface::class, AlertDeduplicator::class);
 

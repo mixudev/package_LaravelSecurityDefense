@@ -148,13 +148,13 @@ class DashboardOtpServiceTest extends TestCase
         Config::set('security-defense.dashboard.otp.window_seconds', 900);
         $ip = '203.0.113.77';
 
-        $this->assertTrue($this->service->canRequestCode($ip));
-
+        // The reservation is a single atomic step: there is no separate
+        // "may I?" check that a concurrent request could pass at the same time.
         for ($i = 0; $i < 3; $i++) {
-            $this->service->incrementBurst($ip);
+            $this->assertTrue($this->service->acquireRequestSlot($ip));
         }
 
-        $this->assertFalse($this->service->canRequestCode($ip));
+        $this->assertFalse($this->service->acquireRequestSlot($ip));
     }
 
     public function test_burst_limiter_is_scoped_per_ip(): void
@@ -163,20 +163,37 @@ class DashboardOtpServiceTest extends TestCase
         $ip = '203.0.113.78';
         $otherIp = '203.0.113.79';
 
-        $this->service->incrementBurst($ip);
+        $this->assertTrue($this->service->acquireRequestSlot($ip));
 
-        $this->assertFalse($this->service->canRequestCode($ip));
-        $this->assertTrue($this->service->canRequestCode($otherIp));
+        $this->assertFalse($this->service->acquireRequestSlot($ip));
+        $this->assertTrue($this->service->acquireRequestSlot($otherIp));
     }
 
     public function test_burst_counter_key_does_not_leak_the_raw_ip(): void
     {
         $ip = '203.0.113.80';
-        $this->service->incrementBurst($ip);
+        $this->service->acquireRequestSlot($ip);
 
         $this->assertTrue(
-            Cache::get('dashboard-otp-burst:' . hash('sha256', $ip)) >= 1,
+            (int) Cache::get('dashboard-otp-burst:' . hash('sha256', $ip)) >= 1,
             'Burst counter must be keyed by a hash, not the raw IP.'
         );
+    }
+
+    public function test_rejected_burst_slot_does_not_inflate_the_counter(): void
+    {
+        Config::set('security-defense.dashboard.otp.max_codes_per_window', 2);
+        $ip = '203.0.113.81';
+
+        $this->assertTrue($this->service->acquireRequestSlot($ip));
+        $this->assertTrue($this->service->acquireRequestSlot($ip));
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->assertFalse($this->service->acquireRequestSlot($ip));
+        }
+
+        // Over-rejection must not keep growing the counter: a later legit
+        // request should see exactly max, not max+5.
+        $this->assertSame(2, (int) Cache::get('dashboard-otp-burst:' . hash('sha256', $ip)));
     }
 }

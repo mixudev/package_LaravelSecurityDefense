@@ -446,6 +446,10 @@ return [
             'max_attempts' => 3,
             'max_codes_per_window' => 3,
             'window_seconds' => 900,
+            // Raise a SIEM alert when the attempt ceiling is reached, so an
+            // operator sees a genuine break-in attempt against the panel.
+            'alert_on_brute_force' => true,
+            'brute_force_severity' => 'high',
         ],
     ],
 

@@ -6,6 +6,7 @@ namespace Mixudev\SecurityDefense\Services;
 
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Support\Facades\Cache;
+use Mixudev\SecurityDefense\DTO\SecurityThreat;
 
 /**
  * Lifecycle manager untuk Dashboard Authorization Code (OTP).
@@ -17,6 +18,11 @@ use Illuminate\Support\Facades\Cache;
  * - Invalidasi penuh setelah max_attempts percobaan salah
  * - Terikat pada binding (session id + client IP) dari pemanggil
  * - Burst limiter per IP mencegah runaway code issuance
+ *
+ * Semua counter (attempts, burst) memakai operasi atomik `add()` + `increment()`.
+ * Pola `get()` lalu `put()` adalah read-modify-write dan bisa dikalahkan request paralel:
+ * semua penebak paralel membaca nilai yang sama lalu menulis nilai yang sama, sehingga
+ * batas percobaan tidak pernah tercapai.
  *
  * ponytail: pending code + attempt counter tinggal di cache store yang dikonfigurasi.
  * Kalau operator menjalankan multi-instance dengan driver `file`, state tidak dibagi antar
@@ -30,8 +36,23 @@ final class DashboardOtpService
     private const ATTEMPT_PREFIX = 'dashboard-otp-attempts:';
     private const BURST_PREFIX = 'dashboard-otp-burst:';
 
+    /** @var callable(SecurityThreat): void|null */
+    private $bruteForceReporter = null;
+
     public function __construct(private readonly ?CacheRepository $cache = null)
     {
+    }
+
+    /**
+     * Register a sink for brute-force alerts (wired to AlertDispatcher by the
+     * service provider). Kept as a callback so this service never hard-depends
+     * on the alert pipeline.
+     *
+     * @param callable(SecurityThreat): void $reporter
+     */
+    public function onBruteForce(callable $reporter): void
+    {
+        $this->bruteForceReporter = $reporter;
     }
 
     /**
@@ -58,8 +79,9 @@ final class DashboardOtpService
     /**
      * Verify a submitted code against the pending code for this binding.
      *
-     * A wrong guess increments an attempt counter; once max_attempts is reached
-     * the code is destroyed so the attacker must make the operator re-issue.
+     * A wrong guess increments an attempt counter atomically; once max_attempts is
+     * reached the code is destroyed so the attacker must make the operator re-issue,
+     * and a brute-force threat is raised.
      */
     public function verify(string $binding, string $input): bool
     {
@@ -73,23 +95,23 @@ final class DashboardOtpService
         }
 
         if (! hash_equals($stored, hash('sha256', $this->normalize($input)))) {
-            $this->registerFailure($cache, $codeKey, $attemptKey);
+            $attempts = $this->registerFailure($cache, $codeKey, $attemptKey);
+
+            // Raised outside the lock: the alert pipeline does I/O and must not
+            // hold the binding lock.
+            if ($attempts !== null) {
+                $this->reportBruteForce($binding, $attempts);
+            }
 
             return false;
         }
 
-        // Consume atomically so two concurrent submits cannot both succeed.
-        $lock = method_exists($cache, 'lock') ? $cache->lock($codeKey . ':lock', 5) : null;
         $consume = static function () use ($cache, $codeKey, $attemptKey): void {
             $cache->forget($codeKey);
             $cache->forget($attemptKey);
         };
 
-        if ($lock !== null) {
-            $lock->block(2, $consume);
-        } else {
-            $consume();
-        }
+        \Mixudev\SecurityDefense\Support\CacheLock::run($cache, $codeKey . ':lock', 5, $consume);
 
         return true;
     }
@@ -100,24 +122,23 @@ final class DashboardOtpService
     }
 
     /**
-     * Read-only check; the caller increments only after a code was delivered.
+     * Atomically reserve one code-issuance slot for an IP.
+     *
+     * The check and the increment MUST be a single operation: a separate
+     * canRequestCode() + incrementBurst() pair lets N concurrent requests all
+     * observe a clean counter and all proceed, overshooting the burst ceiling
+     * by N. Returns false once the window quota is exhausted.
      */
-    public function canRequestCode(string $ip): bool
+    public function acquireRequestSlot(string $ip): bool
     {
         $max = max(1, (int) config('security-defense.dashboard.otp.max_codes_per_window', 3));
-        $issued = (int) $this->cache()->get($this->burstKey($ip), 0);
 
-        return $issued < $max;
-    }
-
-    public function incrementBurst(string $ip): void
-    {
-        $cache = $this->cache();
-        $key = $this->burstKey($ip);
-        $window = $this->window();
-
-        $cache->add($key, 0, $window);
-        $cache->increment($key);
+        return \Mixudev\SecurityDefense\Support\CacheLock::reserveSlot(
+            $this->cache(),
+            $this->burstKey($ip),
+            $max,
+            $this->window()
+        );
     }
 
     /**
@@ -130,19 +151,65 @@ final class DashboardOtpService
         $this->cache()->forget($this->attemptKey($binding));
     }
 
-    private function registerFailure(CacheRepository $cache, string $codeKey, string $attemptKey): void
+    /**
+     * Record one failed guess atomically.
+     *
+     * @return int|null Total attempts when the ceiling was reached (code
+     *                  destroyed), null while guesses remain under the limit.
+     */
+    private function registerFailure(CacheRepository $cache, string $codeKey, string $attemptKey): ?int
     {
         $max = max(1, (int) config('security-defense.dashboard.otp.max_attempts', 3));
-        $attempts = (int) $cache->get($attemptKey, 0) + 1;
 
-        if ($attempts >= $max) {
-            $cache->forget($codeKey);
-            $cache->forget($attemptKey);
+        $record = function () use ($cache, $codeKey, $attemptKey, $max): ?int {
+            $cache->add($attemptKey, 0, $this->ttl());
+            $attempts = (int) $cache->increment($attemptKey);
 
+            if ($attempts >= $max) {
+                $cache->forget($codeKey);
+                $cache->forget($attemptKey);
+
+                return $attempts;
+            }
+
+            return null;
+        };
+
+        return \Mixudev\SecurityDefense\Support\CacheLock::run($cache, $attemptKey . ':lock', 5, $record);
+    }
+
+    private function reportBruteForce(string $binding, int $attempts): void
+    {
+        if ($this->bruteForceReporter === null) {
             return;
         }
 
-        $cache->put($attemptKey, $attempts, $this->ttl());
+        if (! (bool) config('security-defense.dashboard.otp.alert_on_brute_force', true)) {
+            return;
+        }
+
+        [$sessionId, $ip] = array_pad(explode('_', $binding, 2), 2, '');
+
+        try {
+            ($this->bruteForceReporter)(new SecurityThreat(
+                severity: (string) config('security-defense.dashboard.otp.brute_force_severity', 'high'),
+                threatType: 'dashboard_otp_brute_force',
+                // Bound to the IP only: a re-issued code on the same address
+                // must not be able to suppress the alert by changing session.
+                fingerprint: hash('sha256', 'dashboard_otp_brute_force:' . $ip),
+                metadata: [
+                    'ip' => $ip,
+                    'attempts' => $attempts,
+                    'session_ref' => substr(hash('sha256', $sessionId), 0, 16),
+                ],
+                ruleIdentifier: 'dashboard_otp'
+            ));
+        } catch (\Throwable $e) {
+            // Alerting must never turn a rejected login into a 500.
+            logger()->warning('[SecurityDefense] Failed to report dashboard OTP brute force.', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function makeCode(): string
