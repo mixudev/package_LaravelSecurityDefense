@@ -98,12 +98,14 @@ Untuk keamanan tingkat enterprise, gate masuk dapat dipasangkan dengan kode otor
 ```
 
 ### Karakteristik Keamanan OTP
-- **Anti-Bypass Binding**: Kode diikat ke kombinasi `hash(session_id . '_' . ip)`. Kode yang di-generate dari satu IP atau sesi tidak dapat diverifikasi dari IP/sesi lain.
+- **Anti-Bypass Binding**: Kode diikat pada kombinasi `hash(session_id . '_' . ip)`. Kode yang di-generate dari satu IP atau sesi tidak dapat diverifikasi dari IP/sesi lain.
 - **Fail-Closed**: Jika saluran OTP tidak terkonfigurasi atau pengiriman gagal, gate mengembalikan `403`/`503` tanpa membocorkan token.
 - **Brute-Force Guard**: Maksimal 3 kali percobaan salah (`max_attempts`). Setelah batas tercapai, kode langsung dimusnahkan.
 - **Burst Rate Limiting**: Maksimal 3 permintaan kode per jendela 15 menit (`max_codes_per_window`) per IP untuk mencegah abuse pengiriman.
 - **Consume-Once**: Kode segera dihapus secara atomik dari cache begitu diverifikasi, kebal replay attack.
 - **Zero-Plaintext Storage**: Plaintext hanya hidup saat dikirim; server hanya menyimpan hash SHA-256 di cache.
+- **Counter Atomik**: Semua penghitung (percobaan, burst) memakai `add()` + `increment()` di bawah `CacheLock`. Pola `get()` lalu `put()` bisa dikalahkan request paralel — semua penebak membaca angka sama lalu menulis angka sama, sehingga batas tidak pernah tercapai.
+- **Alert Brute-Force ke SIEM**: Saat ambang `max_attempts` terlampaui, sistem membuat `SecurityThreat` dengan `threat_type = dashboard_otp_brute_force` dan mengirimkannya ke `AlertDispatcher`, sehingga insiden tercatat di tabel `security_alerts` dan memicu notifikasi Telegram/Email operator. Fingerprint terikat pada **IP** (bukan session), jadi penyerang yang menghapus cookie tidak bisa membuat identitas alert baru dan membanjiri SIEM. `session_id` disimpan hanya sebagai hash 16 karakter.
 
 ### Konfigurasi di `config/security-defense.php`
 ```php
@@ -116,6 +118,8 @@ Untuk keamanan tingkat enterprise, gate masuk dapat dipasangkan dengan kode otor
         'max_attempts' => 3,                // 3x salah = kode hangus
         'max_codes_per_window' => 3,        // Max 3 request OTP per IP per window
         'window_seconds' => 900,            // Window 15 menit
+        'alert_on_brute_force' => true,      // Kirim alert SIEM saat ambang attempts terlampaui
+        'brute_force_severity' => 'high',
     ],
 ],
 ```
