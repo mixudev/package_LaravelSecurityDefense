@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Mixudev\SecurityDefense\Services\DashboardAccessPolicy;
+use Mixudev\SecurityDefense\Support\ClientIpResolver;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -167,16 +168,13 @@ class EnsureLocalAccess
      */
     private function resolveClientIp(Request $request): string
     {
-        $peer = (string) ($request->server->get('REMOTE_ADDR') ?? '');
-        $trustedProxies = (array) config('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1']);
+        return ClientIpResolver::resolve($request, $this->trustedProxies());
+    }
 
-        // When the TCP peer is loopback or a configured trusted proxy, let
-        // Symfony/Laravel resolve the forwarded IP. Otherwise, lock down to the peer.
-        if ($peer !== '' && !in_array($peer, $trustedProxies, true)) {
-            return $peer;
-        }
-
-        return (string) $request->ip();
+    /** @return array<int, string> */
+    private function trustedProxies(): array
+    {
+        return (array) config('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1']);
     }
 
     private function safeLogPath(Request $request): string

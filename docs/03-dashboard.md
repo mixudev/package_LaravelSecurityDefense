@@ -78,7 +78,53 @@ Jika kunci enkripsi dashboard bercampur langsung dengan `APP_KEY` utama, merotas
 
 ---
 
-## 4. Penyamaran Rute Internal (Opaque Aliases)
+## 4. Autentikasi Dua Lapis (OTP Sekali Pakai)
+
+Untuk keamanan tingkat enterprise, gate masuk dapat dipasangkan dengan kode otorisasi sekali pakai (OTP) 8-karakter alfanumerik yang dikirimkan via **Email** atau **Telegram Bot**:
+
+```
+[Operator] ---> [IP Whitelist Check]
+                      | (Lolos)
+                      v
+                [Generate OTP (8-char entropy ~40-bit)]
+                      |
+                      +---> Kirim via Email / Telegram
+                      |
+                      v
+                [Form Masukkan Kode] ---> [Validasi Hash SHA-256]
+                                                | (Sukses)
+                                                v
+                                        [Opaque Session Path]
+```
+
+### Karakteristik Keamanan OTP
+- **Anti-Bypass Binding**: Kode diikat ke kombinasi `hash(session_id . '_' . ip)`. Kode yang di-generate dari satu IP atau sesi tidak dapat diverifikasi dari IP/sesi lain.
+- **Fail-Closed**: Jika saluran OTP tidak terkonfigurasi atau pengiriman gagal, gate mengembalikan `403`/`503` tanpa membocorkan token.
+- **Brute-Force Guard**: Maksimal 3 kali percobaan salah (`max_attempts`). Setelah batas tercapai, kode langsung dimusnahkan.
+- **Burst Rate Limiting**: Maksimal 3 permintaan kode per jendela 15 menit (`max_codes_per_window`) per IP untuk mencegah abuse pengiriman.
+- **Consume-Once**: Kode segera dihapus secara atomik dari cache begitu diverifikasi, kebal replay attack.
+- **Zero-Plaintext Storage**: Plaintext hanya hidup saat dikirim; server hanya menyimpan hash SHA-256 di cache.
+
+### Konfigurasi di `config/security-defense.php`
+```php
+'dashboard' => [
+    'otp' => [
+        'enabled' => (bool) env('SECURITY_DEFENSE_OTP_ENABLED', false),
+        'channel' => (string) env('SECURITY_DEFENSE_OTP_CHANNEL', 'email'), // 'email' atau 'telegram'
+        'email' => env('SECURITY_DEFENSE_OTP_EMAIL'),
+        'ttl_seconds' => (int) env('SECURITY_DEFENSE_OTP_TTL', 300),       // Kode hangus dalam 5 menit
+        'max_attempts' => 3,                // 3x salah = kode hangus
+        'max_codes_per_window' => 3,        // Max 3 request OTP per IP per window
+        'window_seconds' => 900,            // Window 15 menit
+    ],
+],
+```
+
+> **Catatan Deployment:** `cache_store` dan state OTP berada di cache. Untuk instalasi multi-instance gunakan Redis atau Memcached, bukan driver `file`. Gunakan environment `APP_ENV=local` agar mode loopback aktif.
+
+---
+
+## 5. Penyamaran Rute Internal (Opaque Aliases)
 
 Setelah masuk melalui gate, subrute fungsional dashboard tidak menggunakan kata kunci standar:
 

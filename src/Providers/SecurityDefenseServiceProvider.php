@@ -83,6 +83,10 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         // Bind dashboard entry capability (APP_KEY-backed, one-time, session-bound)
         $this->app->singleton(\Mixudev\SecurityDefense\Support\DashboardCapability::class);
 
+        // Dashboard second-factor authorization code (OTP) lifecycle + delivery.
+        $this->app->singleton(\Mixudev\SecurityDefense\Services\DashboardOtpService::class);
+        $this->app->singleton(\Mixudev\SecurityDefense\Services\DashboardOtpDispatcher::class);
+
         // Bind Alert Deduplicator
         $this->app->singleton(AlertDeduplicatorInterface::class, AlertDeduplicator::class);
 

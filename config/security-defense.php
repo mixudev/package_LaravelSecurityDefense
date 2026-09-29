@@ -435,6 +435,18 @@ return [
                 'decay_seconds' => 60,
             ],
         ],
+        // Second layer: one-time authorization code delivered out-of-band after
+        // the IP whitelist passes. Off by default so existing installs keep the
+        // single-gate flow. Telegram delivery reuses alerts.telegram.* settings.
+        'otp' => [
+            'enabled' => (bool) env('SECURITY_DEFENSE_OTP_ENABLED', false),
+            'channel' => (string) env('SECURITY_DEFENSE_OTP_CHANNEL', 'email'),
+            'email' => env('SECURITY_DEFENSE_OTP_EMAIL'),
+            'ttl_seconds' => (int) env('SECURITY_DEFENSE_OTP_TTL', 300),
+            'max_attempts' => 3,
+            'max_codes_per_window' => 3,
+            'window_seconds' => 900,
+        ],
     ],
 
     'epistemic' => [
