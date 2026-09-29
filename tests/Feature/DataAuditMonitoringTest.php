@@ -95,6 +95,37 @@ class DataAuditMonitoringTest extends TestCase
         $this->assertSame('Bob Updated', $audit->new_values['name']);
     }
 
+    public function test_it_records_model_deletions(): void
+    {
+        // Regression: the deleted branch called a non-existent method, the
+        // BadMethodCallException was swallowed by the catch(\Throwable), and
+        // the delete audit row was silently lost.
+        $model = TestAuditableModel::create([
+            'name' => 'Carol Deleted',
+            'email' => 'carol@example.com',
+            'password' => 'supersecret123',
+            'is_admin' => false,
+        ]);
+
+        $model->delete();
+
+        $audit = SecurityDataAudit::query()
+            ->where('auditable_type', TestAuditableModel::class)
+            ->where('auditable_id', (string) $model->id)
+            ->where('event', 'deleted')
+            ->first();
+
+        $this->assertNotNull($audit, 'Deletion must be recorded in the audit trail.');
+        $this->assertSame('deleted', $audit->event);
+        $this->assertArrayHasKey('name', $audit->old_values);
+        $this->assertSame('Carol Deleted', $audit->old_values['name']);
+        $this->assertNull($audit->new_values);
+        $this->assertContains('name', $audit->modified_fields);
+
+        // Password MUST still be redacted in the old_values snapshot.
+        $this->assertSame('******** [REDACTED]', $audit->old_values['password']);
+    }
+
     public function test_it_detects_burp_suite_parameter_tampering_on_sensitive_fields(): void
     {
         // Mock an HTTP request injecting is_admin parameter

@@ -47,7 +47,14 @@ class AlertDispatcher
         }
 
         if (!$this->acquireRateLimitSlot()) {
+            // Forget the deduplication entry so the same threat can retry next
+            // minute; but log it so operators know alerts were suppressed.
             $this->deduplicator->forget($threat->fingerprint);
+            logger()->warning('[SecurityDefense] Alert rate limit reached - threat suppressed.', [
+                'fingerprint' => $threat->fingerprint,
+                'threat_type' => $threat->threatType,
+                'severity' => $threat->severity,
+            ]);
             return null;
         }
 

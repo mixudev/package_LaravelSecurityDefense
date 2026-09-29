@@ -33,6 +33,10 @@ class QuickActionsToggleTest extends TestCase
         $app['config']->set('security-defense.dashboard.enabled', true);
         $app['config']->set('security-defense.dashboard.local_only', true);
         $app['config']->set('security-defense.dashboard.allowed_ips', ['127.0.0.1', '::1']);
+        $app['config']->set('security-defense.enabled', true);
+        $app['config']->set('security-defense.detection.enabled', true);
+        $app['config']->set('security-defense.detection.rules.user_agent_anomaly.enabled', true);
+        $app['config']->set('security-defense.middleware.user_agent_anomaly.enabled', true);
     }
 
     protected function tearDown(): void
@@ -59,14 +63,48 @@ class QuickActionsToggleTest extends TestCase
 
     public function test_toggle_blocks_headless_clients_persists(): void
     {
-        Config::set('security-defense.middleware.user_agent_anomaly.block_headless_clients', false);
+        Config::set('security-defense.detection.rules.user_agent_anomaly.block_headless_clients', false);
 
         $this->toggle('block_headless_clients', 1)
             ->assertRedirect()
             ->assertSessionHas('status_message', 'Quick-action [block_headless_clients] enabled and saved permanently.');
 
         $loaded = require $this->tempOverrides;
-        $this->assertTrue($loaded['middleware.user_agent_anomaly.block_headless_clients']);
+        $this->assertTrue($loaded['detection.rules.user_agent_anomaly.block_headless_clients']);
+    }
+
+    public function test_toggle_key_matches_rule_read_key(): void
+    {
+        // Regression: the dashboard wrote to middleware.user_agent_anomaly.block_headless_clients
+        // while UserAgentAnomalyRule read detection.rules.user_agent_anomaly.block_headless_clients.
+        // This test asserts the written override key exactly matches what the rule inspects.
+        $this->toggle('block_headless_clients', 1)->assertRedirect();
+
+        $loaded = require $this->tempOverrides;
+
+        // 1. The persisted key must be the detection.rules one:
+        $this->assertArrayHasKey(
+            'detection.rules.user_agent_anomaly.block_headless_clients',
+            $loaded,
+            'The written key must match what UserAgentAnomalyRule actually reads.'
+        );
+
+        // 2. Feed the written override into the rule's config and verify the rule respects it.
+        config()->set('security-defense.detection.rules.user_agent_anomaly.block_headless_clients', $loaded['detection.rules.user_agent_anomaly.block_headless_clients']);
+        config()->set('security-defense.detection.rules.user_agent_anomaly.enabled', true);
+
+        $rule = app(\Mixudev\SecurityDefense\Rules\UserAgentAnomalyRule::class);
+        $event = new \Mixudev\SecurityDefense\DTO\SecurityEvent(
+            ip: '198.51.107.1',
+            identifier: 'probe',
+            eventType: 'http_request',
+            userAgent: 'python-requests/2.31.0',
+        );
+
+        $threat = $rule->evaluate($event);
+        $this->assertNotNull($threat, 'Headless client must be detected as a threat when the toggle is on.');
+        $this->assertSame('user_agent_anomaly', $threat->threatType);
+        $this->assertSame('python_requests', $threat->metadata['detected_tool']);
     }
 
     public function test_toggle_csp_armor_persists(): void

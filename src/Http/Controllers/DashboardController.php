@@ -81,7 +81,7 @@ class DashboardController extends Controller
             'liveEvents' => $liveEvents,
             'dateRange' => $dateRange,
             'quickActions' => [
-                'blockHeadless' => (bool) config('security-defense.middleware.user_agent_anomaly.block_headless_clients', false),
+                'blockHeadless' => (bool) config('security-defense.detection.rules.user_agent_anomaly.block_headless_clients', false),
                 'cspArmor' => (bool) config('security-defense.csp_armor.enabled', true),
                 'asyncQueue' => (bool) config('security-defense.data_audit.queue.enabled', false),
             ],
@@ -403,7 +403,7 @@ class DashboardController extends Controller
         $value = (bool) $request->input('value');
 
         $toggles = [
-            'block_headless_clients' => 'middleware.user_agent_anomaly.block_headless_clients',
+            'block_headless_clients' => 'detection.rules.user_agent_anomaly.block_headless_clients',
             'csp_armor' => 'csp_armor.enabled',
             'async_queue' => 'data_audit.queue.enabled',
         ];
