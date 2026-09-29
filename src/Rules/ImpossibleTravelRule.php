@@ -6,6 +6,7 @@ namespace Mixudev\SecurityDefense\Rules;
 
 use Mixudev\SecurityDefense\DTO\SecurityEvent;
 use Mixudev\SecurityDefense\DTO\SecurityThreat;
+use Mixudev\SecurityDefense\Support\CacheLock;
 /**
  * Detects impossible travel anomalies (e.g. login from two physically distant locations in an unrealistically short timeframe).
  * Uses cache lock to prevent TOCTOU race condition on concurrent requests.
@@ -53,17 +54,22 @@ class ImpossibleTravelRule extends AbstractDetectionRule
         $now = time();
 
         // Use cache lock to prevent TOCTOU race on concurrent location updates
-        $lock = null;
-        if (method_exists($cache, 'lock')) {
-            try {
-                $lock = $cache->lock($lockKey, 5);
-                $lock->block(3);
-            } catch (\Throwable) {
-                $lock = null; // Graceful fallback on non-locking drivers
-            }
-        }
+        $rule = $this;
 
-        try {
+        $evaluate = function () use (
+            $cache,
+            $cacheKey,
+            $event,
+            $target,
+            $now,
+            $window,
+            $currentLat,
+            $currentLon,
+            $currentCountry,
+            $maxSpeed,
+            $severity,
+            $rule
+        ): ?SecurityThreat {
             /** @var array{ip: string, lat: float|null, lon: float|null, country: string|null, timestamp: int}|null $lastLocation */
             $lastLocation = $cache->get($cacheKey);
 
@@ -93,7 +99,7 @@ class ImpossibleTravelRule extends AbstractDetectionRule
                 $currentLat !== null && $currentLon !== null &&
                 $lastLocation['lat'] !== null && $lastLocation['lon'] !== null
             ) {
-                $distanceKm = $this->calculateDistanceKm(
+                $distanceKm = $rule->calculateDistanceKm(
                     $lastLocation['lat'],
                     $lastLocation['lon'],
                     $currentLat,
@@ -120,7 +126,7 @@ class ImpossibleTravelRule extends AbstractDetectionRule
                             'previous_location' => ['lat' => $lastLocation['lat'], 'lon' => $lastLocation['lon']],
                             'current_location' => ['lat' => $currentLat, 'lon' => $currentLon],
                         ],
-                        ruleIdentifier: $this->identifier()
+                        ruleIdentifier: $rule->identifier()
                     );
                 }
             } elseif (
@@ -143,16 +149,14 @@ class ImpossibleTravelRule extends AbstractDetectionRule
                         'current_country' => $currentCountry,
                         'time_elapsed_seconds' => $timeDiffSeconds,
                     ],
-                    ruleIdentifier: $this->identifier()
+                    ruleIdentifier: $rule->identifier()
                 );
             }
-        } finally {
-            if ($lock !== null) {
-                $lock->release();
-            }
-        }
 
-        return null;
+            return null;
+        };
+
+        return CacheLock::run($cache, $lockKey, 5, $evaluate, 3);
     }
 
     /**
