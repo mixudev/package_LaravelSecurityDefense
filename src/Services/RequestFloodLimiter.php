@@ -48,20 +48,25 @@ class RequestFloodLimiter
 
         $cache = $this->getFloodCache();
 
-        // Atomic increment; seeds TTL on first touch. add() cannot zero-out
-        // an already-incremented counter under concurrent requests.
+        // Seed the TTL FIRST. increment() on a missing key calls forever() with
+        // no expiry, so incrementing before add() makes the following add() a
+        // permanent no-op and the window never expires. Because the flood key
+        // is time-bucketed, that leaked one key per window per IP forever.
+        $cache->add($key, 0, $window);
         $count = (int) $cache->increment($key);
-        $cache->add($key, 1, $window);
 
         if ($count <= $max) {
             return false;
         }
 
-        // Exceeded: count consecutive windows; jail once past threshold
-        // add() seed keeps concurrent strike increments monotonic.
+        // Exceeded: count consecutive windows; jail once past threshold.
+        // Same ordering rule — seed the TTL before incrementing, otherwise the
+        // strike counter accumulates for the life of the cache and re-jails the
+        // IP on every later flood with no way to shed strikes.
         $strikeKey = sprintf('%sflood:strike:%s', $prefix, md5($ip));
+        $cache->add($strikeKey, 0, $window * 4);
         $strikes = (int) $cache->increment($strikeKey);
-        $cache->add($strikeKey, 1, $window * 4);
+
         if ($strikes >= $targetJail) {
             $this->quarantineService->jail($ip, null, 'Auto-quarantined: request flood exceeding ' . $max . ' req/s per IP');
         }

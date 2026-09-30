@@ -103,11 +103,12 @@ class ThreatScoringEngine
         $now = time();
 
         // Atomic, race-free total score increment with windowed TTL.
+        // Seed the TTL with add() BEFORE incrementing. The previous pattern of
+        // increment() followed by put() when ($totalScore === $weight) raced:
+        // a concurrent second increment between the two lines was stomped by
+        // the put() resetting the counter back down to the first weight.
+        $cache->add($counterKey, 0, $window);
         $totalScore = (int) $cache->increment($counterKey, $weight);
-        if ($totalScore === $weight) {
-            // First increment seeds the TTL for the accumulation window.
-            $cache->put($counterKey, $weight, $window);
-        }
 
         // Bounded records list — metadata only (involved threats), capped to prevent
         // unbounded memory growth in the cache under sustained attack.
