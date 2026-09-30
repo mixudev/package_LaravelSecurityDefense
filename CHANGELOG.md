@@ -9,6 +9,15 @@ mengikuti [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Diperbaiki
 
+- **Dashboard OTP Session Fixation:** `PortalController::verifyCode()` kini merotasi session ID setelah verifikasi OTP, sehingga session ID yang ditanam sebelum step-up tidak dapat menjadi sesi dashboard terotorisasi.
+- **Opaque Mode Alert Actions:** Memperbaiki `TypeError` pada `acknowledge` dan `resolve` ketika `dashboard.opaque_path.enabled = true`; alert kini diambil dari parameter route bernama.
+- **Forensic Audit IP:** `DataAuditService` kini memakai `ClientIpResolver`, sehingga `X-Forwarded-For` palsu tidak masuk sebagai alamat aktor di tabel audit.
+- **Audit Masking Parity:** `AuditPayloadSanitizer` kini memakai seluruh vocabulary `Sanitizer`, termasuk `api_key`, `private_key`, `otp`, dan `access_token`.
+- **Epistemic Login Polarity:** `LOGIN_SUCCESS` kini diklasifikasikan sebagai evidence kontradiktif, bukan evidence ancaman yang memicu rekomendasi `block`.
+- **Threat Scoring Zero Retention:** `max_records = 0` kini benar-benar menyimpan nol record; sebelumnya `array_slice(..., -0)` mempertahankan seluruh array.
+- **Config Drift:** Menambahkan `alerts.retention_days` dan menghapus `alerts.mail.timeout` yang tidak pernah dibaca.
+- **Artisan Exit Codes:** Memperbaiki exit code palsu pada `TestWebhookCommand --all`, `InstallCommand`, dan `TelegramPollCommand`.
+
 - **Urutan inisialisasi TTL pada `RequestFloodLimiter` dan `ThreatScoringEngine`.**
   Sebelumnya `increment()` dipanggil sebelum `add()`/`put()`. Pada cache driver
   Laravel, `increment()` pada key yang belum ada memanggil `forever()` (tanpa TTL),
