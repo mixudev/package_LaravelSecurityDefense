@@ -204,6 +204,17 @@ class PayloadInjectionRule extends AbstractDetectionRule
             $payloads['path'] = $event->metadata['path'];
         }
 
+        // PayloadDecoder adds normalized/decoded copies under explicit keys.
+        // Include those copies in the rule input; otherwise decoding is dead
+        // code and form-urlencoded '+' separators remain an evasion path.
+        foreach ($event->metadata as $key => $value) {
+            if (!is_string($value) || !preg_match('/(?:_decoded|_form_decoded|_normalized)$/', (string) $key)) {
+                continue;
+            }
+
+            $payloads[(string) $key] = $value;
+        }
+
         return $payloads;
     }
 

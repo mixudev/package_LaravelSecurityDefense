@@ -34,6 +34,12 @@ class PayloadDecoder
                 ? substr($rawContent, 0, $maxLength)
                 : $rawContent;
             $decoded['raw_decoded'] = rawurldecode($rawContent);
+            // form-urlencoded encodes a space as '+', and rawurldecode() leaves
+            // '+' untouched. Without this variant a SQLi whose keywords are
+            // separated by '+' keeps no literal whitespace and evades every
+            // signature that requires \s+ between tokens.
+            $decoded['raw_form_decoded'] = urldecode($rawContent);
+            $decoded['raw_form_double_decoded'] = urldecode(urldecode($rawContent));
             // Normalize CRLF/CR/LF to spaces so CRLF injection shows as literal pattern
             $decoded['raw_crlf_normalized'] = str_replace(["\r\n", "\r", "\n"], ' ', $rawContent);
             // Unicode escape sequences (Burp Suite / JS obfuscation): \u0027 -> '
@@ -54,6 +60,9 @@ class PayloadDecoder
                 }
 
                 $parts[] = rawurldecode($value);
+                // form-urlencoded '+' is a space; rawurldecode() keeps it literal,
+                // so a '+'-separated payload never gains the \s+ its signature needs.
+                $parts[] = urldecode($value);
                 // Double-decode for %2527 -> %27 -> ' (Burp double-encoding)
                 $parts[] = rawurldecode(rawurldecode($value));
                 $parts[] = str_replace(["\r\n", "\r", "\n"], ' ', $value);

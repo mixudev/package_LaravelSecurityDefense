@@ -83,6 +83,85 @@ class WafMultipartPayloadScanTest extends TestCase
         $this->assertSame(403, $response->getStatusCode(), 'JSON body harus tetap diblokir.');
     }
 
+    public function test_form_urlencoded_plus_separators_are_decoded_before_scan(): void
+    {
+        $response = $this->call(
+            'POST',
+            '/probe-target',
+            [],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/x-www-form-urlencoded'],
+            "'+UNION+SELECT+1,2,3--"
+        );
+
+        $this->assertSame(403, $response->getStatusCode(), 'Separator + pada form-urlencoded tidak boleh melewati WAF.');
+    }
+
+    public function test_clean_form_urlencoded_body_is_allowed(): void
+    {
+        $response = $this->call(
+            'POST',
+            '/probe-target',
+            [],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/x-www-form-urlencoded'],
+            'title=annual+report&note=reviewed+by+finance'
+        );
+
+        $this->assertSame(200, $response->getStatusCode(), 'Form-urlencoded yang sah tidak boleh diblokir.');
+    }
+
+    /**
+     * Padding on either side must not hide a payload from the bounded scan.
+     */
+    public function test_padding_on_either_side_of_form_body_is_blocked(): void
+    {
+        $payload = "1' UNION SELECT 1,2,3--";
+        $padding = str_repeat('A', 5000);
+
+        foreach ([
+            $padding . $payload,
+            $payload . $padding,
+        ] as $body) {
+            $response = $this->call(
+                'POST',
+                '/probe-target',
+                [],
+                [],
+                [],
+                ['CONTENT_TYPE' => 'application/x-www-form-urlencoded'],
+                $body
+            );
+
+            $this->assertSame(403, $response->getStatusCode());
+        }
+    }
+
+    /**
+     * The decoder is wired into the middleware, not merely unit-tested alone.
+     */
+    public function test_encoded_sqli_variants_are_blocked_end_to_end(): void
+    {
+        foreach ([
+            '%27%20UNION%20SELECT%201,2,3--',
+            '%2527%2520UNION%2520SELECT%25201,2,3--',
+        ] as $payload) {
+            $response = $this->call(
+                'POST',
+                '/probe-target',
+                [],
+                [],
+                [],
+                ['CONTENT_TYPE' => 'application/x-www-form-urlencoded'],
+                'q=' . $payload
+            );
+
+            $this->assertSame(403, $response->getStatusCode());
+        }
+    }
+
     public function test_clean_multipart_upload_is_allowed(): void
     {
         // False-positive guard: legitimate uploads must not be blocked.

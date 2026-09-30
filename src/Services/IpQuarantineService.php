@@ -162,14 +162,18 @@ class IpQuarantineService
         $quarantineDuration = $this->clampDuration($duration);
         $reason = $this->boundReason($reason);
         $cacheKey = $this->getCacheKey($ip);
-        $expiresAt = time() + $quarantineDuration;
+        $now = time();
+        $existing = $this->getCache()->get($cacheKey);
+        $existingExpiry = is_array($existing) ? (int) ($existing['expires_at'] ?? 0) : 0;
+        $expiresAt = max($existingExpiry, $now + $quarantineDuration);
+        $effectiveDuration = max(1, $expiresAt - $now);
 
         $this->getCache()->put($cacheKey, [
             'ip' => $ip,
-            'jailed_at' => time(),
+            'jailed_at' => is_array($existing) ? (int) ($existing['jailed_at'] ?? $now) : $now,
             'expires_at' => $expiresAt,
             'reason' => $reason,
-        ], $quarantineDuration);
+        ], $effectiveDuration);
 
         // Durable path: upsert DB record when enabled
         if ($this->persistToDatabase()) {
@@ -179,7 +183,7 @@ class IpQuarantineService
                         ['ip' => $ip],
                         [
                             'jailed_at' => now(),
-                            'expires_at' => now()->addSeconds($quarantineDuration),
+                            'expires_at' => now()->addSeconds($effectiveDuration),
                             'reason' => $reason,
                         ]
                     );
