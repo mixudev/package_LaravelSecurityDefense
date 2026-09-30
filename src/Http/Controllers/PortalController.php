@@ -146,6 +146,11 @@ class PortalController extends Controller
 
         $request->session()->forget('security-defense.otp-pending');
 
+        // Rotate the session after the privilege boundary so a session ID planted
+        // before OTP verification cannot become an authorized dashboard session.
+        $request->session()->regenerate();
+        $sessionId = (string) $request->session()->getId();
+
         return new Response('', 302, ['Location' => '/' . $this->capability->issue($sessionId)]);
     }
 

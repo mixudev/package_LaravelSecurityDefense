@@ -311,22 +311,55 @@ class DashboardController extends Controller
 
     /**
      * Mark an alert as acknowledged.
+     *
+     * In opaque mode the route carries an extra `{opaque}` prefix segment, so
+     * Laravel passes that string as the first positional argument. Resolve the
+     * alert from the named route parameter instead of the positional one.
      */
-    public function acknowledge(SecurityAlert $alert): RedirectResponse
+    public function acknowledge(SecurityAlert|int|string $alert): RedirectResponse
     {
-        $alert->acknowledge();
+        $this->resolveAlert($alert)->acknowledge();
 
-        return back()->with('status_message', "Alert #{$alert->id} acknowledged successfully.");
+        return back()->with('status_message', "Alert #{$this->resolvedAlertId($alert)} acknowledged successfully.");
     }
 
     /**
      * Mark an alert as resolved.
      */
-    public function resolve(SecurityAlert $alert): RedirectResponse
+    public function resolve(SecurityAlert|int|string $alert): RedirectResponse
     {
-        $alert->resolve();
+        $this->resolveAlert($alert)->resolve();
 
-        return back()->with('status_message', "Alert #{$alert->id} resolved.");
+        return back()->with('status_message', "Alert #{$this->resolvedAlertId($alert)} resolved.");
+    }
+
+    /**
+     * Resolve the alert from either the bound model or the {alert} route param.
+     */
+    private function resolveAlert(SecurityAlert|int|string $alert): SecurityAlert
+    {
+        if ($alert instanceof SecurityAlert) {
+            return $alert;
+        }
+
+        $id = $alert;
+
+        // Opaque mode passes the prefix segment first; fall back to the named param.
+        if (! is_numeric($id) && request()->route('alert') !== null) {
+            $id = request()->route('alert');
+        }
+
+        return SecurityAlert::query()->findOrFail(is_numeric($id) ? (int) $id : $id);
+    }
+
+    /**
+     * The id to display in the flash message, following the same resolution order.
+     */
+    private function resolvedAlertId(SecurityAlert|int|string $alert): int|string
+    {
+        return is_numeric($alert)
+            ? (int) $alert
+            : (request()->route('alert') ?? $alert);
     }
 
     /**

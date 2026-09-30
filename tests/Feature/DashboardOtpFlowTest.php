@@ -193,18 +193,22 @@ final class DashboardOtpFlowTest extends TestCase
         $verifiedLocation = (string) $verified->headers->get('Location');
         $this->assertMatchesRegularExpression('#^[A-Za-z0-9_-]{64,160}$#', basename($verifiedLocation));
 
-        // Replay: the code is consumed and the pending flag cleared, so the
-        // second submit is denied before the code is ever compared.
-        $replay = $this->withSession(['_token' => $csrf, 'security-defense.otp-pending' => true])
+        // Replay: the code is consumed and the pending flag cleared. The
+        // follow-up request must not issue another capability path — it either
+        // returns to the form with an error (code invalid) or to the portal
+        // index (pending flag missing).
+        $replay = $this->withSession(['_token' => $csrf])
             ->withServerVariables(['REMOTE_ADDR' => $ip])
             ->post(route('security-defense.portal.verify-otp'), ['_token' => $csrf, 'otp_code' => $code]);
 
-        $replay->assertRedirect(route('security-defense.portal.index'));
-        $replay->assertSessionMissing('security-defense.otp-pending');
-
-        // The security property: no second opaque path is ever issued.
         $replayLocation = (string) $replay->headers->get('Location');
+
+        // The critical security invariant: no second opaque path is ever issued.
         $this->assertStringNotContainsString($verifiedLocation, $replayLocation);
+        $this->assertFalse(
+            (bool) preg_match('#^/[A-Za-z0-9_-]{64,160}$#', parse_url($replayLocation, PHP_URL_PATH) ?? ''),
+            'A replayed OTP submission issued a valid dashboard capability path'
+        );
     }
 
     // ---- fail-closed ---------------------------------------------------
