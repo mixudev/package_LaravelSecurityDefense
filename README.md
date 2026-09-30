@@ -5,7 +5,7 @@
 [![Versi PHP](https://img.shields.io/badge/PHP-%5E8.2-blue.svg?style=flat-square)]()
 [![Kompatibilitas Laravel](https://img.shields.io/badge/Laravel-10%20%7C%2011%20%7C%2012%20%7C%2013-red.svg?style=flat-square)]()
 [![Lisensi: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-|![Tests](https://img.shields.io/badge/tests-480%20%7C%201478%20assertions-brightgreen.svg?style=flat-square)()|
+|![Tests](https://img.shields.io/badge/tests-492%20%7C%201496%20assertions-brightgreen.svg?style=flat-square)()|
 
 **`mixudev/security-defense`** adalah package pertahanan keamanan tingkat enterprise untuk aplikasi Laravel. Bertindak sebagai **"kamera pengawas, perisai proaktif, dan integritas data"** yang mendeteksi ancaman secara real-time, mengorelasikan pola serangan multi-vektor, mengisolasi penyerang (Fail2Ban IP Quarantine), memantau mutasi data & mendeteksi manipulasi parameter Burp Suite, melindungi sesi terautentikasi dari pencurian cookie malware, serta mengirimkan alert ter-deduplikasi ke berbagai saluran.
 

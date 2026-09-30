@@ -5,6 +5,37 @@ Semua perubahan penting pada paket `mixudev/security-defense` didokumentasikan d
 Format berbasis [Keep a Changelog](https://keepachangelog.com/id/1.1.0/), dan paket ini
 mengikuti [Semantic Versioning](https://semver.org/lang/id/).
 
+## [Unreleased]
+
+### Diperbaiki
+
+- **Urutan inisialisasi TTL pada `RequestFloodLimiter` dan `ThreatScoringEngine`.**
+  Sebelumnya `increment()` dipanggil sebelum `add()`/`put()`. Pada cache driver
+  Laravel, `increment()` pada key yang belum ada memanggil `forever()` (tanpa TTL),
+  sehingga pemanggilan `add()` berikutnya menjadi permanen no-op. Akibatnya:
+  - Key flood berbasis waktu bocor tak terbatas satu key per window per IP.
+  - Counter strike tidak pernah expire, sehingga IP yang pernah mencapai ambang batas
+    akan selalu ter-jail kembali seumur hidup cache.
+  - Pada `ThreatScoringEngine`, guard `put()` saat increment pertama menimpa skor
+    apabila ada request konkuren yang masuk di antara kedua baris, menghilangkan
+    kontribusi threat tersebut dari skor kumulatif.
+  Kedua service kini menyemai TTL dengan `add($key, 0, $ttl)` *sebelum* `increment()`.
+
+- **Penyelarasan resolusi IP klien pada seluruh lapisan WAF dan telemetri.**
+  Sebelumnya `RequestThreatScanner`, `ThreatTelemetryRecorder`, dan
+  `AuthenticatedSessionScanner` membaca `$request->ip()` langsung, sementara
+  `EnsureLocalAccess` dan `PortalController` memakai `ClientIpResolver`. Ketika
+  aplikasi host menggunakan konfigurasi `trustProxies` terbuka (mis. `0.0.0.0/0`
+  yang umum di cloud deploy), Symfony mengembalikan nilai `X-Forwarded-For` yang
+  dikendalikan penyerang. Penyerang dapat merotasi header tersebut untuk:
+  - Memintas karantina IP dan kuota per-IP flood limiter.
+  - Memanipulasi fingerprint pada `ThreatTelemetryRecorder` sehingga dedup dan
+    rate limiter alert tidak berfungsi.
+  - Menghindari deteksi `ImpossibleTravelRule` pada `AuthenticatedSessionScanner`.
+  Seluruh jalur keamanan kini konsisten menyelesaikan alamat melalui `ClientIpResolver`
+  dari batas TCP (`REMOTE_ADDR`), hanya mempercayai header bila hop terakhir adalah
+  proxy terpercaya.
+
 ## [1.10.0] - 2026-09-29
 
 ### Ditambahkan

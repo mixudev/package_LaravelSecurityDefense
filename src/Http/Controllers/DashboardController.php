@@ -24,6 +24,7 @@ use Mixudev\SecurityDefense\Services\DashboardAnalyticsService;
 use Mixudev\SecurityDefense\Services\DataAuditQueryService;
 use Mixudev\SecurityDefense\Services\IpQuarantineService;
 use Mixudev\SecurityDefense\Services\SessionIntelligenceQueryService;
+use Mixudev\SecurityDefense\Support\ClientIpResolver;
 use Mixudev\SecurityDefense\Support\DateRangeFilter;
 use Throwable;
 
@@ -243,7 +244,12 @@ class DashboardController extends Controller
     {
         $rateLimitEnabled = (bool) config('security-defense.dashboard.rate_limit.enabled', true);
         $maxProbes = (int) config('security-defense.dashboard.rate_limit.max_probes_per_minute', 30);
-        $rateLimitKey = 'sec_defense_test_channel:' . ($request->ip() ?? '127.0.0.1');
+        // Key on the verified TCP peer: a spoofable X-Forwarded-For would let a
+        // caller rotate the key per request and probe every channel without limit.
+        $rateLimitKey = 'sec_defense_test_channel:' . ClientIpResolver::resolve(
+            $request,
+            (array) config('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1'])
+        );
 
         if ($rateLimitEnabled && RateLimiter::tooManyAttempts($rateLimitKey, $maxProbes)) {
             $seconds = RateLimiter::availableIn($rateLimitKey);
@@ -285,7 +291,10 @@ class DashboardController extends Controller
         } catch (Throwable $e) {
             Log::error('Security Defense dashboard channel probe failed.', [
                 'channel' => $channel,
-                'ip' => $request->ip(),
+                'ip' => ClientIpResolver::resolve(
+                    $request,
+                    (array) config('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1'])
+                ),
                 'exception' => $e,
             ]);
 
