@@ -198,10 +198,15 @@ return [
         /*
         | Telegram Bot Alerting & Interactive Control Panel
         */
+        /*
+        | Credential note: only true secrets read env(). Toggles, addresses,
+        | identifiers and tuning values are plain literals so the operator sees
+        | the entire policy surface in one file.
+        */
         'telegram' => [
             'enabled' => false,
             'bot_token' => env('SECURITY_TELEGRAM_BOT_TOKEN'),
-            'chat_id' => env('SECURITY_TELEGRAM_CHAT_ID'),
+            'chat_id' => null,
             'timeout' => 5,
             'interactive' => [
                 'enabled' => false,
@@ -210,13 +215,15 @@ return [
 
         'discord' => [
             'enabled' => false,
+            // Secret: the webhook URL is itself the authentication credential.
             'webhook_url' => env('SECURITY_DISCORD_WEBHOOK'),
             'timeout' => 5,
         ],
 
         'webhook' => [
             'enabled' => false,
-            'url' => env('SECURITY_WEBHOOK_URL'),
+            'url' => null,
+            // Secret: HMAC-SHA256 signing key for outbound payloads.
             'secret' => env('SECURITY_WEBHOOK_SECRET'),
             'timeout' => 5,
         ],
@@ -227,7 +234,7 @@ return [
         */
         'mail' => [
             'enabled' => false,
-            'to' => env('SECURITY_ALERT_EMAIL'),
+            'to' => null,
             'subject_prefix' => '[SECURITY DEFENSE ALERT]',
             'timeout' => 10,
         ],
@@ -439,10 +446,10 @@ return [
         // the IP whitelist passes. Off by default so existing installs keep the
         // single-gate flow. Telegram delivery reuses alerts.telegram.* settings.
         'otp' => [
-            'enabled' => (bool) env('SECURITY_DEFENSE_OTP_ENABLED', false),
-            'channel' => (string) env('SECURITY_DEFENSE_OTP_CHANNEL', 'email'),
-            'email' => env('SECURITY_DEFENSE_OTP_EMAIL'),
-            'ttl_seconds' => (int) env('SECURITY_DEFENSE_OTP_TTL', 300),
+            'enabled' => false,
+            'channel' => 'email',
+            'email' => null,
+            'ttl_seconds' => 300,
             'max_attempts' => 3,
             'max_codes_per_window' => 3,
             'window_seconds' => 900,

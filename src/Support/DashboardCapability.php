@@ -150,7 +150,8 @@ final class DashboardCapability
     private function rawRootKey(): string
     {
         // 1. Explicit isolated key takes precedence (zero blast radius on app.key).
-        $custom = (string) config('security-defense.dashboard.key', env('SECURITY_DEFENSE_KEY', ''));
+        //    Published config reads env() for this one value: it IS a secret.
+        $custom = (string) config('security-defense.dashboard.key');
         if ($custom !== '') {
             return str_starts_with($custom, 'base64:') ? (string) base64_decode(substr($custom, 7), true) : $custom;
         }

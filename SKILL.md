@@ -40,7 +40,7 @@ composer require mixudev/security-defense
 php artisan security-defense:install --with-opaque-path
 
 # 3. Synchronize WAF middleware and auth subscriber
-php artisan security-defense:auth:sync
+php artisan auth:sync
 
 # 4. Verify deployment
 php artisan route:list --name=security-defense
@@ -123,7 +123,7 @@ protected $middleware = [
 
 *Verification*:
 ```bash
-php artisan security-defense:auth:sync --dry-run
+php artisan auth:sync --dry-run
 ```
 Output must print: `[OK] WAF middleware already registered`.
 
@@ -154,46 +154,50 @@ Open `config/security-defense.php` and declare critical models in `data_audit.au
 ```
 When an attacker modifies a guarded field (e.g. `role`, `is_admin`, `balance`) via Burp Suite, the package detects the mutation, verifies against the original payload snapshot, flags `is_tampered = true`, and raises a SIEM alert.
 
-### Step 5: Configure Environment Variables (`.env`)
+### Step 5: Configure Credentials in `.env` (Secrets Only)
 
-Add the following block to the host application's `.env`:
+**Strict Rule**: All booleans (`true`/`false`), toggles, timeouts, recipient addresses, and window sizes MUST be configured directly inside `config/security-defense.php`. The `.env` file is reserved **STRICTLY for credentials and cryptographic secrets**.
+
+Add only the active credentials to the host application's `.env`:
 
 ```env
 # ==============================================================================
-# Security Defense Configuration
+# Security Defense Credentials (STRICTLY SECRETS ONLY)
 # ==============================================================================
-SECURITY_DEFENSE_ENABLED=true
-
-# Cache Store: redis or memcached strongly advised in multi-server production
-# SECURITY_DEFENSE_CACHE_STORE=redis
-
-# Dedicated Dashboard Key (optional; falls back to APP_KEY via HKDF derivation)
+# Optional dedicated dashboard root key (if omitted, auto-derived from APP_KEY via HKDF)
 # SECURITY_DEFENSE_KEY=
 
-# Dashboard Second-Factor (OTP) - Default: false
-SECURITY_DEFENSE_OTP_ENABLED=false
-SECURITY_DEFENSE_OTP_CHANNEL=email
-SECURITY_DEFENSE_OTP_EMAIL=security-admin@yourdomain.com
-SECURITY_DEFENSE_OTP_TTL=300
+# Telegram Bot Token (from @BotFather)
+SECURITY_TELEGRAM_BOT_TOKEN=
 
-# Outbound Alert Channels (configure at least one)
-# Telegram:
-SECURITY_DEFENSE_TELEGRAM_ENABLED=false
-SECURITY_DEFENSE_TELEGRAM_BOT_TOKEN=
-SECURITY_DEFENSE_TELEGRAM_CHAT_ID=
+# Discord Webhook URL (contains private webhook token)
+SECURITY_DISCORD_WEBHOOK=
 
-# Discord:
-SECURITY_DEFENSE_DISCORD_ENABLED=false
-SECURITY_DEFENSE_DISCORD_WEBHOOK_URL=
+# Outbound Webhook HMAC-SHA256 Signing Secret
+SECURITY_WEBHOOK_SECRET=
+```
 
-# Generic Webhook (HMAC-SHA256 signed):
-SECURITY_DEFENSE_WEBHOOK_ENABLED=false
-SECURITY_DEFENSE_WEBHOOK_URL=
-SECURITY_DEFENSE_WEBHOOK_SECRET=
+All non-secret configurations (toggles, chat IDs, email destinations, OTP settings) are set directly in `config/security-defense.php`:
 
-# Email Alerts:
-SECURITY_DEFENSE_MAIL_ENABLED=false
-SECURITY_DEFENSE_MAIL_TO=alerts@yourdomain.com
+```php
+// In config/security-defense.php:
+'alerts' => [
+    'telegram' => [
+        'enabled' => true, // Set true directly in config
+        'chat_id' => '123456789', // Set chat ID directly in config
+    ],
+    'mail' => [
+        'enabled' => true,
+        'to' => 'security-alerts@yourdomain.com',
+    ],
+],
+'dashboard' => [
+    'otp' => [
+        'enabled' => true, // Set true directly in config
+        'channel' => 'email',
+        'email' => 'admin@yourdomain.com',
+    ],
+],
 ```
 
 ### Step 6: Configure Dashboard Access Policy
@@ -284,7 +288,7 @@ Must display:
 ### Check 2: Outbound Alert Channel Connectivity
 ```bash
 # Probes configured channels with a signed benign test alert
-php artisan security-defense:test-webhook
+php artisan security:test-webhook
 ```
 
 ### Check 3: Active WAF Blocking Test
