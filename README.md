@@ -146,22 +146,30 @@ Subscriber yang ter-generate otomatis meneruskan 12 domain auth event ke `Securi
 
 ### 5. Masukkan Kredensial Channel di `.env` (Opsional)
 
-Aktivasi channel dilakukan di `config/security-defense.php`. File `.env` hanya digunakan untuk menyimpan kredensial:
+Aktivasi channel, `chat_id`, alamat email, dan seluruh toggle dilakukan di `config/security-defense.php`. File `.env` **hanya** menyimpan kredensial:
 
 ```env
-# Telegram Alerting
-SECURITY_TELEGRAM_BOT_TOKEN=[REDACTED]
-SECURITY_TELEGRAM_CHAT_ID=[REDACTED]
+# Telegram Bot Token (dari @BotFather)
+SECURITY_TELEGRAM_BOT_TOKEN=
 
-# Discord Webhook
-SECURITY_DISCORD_WEBHOOK=[REDACTED]
+# Discord Webhook (URL-nya sudah mengandung token)
+SECURITY_DISCORD_WEBHOOK=
 
-# SIEM Webhook
-SECURITY_WEBHOOK_URL=[REDACTED]
-SECURITY_WEBHOOK_SECRET=[REDACTED]
+# HMAC-SHA256 signing key untuk outbound webhook
+SECURITY_WEBHOOK_SECRET=
 
-# Email Alert
-SECURITY_ALERT_EMAIL=[REDACTED]
+# Kunci dashboard khusus (opsional; jika kosong, diturunkan dari APP_KEY via HKDF)
+SECURITY_DEFENSE_KEY=
+```
+
+Tujuan channel (chat ID, alamat email, URL webhook) diisi di config:
+
+```php
+// config/security-defense.php
+'alerts' => [
+    'telegram' => ['enabled' => true, 'chat_id' => '123456789'],
+    'mail'     => ['enabled' => true, 'to' => 'alerts@yourdomain.com'],
+],
 ```
 
 Uji konektivitas channel melalui terminal:

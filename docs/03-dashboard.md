@@ -111,10 +111,10 @@ Untuk keamanan tingkat enterprise, gate masuk dapat dipasangkan dengan kode otor
 ```php
 'dashboard' => [
     'otp' => [
-        'enabled' => (bool) env('SECURITY_DEFENSE_OTP_ENABLED', false),
-        'channel' => (string) env('SECURITY_DEFENSE_OTP_CHANNEL', 'email'), // 'email' atau 'telegram'
-        'email' => env('SECURITY_DEFENSE_OTP_EMAIL'),
-        'ttl_seconds' => (int) env('SECURITY_DEFENSE_OTP_TTL', 300),       // Kode hangus dalam 5 menit
+        'enabled' => false,                 // Aktifkan langsung di config (bukan .env)
+        'channel' => 'email',               // 'email' atau 'telegram'
+        'email' => 'operator@domain.com',   // Email tujuan OTP (bukan .env)
+        'ttl_seconds' => 300,               // Kode hangus dalam 5 menit
         'max_attempts' => 3,                // 3x salah = kode hangus
         'max_codes_per_window' => 3,        // Max 3 request OTP per IP per window
         'window_seconds' => 900,            // Window 15 menit
