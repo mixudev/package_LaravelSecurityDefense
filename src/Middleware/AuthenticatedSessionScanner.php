@@ -92,8 +92,10 @@ class AuthenticatedSessionScanner
                     }
                 }
             }
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
+            throw $e;
         } catch (Throwable $e) {
-            // Fail-open for post-auth telemetry: never disrupt user flow unless explicitly configured
+            // Telemetry failures must not disrupt ordinary user flow.
             report($e);
         }
 

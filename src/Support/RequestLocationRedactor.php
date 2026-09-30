@@ -18,7 +18,18 @@ final class RequestLocationRedactor
             return '[dashboard-route:' . $routeName . ']';
         }
 
-        return substr($request->path(), 0, 500);
+        $path = $request->path();
+
+        // Unresolved routes (404 before the router finishes, or global
+        // middleware that runs pre-routing) still carry the opaque prefix in
+        // $request->path(), so mask long hex-like segments unconditionally.
+        $masked = preg_replace(
+            '~(?<![A-Za-z0-9_-])([A-Za-z0-9_-]{32,160})(?![A-Za-z0-9_-])~',
+            '[redacted]',
+            $path
+        );
+
+        return substr(is_string($masked) ? $masked : $path, 0, 500);
     }
 
     public static function url(Request $request): string

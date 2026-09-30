@@ -97,7 +97,7 @@ class DistributedSprayRule extends AbstractDetectionRule
                     'sample_ips_hashed' => array_slice($hashedIps, 0, 10),
                     'threshold' => $threshold,
                     'window_seconds' => $window,
-                    'last_ip' => $event->ip,
+                    'last_ip_hash' => hash('sha256', (string) $event->ip),
                 ],
                 ruleIdentifier: $this->identifier()
             );

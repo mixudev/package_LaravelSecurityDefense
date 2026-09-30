@@ -33,7 +33,7 @@ class SecurityAlertMail extends Mailable
         return $this->subject($subject)
             ->view('security-defense::emails.alert', [
                 'alert' => $this->alert,
-                'metadata' => $this->alert->metadata ?? [],
+                'metadata' => \Mixudev\SecurityDefense\Support\Sanitizer::clean($this->alert->metadata ?? []),
                 'appName' => config('app.name', 'Laravel Application'),
                 'appEnv' => app()->environment(),
             ]);

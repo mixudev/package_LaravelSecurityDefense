@@ -48,6 +48,10 @@ class ProcessSecurityDataAuditJob implements ShouldQueue
             }
         } catch (Throwable $e) {
             report($e);
+
+            // Re-throw so the queue records the failure and retries instead of
+            // silently dropping the audit row.
+            throw $e;
         }
     }
 }

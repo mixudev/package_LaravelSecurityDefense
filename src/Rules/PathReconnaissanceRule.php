@@ -33,7 +33,7 @@ class PathReconnaissanceRule extends AbstractDetectionRule
         '/\.aws\//i',
         '/(wp-admin|wp-login\.php|xmlrpc\.php)/i',
         '/(phpinfo(\.php)?|info\.php)/i',
-        '/(actuator|console|server-status)/i',
+        '~(?:^|/)(?:actuator|console|server-status)(?:/|$)~i',
         '/(storage\/logs|\.log$)/i',
         '/(\.bak|\.old|\.sql|\.tar\.gz|\.zip)$/i',
         '/(config\.json|\.dockerenv|docker-compose\.yml)/i',

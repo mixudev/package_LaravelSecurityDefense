@@ -67,15 +67,22 @@ class PayloadInjectionRule extends AbstractDetectionRule
                 continue;
             }
 
-            // Anti-ReDoS truncation
-            $safeContent = strlen($content) > $maxLength ? substr($content, 0, $maxLength) : $content;
+            // Bound regex work while inspecting both edges. Scanning only the
+            // prefix lets an attacker hide a payload behind harmless padding.
+            $safeContents = strlen($content) > $maxLength
+                ? [substr($content, 0, $maxLength), substr($content, -$maxLength)]
+                : [$content];
 
             foreach ($this->signatures as $category => $pattern) {
                 if (empty($activeCategories[$category])) {
                     continue;
                 }
 
-                if (preg_match($pattern, $safeContent, $matches)) {
+                foreach ($safeContents as $safeContent) {
+                    if (! preg_match($pattern, $safeContent, $matches)) {
+                        continue;
+                    }
+
                     // Strip control characters to prevent log/markdown injection
                     $matchedSample = preg_replace('/[\x00-\x1f\x7f]/', '', substr($matches[0], 0, 50));
                     $fingerprint = hash('sha256', sprintf('payload_injection:%s:%s:%s', $category, $event->ip, $matchedSample));
@@ -89,7 +96,10 @@ class PayloadInjectionRule extends AbstractDetectionRule
                             'matched_field' => $field,
                             'matched_signature' => $matchedSample,
                             'ip' => $event->ip,
-                            'target_identifier' => $event->identifier,
+                            // Hash the target: metadata is broadcast to
+                            // external channels, so a raw email or username
+                            // is a disclosure of a valid account.
+                            'target_hash' => hash('sha256', (string) $event->identifier),
                             'user_agent' => $event->userAgent,
                             'path' => $event->metadata['path'] ?? null,
                             'method' => $event->metadata['method'] ?? null,
@@ -129,15 +139,22 @@ class PayloadInjectionRule extends AbstractDetectionRule
                 continue;
             }
 
-            // Anti-ReDoS truncation
-            $safeValue = strlen($value) > $maxLength ? substr($value, 0, $maxLength) : $value;
+            // Bound regex work while inspecting both edges, so padding cannot
+            // push a payload outside the inspection window.
+            $safeValues = strlen($value) > $maxLength
+                ? [substr($value, 0, $maxLength), substr($value, -$maxLength)]
+                : [$value];
 
             foreach ($this->signatures as $category => $pattern) {
                 if (empty($activeCategories[$category])) {
                     continue;
                 }
 
-                if (preg_match($pattern, $safeValue, $matches)) {
+                foreach ($safeValues as $safeValue) {
+                    if (! preg_match($pattern, $safeValue, $matches)) {
+                        continue;
+                    }
+
                     // Strip control characters to prevent log/markdown injection
                     return [
                         'matched' => true,

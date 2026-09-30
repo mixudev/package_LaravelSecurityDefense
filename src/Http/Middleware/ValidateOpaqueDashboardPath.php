@@ -45,7 +45,7 @@ final class ValidateOpaqueDashboardPath
         // without authorized-at (pre-upgrade) are treated as fresh.
         if (!$request->session()->get('security-defense.dashboard-authorized', false)
             || $sessionPath === ''
-            || $sessionPath !== $candidate
+            || ! hash_equals($sessionPath, $candidate)
             || ($authorizedAt > 0 && (time() - $authorizedAt) > $ttl)) {
             $request->session()->forget('security-defense.dashboard-authorized');
             $request->session()->forget('security-defense.dashboard-session-path');

@@ -17,6 +17,7 @@ use Mixudev\SecurityDefense\Services\RequestFloodLimiter;
 use Mixudev\SecurityDefense\Services\SecurityDefenseManager;
 use Mixudev\SecurityDefense\Services\ThreatTelemetryRecorder;
 use Mixudev\SecurityDefense\Support\ClientIpResolver;
+use Mixudev\SecurityDefense\Support\RequestLocationRedactor;
 use Mixudev\SecurityDefense\Support\ThreatResponseBuilder;
 
 /**
@@ -97,7 +98,7 @@ class RequestThreatScanner
                 identifier: $request->user()?->getAuthIdentifier() ?: ($request->input('email') ?: 'guest'),
                 eventType: 'HttpRequestTelemetry',
                 userAgent: $userAgent,
-                metadata: ['path' => $request->path()]
+                metadata: ['path' => RequestLocationRedactor::path($request)]
             );
             $uaThreat = $this->uaRule->evaluate($uaEvent);
             if ($uaThreat !== null) {
@@ -211,6 +212,12 @@ class RequestThreatScanner
         {
             $content = $request->getContent();
 
-            return is_string($content) && trim($content) !== '';
+            if (is_string($content) && trim($content) !== '') {
+                return true;
+            }
+
+            // Multipart/form-data is parsed into the request bag while PHP
+            // exposes an empty raw content stream. Do not skip those fields.
+            return $request->request->all() !== [] || $request->files->all() !== [];
         }
     }

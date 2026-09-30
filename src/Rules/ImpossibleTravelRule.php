@@ -116,9 +116,12 @@ class ImpossibleTravelRule extends AbstractDetectionRule
                         threatType: 'impossible_travel',
                         fingerprint: $fingerprint,
                         metadata: [
-                            'identifier' => $target,
-                            'previous_ip' => $lastLocation['ip'],
-                            'current_ip' => $event->ip,
+                            // Hashed: alert metadata is broadcast to external
+                            // channels, so a raw user id or client IP is a
+                            // disclosure of both the account and the attacker.
+                            'identifier_hash' => hash('sha256', (string) $target),
+                            'previous_ip_hash' => hash('sha256', (string) $lastLocation['ip']),
+                            'current_ip_hash' => hash('sha256', (string) $event->ip),
                             'distance_km' => round($distanceKm, 2),
                             'time_elapsed_seconds' => $timeDiffSeconds,
                             'calculated_speed_kmh' => round($calculatedSpeed, 2),
@@ -142,9 +145,9 @@ class ImpossibleTravelRule extends AbstractDetectionRule
                     threatType: 'impossible_travel',
                     fingerprint: $fingerprint,
                     metadata: [
-                        'identifier' => $target,
-                        'previous_ip' => $lastLocation['ip'],
-                        'current_ip' => $event->ip,
+                        'identifier_hash' => hash('sha256', (string) $target),
+                        'previous_ip_hash' => hash('sha256', (string) $lastLocation['ip']),
+                        'current_ip_hash' => hash('sha256', (string) $event->ip),
                         'previous_country' => $lastLocation['country'],
                         'current_country' => $currentCountry,
                         'time_elapsed_seconds' => $timeDiffSeconds,
