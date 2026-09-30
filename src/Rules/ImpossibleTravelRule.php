@@ -120,8 +120,8 @@ class ImpossibleTravelRule extends AbstractDetectionRule
                             // channels, so a raw user id or client IP is a
                             // disclosure of both the account and the attacker.
                             'identifier_hash' => hash('sha256', (string) $target),
-                            'previous_ip_hash' => hash('sha256', (string) $lastLocation['ip']),
-                            'current_ip_hash' => hash('sha256', (string) $event->ip),
+                            'ip' => $event->ip,
+                            'previous_ip' => $lastLocation['ip'],
                             'distance_km' => round($distanceKm, 2),
                             'time_elapsed_seconds' => $timeDiffSeconds,
                             'calculated_speed_kmh' => round($calculatedSpeed, 2),
@@ -146,8 +146,8 @@ class ImpossibleTravelRule extends AbstractDetectionRule
                     fingerprint: $fingerprint,
                     metadata: [
                         'identifier_hash' => hash('sha256', (string) $target),
-                        'previous_ip_hash' => hash('sha256', (string) $lastLocation['ip']),
-                        'current_ip_hash' => hash('sha256', (string) $event->ip),
+                        'ip' => $event->ip,
+                        'previous_ip' => $lastLocation['ip'],
                         'previous_country' => $lastLocation['country'],
                         'current_country' => $currentCountry,
                         'time_elapsed_seconds' => $timeDiffSeconds,

@@ -45,9 +45,11 @@ class SessionFingerprintRule extends AbstractDetectionRule
         $stored = $cache->get($fingerprintKey);
 
         if (! is_array($stored)) {
-            // First time seeing this session: establish baseline
+            // Claim the baseline with add(), not put(). put() would let a
+            // hijacker who arrives first overwrite a legitimate baseline, and
+            // would also clobber a baseline a concurrent request just wrote.
             $ttl = (int) $this->getConfig('session_ttl', 7200); // 2 hours default
-            $cache->put($fingerprintKey, [
+            $cache->add($fingerprintKey, [
                 'subnet' => $currentSubnet,
                 'ua_hash' => $currentUaHash,
                 'initial_ip' => $event->ip,
@@ -77,7 +79,7 @@ class SessionFingerprintRule extends AbstractDetectionRule
             $metadata = [
                 'session_hash' => $sessionHash,
                 'identifier_hash' => hash('sha256', $event->identifier),
-                'current_ip' => $event->ip,
+                'ip' => $event->ip,
                 'initial_ip' => $stored['initial_ip'] ?? null,
                 'current_ua_hash' => hash('sha256', $event->userAgent ?: 'empty'),
                 'initial_ua_hash' => hash('sha256', $stored['user_agent'] ?? ''),

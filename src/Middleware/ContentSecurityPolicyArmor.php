@@ -28,18 +28,18 @@ class ContentSecurityPolicyArmor
             return $next($request);
         }
 
-        // Set nonce before rendering so dashboard views can attach it to scripts.
-        if (! $request->attributes->has('csp_nonce')) {
-            $request->attributes->set('csp_nonce', base64_encode(random_bytes(16)));
-        }
-        $nonce = (string) $request->attributes->get('csp_nonce');
+        // Always generate the nonce here. Never trust a pre-seeded request
+        // attribute: another middleware may have copied attacker-controlled input.
+        $nonce = base64_encode(random_bytes(16));
+        $request->attributes->set('csp_nonce', $nonce);
 
         /** @var Response $response */
         $response = $next($request);
 
-        // Apply CSP Header if response is HTML
+        // Apply CSP only to non-empty HTML responses. An absent content type is
+        // not proof of HTML and must not cause nonce-bearing headers on 204/304.
         $contentType = (string) $response->headers->get('Content-Type', '');
-        if ($contentType === '' || str_contains($contentType, 'text/html')) {
+        if (! $response->isEmpty() && str_contains($contentType, 'text/html')) {
             $policy = config('security-defense.csp_armor.policy');
 
             if (! $policy) {
@@ -49,13 +49,19 @@ class ContentSecurityPolicyArmor
                 $policy = str_replace('{nonce}', $nonce, $policy);
             }
 
-            $headerName = config('security-defense.csp_armor.report_only', false)
+            $reportOnly = (bool) config('security-defense.csp_armor.report_only', false);
+            $headerName = $reportOnly
                 ? 'Content-Security-Policy-Report-Only'
                 : 'Content-Security-Policy';
+            $oppositeHeaderName = $reportOnly
+                ? 'Content-Security-Policy'
+                : 'Content-Security-Policy-Report-Only';
 
-            if (! $response->headers->has($headerName)) {
-                $response->headers->set($headerName, $policy);
-            }
+            // One mode must be authoritative. Leaving a downstream opposite
+            // header in place makes the effective policy depend on middleware
+            // order and can silently disable enforcement in report-only mode.
+            $response->headers->remove($oppositeHeaderName);
+            $response->headers->set($headerName, $policy);
         }
 
         return $response;

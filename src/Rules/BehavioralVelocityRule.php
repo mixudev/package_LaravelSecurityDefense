@@ -60,7 +60,7 @@ class BehavioralVelocityRule extends AbstractDetectionRule
                     // Hash the identifier: this metadata is broadcast to
                     // external chat channels, so a raw user id is a disclosure.
                     'identifier_hash' => hash('sha256', (string) $target),
-                    'ip_hash' => hash('sha256', (string) $event->ip),
+                    'ip' => $event->ip,
                     'requests_in_window' => $count,
                     'threshold_rpm' => $threshold,
                     'window_seconds' => $window,

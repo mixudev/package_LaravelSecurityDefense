@@ -49,6 +49,40 @@ class PruneAndCspArmorTest extends TestCase
         $this->assertDoesNotMatchRegularExpression("/script-src[^;]*'unsafe-inline'/", $cspHeader);
     }
 
+    public function test_csp_armor_skips_non_html_responses(): void
+    {
+        $middleware = new ContentSecurityPolicyArmor();
+
+        // A JSON response must never receive a CSP header.
+        $json = $middleware->handle(Request::create('/api', 'GET'), fn () => new Response('{}', 200, ['Content-Type' => 'application/json']));
+        $this->assertFalse($json->headers->has('Content-Security-Policy'), 'JSON tidak boleh menerima CSP.');
+
+        // A bodyless response has nothing to protect; a CSP header there wastes
+        // bytes and can confuse shared caches keyed on 204/304.
+        $noContent = $middleware->handle(Request::create('/x', 'GET'), fn () => new Response('', 204));
+        $this->assertFalse($noContent->headers->has('Content-Security-Policy'), 'Respons 204 tidak boleh menerima CSP.');
+
+        $image = $middleware->handle(Request::create('/x', 'GET'), fn () => new Response('binary', 200, ['Content-Type' => 'image/png']));
+        $this->assertFalse($image->headers->has('Content-Security-Policy'), 'Gambar tidak boleh menerima CSP.');
+    }
+
+    public function test_csp_armor_clears_a_conflicting_opposite_mode_header(): void
+    {
+        config()->set('security-defense.csp_armor.report_only', true);
+        $middleware = new ContentSecurityPolicyArmor();
+
+        // report_only=true but downstream set an ENFORCED policy: sending only the
+        // report-only header would silently drop enforcement.
+        $response = $middleware->handle(Request::create('/x', 'GET'), function () {
+            return new Response('<html></html>', 200, [
+                'Content-Type' => 'text/html',
+                'Content-Security-Policy' => "default-src 'none'",
+            ]);
+        });
+
+        $this->assertTrue($response->headers->has('Content-Security-Policy-Report-Only'));
+    }
+
     public function test_audit_diff_escapes_stored_xss_values_before_inner_html(): void
     {
         $view = file_get_contents(dirname(__DIR__, 2) . '/resources/views/components/audits/audit-diff-modal.blade.php');
