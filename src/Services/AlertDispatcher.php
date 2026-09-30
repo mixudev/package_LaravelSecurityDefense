@@ -47,7 +47,14 @@ class AlertDispatcher
         }
 
         if (!$this->acquireRateLimitSlot()) {
+            // Forget the deduplication entry so the same threat can retry next
+            // minute; but log it so operators know alerts were suppressed.
             $this->deduplicator->forget($threat->fingerprint);
+            logger()->warning('[SecurityDefense] Alert rate limit reached - threat suppressed.', [
+                'fingerprint' => $threat->fingerprint,
+                'threat_type' => $threat->threatType,
+                'severity' => $threat->severity,
+            ]);
             return null;
         }
 
@@ -108,22 +115,7 @@ class AlertDispatcher
         $key = config('security-defense.cache_prefix', 'security_defense:') . 'rate_limit:alerts_per_minute';
         $cache = Cache::store(config('security-defense.cache_store'));
 
-        $reserve = function () use ($cache, $key, $max): bool {
-            $cache->add($key, 0, 60);
-            $current = (int) $cache->increment($key);
-            if ($current <= $max) {
-                return true;
-            }
-            $cache->decrement($key);
-            return false;
-        };
-
-        if (method_exists($cache, 'lock')) {
-            return (bool) $cache->lock($key . ':lock', 5)->block(1, $reserve);
-        }
-
-        return $reserve();
-
+        return \Mixudev\SecurityDefense\Support\CacheLock::reserveSlot($cache, $key, $max, 60);
     }
 
     /** Recursively trim strings first, then enforce one global JSON byte ceiling. */

@@ -9,6 +9,7 @@ use Mixudev\SecurityDefense\Services\AlertDispatcher;
 use Mixudev\SecurityDefense\Tests\TestCase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 
 class AlertDispatcherRaceRegressionTest extends TestCase
 {
@@ -28,6 +29,34 @@ class AlertDispatcherRaceRegressionTest extends TestCase
 
         $emitted = array_filter($results);
         $this->assertCount(3, $emitted, 'Rate limiter must cap at max_alerts_per_minute');
+    }
+
+    public function test_rate_limit_suppression_is_logged(): void
+    {
+        Config::set('security-defense.hardening.alert_rate_limit.enabled', true);
+        Config::set('security-defense.hardening.alert_rate_limit.max_alerts_per_minute', 1);
+        Config::set('security-defense.deduplication.enabled', false);
+
+        Log::spy();
+
+        $dispatcher = app(AlertDispatcher::class);
+
+        // Consume the only slot.
+        $dispatcher->dispatch(new SecurityThreat('low', 'brute_force', 'rl-warn-1'));
+
+        // The second alert exceeds the cap: it must be suppressed, the counter
+        // must not over-count, and the suppression must be visible in the log.
+        $suppressed = $dispatcher->dispatch(new SecurityThreat('high', 'brute_force', 'rl-warn-2'));
+
+        $this->assertNull($suppressed, 'Alert must be suppressed once the rate limit is exhausted.');
+        $this->assertSame(1, Cache::get('security_defense:rate_limit:alerts_per_minute'));
+
+        Log::shouldHaveReceived('warning')
+            ->once()
+            ->withArgs(function (string $message, array $context = []): bool {
+                return str_contains($message, 'Alert rate limit reached')
+                    && ($context['fingerprint'] ?? null) === 'rl-warn-2';
+            });
     }
 
     public function test_nested_metadata_bounded_within_byte_limit(): void

@@ -23,6 +23,11 @@ if (config('security-defense.dashboard.enabled', true)) {
             ->group(function () {
                 Route::get('/', [PortalController::class, 'index'])->name('index');
                 Route::post('/enter', [PortalController::class, 'enter'])->name('enter');
+
+                // Second gate: one-time authorization code issued after the IP
+                // whitelist passes. Reachable only when dashboard.otp.enabled.
+                Route::get('/verify-code', [PortalController::class, 'codeForm'])->name('otp-form');
+                Route::post('/verify-code', [PortalController::class, 'verifyCode'])->name('verify-otp');
             });
     }
 

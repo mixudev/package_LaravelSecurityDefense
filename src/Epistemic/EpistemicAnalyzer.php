@@ -155,15 +155,6 @@ final class EpistemicAnalyzer
         ], 300);
     }
 
-    /** @param Evidence[] $all @param Evidence[] $trusted @return Evidence[] */
-    private function advisoryAiEvidence(array $all, array $trusted): array
-    {
-        if ($trusted === []) return [];
-        $trustedTypes = array_map(fn (Evidence $e) => $e->type->value, $trusted);
-        return array_values(array_filter($all, fn (Evidence $e) => $this->isAiEvidence($e)
-            && in_array($e->type->value, $trustedTypes, true)));
-    }
-
     private function responseExecutionKey(string $decisionId, \Mixudev\SecurityDefense\Epistemic\Policy\ThreatDecision $decision, AnalysisContext $context, EvidenceCollection $collection): string
     {
         return 'security-defense:epistemic-response:' . hash('sha256', serialize([$decisionId, $decision->action->value, $decision->reason, $decision->context, $context->subject, $context->windowSeconds, array_map(fn (Evidence $e) => [$e->id, $e->type->value, $e->source, $e->metadata], $collection->all())]));

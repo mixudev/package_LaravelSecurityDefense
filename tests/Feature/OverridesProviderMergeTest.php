@@ -35,13 +35,13 @@ class OverridesProviderMergeTest extends TestCase
         (new ConfigWriterService($this->tempOverrides))->write([
             'csp_armor.enabled' => false,
             'data_audit.queue.enabled' => true,
-            'middleware.user_agent_anomaly.block_headless_clients' => true,
+            'detection.rules.user_agent_anomaly.block_headless_clients' => true,
         ]);
 
         $loaded = require $this->tempOverrides;
         $this->assertSame(false, $loaded['csp_armor.enabled']);
         $this->assertSame(true, $loaded['data_audit.queue.enabled']);
-        $this->assertSame(true, $loaded['middleware.user_agent_anomaly.block_headless_clients']);
+        $this->assertSame(true, $loaded['detection.rules.user_agent_anomaly.block_headless_clients']);
     }
 
     public function test_overrides_file_format_is_valid_php(): void

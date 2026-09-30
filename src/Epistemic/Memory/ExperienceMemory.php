@@ -5,6 +5,7 @@ namespace Mixudev\SecurityDefense\Epistemic\Memory;
 
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Mixudev\SecurityDefense\Epistemic\Contracts\ExperienceMemoryInterface;
+use Mixudev\SecurityDefense\Support\CacheLock;
 use Throwable;
 
 final class ExperienceMemory implements ExperienceMemoryInterface
@@ -97,9 +98,13 @@ final class ExperienceMemory implements ExperienceMemoryInterface
     {
         if (isset($this->noLock)) { ($fallback ?? $callback)(); return; }
         try {
-            if (method_exists($this->cache, 'lock')) {
-                $lock = $this->cache->lock($this->prefix . 'lock', 10);
-                $lock->block(5, $callback);
+            $acquired = CacheLock::run($this->cache, $this->prefix . 'lock', 10, static function () use ($callback): bool {
+                $callback();
+
+                return true;
+            }, 5);
+
+            if ($acquired) {
                 return;
             }
         } catch (Throwable) {

@@ -27,7 +27,7 @@ Package mendukung dua cara pengaturan:
 | `waf.rules.traversal` | bool | `true` | Deteksi path directory traversal (`../`, `..\`) |
 | `waf.rules.command_injection` | bool | `true` | Deteksi injeksi perintah sistem OS shell |
 | `middleware.user_agent_anomaly.enabled` | bool | `true` | Deteksi client anomali (scanner SQLMap, Nikto, Gobuster) |
-| `middleware.user_agent_anomaly.block_headless_clients` | bool | `false` | Blokir browser headless otomatis (Puppeteer, Playwright non-human) |
+| `detection.rules.user_agent_anomaly.block_headless_clients` | bool | `false` | Blokir browser headless otomatis (Puppeteer, Playwright non-human). Diubah dari dashboard lewat quick-action |
 
 ### B. Dashboard & Akses Opaque
 | Kunci | Tipe | Default / Env | Keterangan |

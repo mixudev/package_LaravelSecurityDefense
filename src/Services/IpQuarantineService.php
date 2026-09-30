@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Support\Facades\Cache;
 use Mixudev\SecurityDefense\Models\SecurityQuarantine;
+use Mixudev\SecurityDefense\Support\CacheLock;
 
 /**
  * Enterprise IP quarantine service (Fail2Ban-style active defense).
@@ -219,12 +220,13 @@ class IpQuarantineService
      */
     private function withIpLock(string $ip, Closure $operation): mixed
     {
-        $cache = $this->getCache();
-        if (!method_exists($cache, 'lock')) {
-            return $operation();
-        }
-
-        return $cache->lock($this->getCacheKey($ip) . ':mutation', 10)->block(3, $operation);
+        return CacheLock::run(
+            $this->getCache(),
+            $this->getCacheKey($ip) . ':mutation',
+            10,
+            $operation,
+            3
+        );
     }
 
     /**

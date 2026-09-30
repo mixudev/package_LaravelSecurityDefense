@@ -92,7 +92,6 @@ final class DashboardCapability
         }
 
         $cache = $this->cache();
-        $lock = method_exists($cache, 'lock') ? $cache->lock($this->key($nonce) . ':lock', 5) : null;
         $consume = function () use ($cache, $nonce, $sessionHash): bool {
             $stored = $cache->get($this->key($nonce));
             if (! is_string($stored) || ! hash_equals($stored, $sessionHash)) {
@@ -103,7 +102,15 @@ final class DashboardCapability
             return true;
         };
 
-        $ok = $lock !== null ? (bool) $lock->block(2, $consume) : $consume();
+        // Serialized per nonce so two concurrent requests carrying the same
+        // one-time token cannot both consume it. The lock capability check
+        // must target the store, not the Repository wrapper (see CacheLock).
+        $ok = (bool) \Mixudev\SecurityDefense\Support\CacheLock::run(
+            $cache,
+            $this->key($nonce) . ':lock',
+            5,
+            $consume
+        );
 
         if (!$ok) {
             return null;

@@ -57,7 +57,7 @@ class DataAuditService
                     if (in_array($column, $excluded, true)) {
                         continue;
                     }
-                    $oldValues[$column] = $this->normalizeValue($value);
+                    $oldValues[$column] = $this->sanitizer->normalizeValue($value);
                     $modifiedFields[] = $column;
                 }
             } else {
@@ -237,16 +237,6 @@ class DataAuditService
         } catch (Throwable) {
             // Fail-safe
         }
-    }
-
-    private function safeRequestUrl(Request $request): string
-    {
-        $routeName = $request->route()?->getName();
-        if (is_string($routeName) && str_starts_with($routeName, 'security-defense.')) {
-            return '[dashboard-route:' . $routeName . ']';
-        }
-
-        return RequestLocationRedactor::url($request);
     }
 
     /**
