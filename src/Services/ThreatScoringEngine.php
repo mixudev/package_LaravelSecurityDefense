@@ -122,8 +122,11 @@ class ThreatScoringEngine
             'threat' => $threat->threatType,
             'time' => $now,
         ];
-        if (count($records) > $this->maxRecords()) {
-            $records = array_slice($records, -$this->maxRecords());
+        $maxRecords = $this->maxRecords();
+        if ($maxRecords <= 0) {
+            $records = [];
+        } elseif (count($records) > $maxRecords) {
+            $records = array_slice($records, -$maxRecords);
         }
         $cache->put($cacheKey, $records, $window);
 

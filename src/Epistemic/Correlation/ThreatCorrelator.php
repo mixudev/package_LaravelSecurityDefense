@@ -29,7 +29,7 @@ final class ThreatCorrelator
         $groups = [];
         foreach ($evidence as $item) {
             $hypothesis = match ($item->type->value) {
-                'login_failed', 'otp_failed', 'new_device', 'password_reset',
+                'login_failed', 'login_success', 'otp_failed', 'new_device', 'password_reset',
                 'trusted_device', 'trusted_location', 'clean_history' => ThreatHypothesis::ACCOUNT_COMPROMISE,
                 'brute_force' => ThreatHypothesis::BRUTE_FORCE_ATTACK,
                 'payload_injection' => ThreatHypothesis::PAYLOAD_ATTACK,

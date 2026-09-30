@@ -83,6 +83,10 @@ final class Evidence
     public function isThreatSupporting(): bool
     {
         return !in_array($this->type, [
+            // A successful login is evidence AGAINST account compromise, not for
+            // it. Omitting it here made every legitimate login drive the risk
+            // score to ~0.998 and produce a BLOCK decision.
+            EvidenceType::LOGIN_SUCCESS,
             EvidenceType::TRUSTED_DEVICE,
             EvidenceType::TRUSTED_LOCATION,
             EvidenceType::CLEAN_HISTORY,

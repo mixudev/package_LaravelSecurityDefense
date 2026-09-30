@@ -53,9 +53,25 @@ class TestWebhookCommand extends Command
                 $results = $testService->testAll();
                 $this->renderResultTable(array_values($results));
 
-                $allSuccessful = count(array_filter($results, fn($r) => $r['success'])) > 0;
+                // Report the truth: a run where one delivery failed must not
+                // exit 0, or a supervisor/cron job sees a green check while
+                // alerts are silently not being delivered. Channels that are
+                // disabled or unconfigured are skipped, not failures.
+                $failures = array_values(array_filter(
+                    $results,
+                    static fn (array $r): bool => $r['enabled'] && $r['configured'] && ! $r['success']
+                ));
 
-                return $allSuccessful ? self::SUCCESS : self::FAILURE;
+                if ($failures !== []) {
+                    $this->error(sprintf(
+                        '%d configured channel(s) failed delivery.',
+                        count($failures)
+                    ));
+
+                    return self::FAILURE;
+                }
+
+                return self::SUCCESS;
             }
         } catch (Throwable $e) {
             $this->error('Error executing channel test: ' . $e->getMessage());

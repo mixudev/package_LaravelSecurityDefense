@@ -28,26 +28,43 @@ class InstallCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->call('vendor:publish', [
+        // Each step is verified: a failed publish, migration, or route cache
+        // build leaves the package half-installed, so a silent SUCCESS here
+        // tells the operator they are protected when they are not.
+        if ($this->call('vendor:publish', [
             '--tag' => 'security-defense-config',
             '--force' => (bool) $this->option('force'),
-        ]);
+        ]) !== self::SUCCESS) {
+            $this->error('Failed to publish the security-defense config file.');
+
+            return self::FAILURE;
+        }
 
         if ($opaque) {
             $this->enableOpaquePath();
         }
 
         if (! (bool) $this->option('no-migrate')) {
-            $this->call('migrate', ['--force' => true]);
+            if ($this->call('migrate', ['--force' => true]) !== self::SUCCESS) {
+                $this->error('Database migrations failed. The security tables may be missing.');
+
+                return self::FAILURE;
+            }
         }
 
         if (! (bool) $this->option('no-cache')) {
             $this->call('route:clear');
             $this->call('config:clear');
-            $this->call('route:cache');
+
+            if ($this->call('route:cache') !== self::SUCCESS) {
+                $this->error('Failed to build the route cache. Dashboard routes may not resolve.');
+
+                return self::FAILURE;
+            }
         }
 
         $this->info('Security Defense installed.');
+
         return self::SUCCESS;
     }
 

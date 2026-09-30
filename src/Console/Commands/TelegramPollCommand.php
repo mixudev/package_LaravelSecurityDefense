@@ -50,6 +50,7 @@ class TelegramPollCommand extends Command
         $this->line('Press Ctrl+C to terminate.');
 
         $offset = 0;
+        $hadFailure = false;
 
         do {
             try {
@@ -69,6 +70,10 @@ class TelegramPollCommand extends Command
                     $botService->handleUpdate($update);
                 }
             } catch (Throwable $e) {
+                // A long-running poller must keep going, but it must not exit 0
+                // after a run where every poll failed — a supervisor or cron
+                // entry would report success while nothing was ever received.
+                $hadFailure = true;
                 $this->error('Error during Telegram update poll: ' . $e->getMessage());
             }
 
@@ -81,6 +86,6 @@ class TelegramPollCommand extends Command
             }
         } while (true);
 
-        return self::SUCCESS;
+        return $hadFailure ? self::FAILURE : self::SUCCESS;
     }
 }

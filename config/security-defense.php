@@ -195,6 +195,11 @@ return [
             'table' => 'security_alerts',
         ],
 
+        // Retention in days for persisted security alerts. Read by
+        // `security-defense:prune`; without this key the command silently
+        // fell back to its hard-coded 60 and the operator's setting was ignored.
+        'retention_days' => 60,
+
         /*
         | Telegram Bot Alerting & Interactive Control Panel
         */
@@ -236,7 +241,8 @@ return [
             'enabled' => false,
             'to' => null,
             'subject_prefix' => '[SECURITY DEFENSE ALERT]',
-            'timeout' => 10,
+            // Delivery timeout is delegated to Laravel's mail transport
+            // (config/mail.php). Set it there, not here.
         ],
     ],
 
