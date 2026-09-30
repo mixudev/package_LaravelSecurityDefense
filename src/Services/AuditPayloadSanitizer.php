@@ -113,15 +113,16 @@ class AuditPayloadSanitizer
             return $model->getSecurityAuditMaskedColumns();
         }
 
-        return (array) config('security-defense.data_audit.default_masked_fields', [
-            'password',
-            'password_hash',
-            'remember_token',
-            'api_token',
-            'secret',
-            'two_factor_secret',
-            'credit_card',
-            'cvv',
-        ]);
+        $configured = (array) config('security-defense.data_audit.default_masked_fields', []);
+
+        // Merge the package-wide sensitive-key vocabulary so a column the rest of
+        // the package treats as a credential (api_key, private_key, otp,
+        // bot_token, ...) is masked in audit rows too. Previously only 8 narrow
+        // patterns were listed, so mutating such a column persisted plaintext
+        // secrets to security_data_audits.
+        return array_values(array_unique(array_merge(
+            $configured,
+            Sanitizer::sensitiveKeys()
+        )));
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Mixudev\SecurityDefense\Models\SecurityDataAudit;
+use Mixudev\SecurityDefense\Support\ClientIpResolver;
 use Mixudev\SecurityDefense\Support\RequestLocationRedactor;
 use Throwable;
 
@@ -91,13 +92,20 @@ class DataAuditService
             $actor = $this->resolveActor();
             $payloadSnapshot = $this->sanitizer->resolvePayloadSnapshot($request);
 
+            $clientIp = $request === null
+                ? '127.0.0.1'
+                : ClientIpResolver::resolve(
+                    $request,
+                    (array) config('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1'])
+                );
+
             $auditData = [
                 'event' => $event,
                 'auditable_type' => get_class($model),
                 'auditable_id' => (string) $model->getKey(),
                 'actor_id' => $actor['id'],
                 'actor_type' => $actor['type'],
-                'ip_address' => $request?->ip() ?? '127.0.0.1',
+                'ip_address' => $clientIp !== '' ? $clientIp : '127.0.0.1',
                 'user_agent' => substr((string) ($request?->userAgent() ?? 'CLI / System Process'), 0, 500),
                 'request_url' => $request ? RequestLocationRedactor::url($request) : 'CLI Console Command',
                 'request_method' => $request?->method() ?? 'CLI',

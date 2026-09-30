@@ -206,4 +206,33 @@ final class WafClientIpConsistencyTest extends TestCase
             . 'rotating the header defeats ImpossibleTravelRule and the session fingerprint'
         );
     }
+
+    public function test_data_audit_records_the_socket_peer_in_forensic_table(): void
+    {
+        $request = $this->openProxyRequest();
+
+        config([
+            'security-defense.data_audit.enabled'            => true,
+            'security-defense.data_audit.queue.enabled'      => false,
+            'security-defense.data_audit.alert_on_tampering' => false,
+        ]);
+
+        $probe = \Mixudev\SecurityDefense\Models\SecurityDataAudit::query()->create([
+            'event'          => 'created',
+            'auditable_type' => 'probe',
+            'auditable_id'   => '42',
+            'request_method' => 'POST',
+        ]);
+
+        $audit = (new \Mixudev\SecurityDefense\Services\DataAuditService($request))
+            ->recordMutation($probe, \Mixudev\SecurityDefense\Models\SecurityDataAudit::EVENT_CREATED);
+
+        self::assertNotNull($audit);
+        self::assertSame(
+            '203.0.113.50',
+            $audit->ip_address,
+            'the forensic audit table recorded the attacker-controlled X-Forwarded-For '
+            . 'value (9.9.9.9), so post-incident forensics blames a decoy address'
+        );
+    }
 }

@@ -44,6 +44,20 @@ class Sanitizer
     ];
 
     /**
+     * The package-wide sensitive-key vocabulary.
+     *
+     * Consumers that need to mask values by key (audit rows, alert payloads)
+     * read this so their redaction list can never drift from the one used by
+     * clean()/isSensitiveKey().
+     *
+     * @return array<string>
+     */
+    public static function sensitiveKeys(): array
+    {
+        return static::$sensitiveKeys;
+    }
+
+    /**
      * Redact sensitive keys from an associative array recursively.
      *
      * @param array<string, mixed> $data
