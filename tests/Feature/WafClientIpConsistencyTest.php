@@ -123,4 +123,87 @@ final class WafClientIpConsistencyTest extends TestCase
 
         self::assertNotSame([], $keys, 'the limiter recorded nothing at all');
     }
+
+    public function test_telemetry_recorder_fingerprints_on_the_socket_peer(): void
+    {
+        $request = $this->openProxyRequest();
+
+        $threat = app(\Mixudev\SecurityDefense\Services\ThreatTelemetryRecorder::class)
+            ->handleDetectedAnomaly($request, 'sql_injection', "1' OR 1=1--", 'body');
+
+        // Rotating X-Forwarded-For must not produce a rotating dedupe key, so the
+        // same attack from the same peer has to yield the same fingerprint.
+        $other = $this->openProxyRequest();
+        $other->headers->set('X-Forwarded-For', '8.8.4.4');
+        $other->setTrustedProxies(['0.0.0.0/0'], Request::HEADER_X_FORWARDED_FOR);
+
+        $second = app(\Mixudev\SecurityDefense\Services\ThreatTelemetryRecorder::class)
+            ->handleDetectedAnomaly($other, 'sql_injection', "1' OR 1=1--", 'body');
+
+        self::assertSame($threat->fingerprint, $second->fingerprint);
+        self::assertSame('203.0.113.50', $threat->metadata['ip'] ?? null);
+    }
+
+    public function test_session_scanner_records_the_socket_peer(): void
+    {
+        $user = new class implements \Illuminate\Contracts\Auth\Authenticatable {
+            public function getAuthIdentifierName(): string
+            {
+                return 'id';
+            }
+
+            public function getAuthIdentifier(): int
+            {
+                return 7;
+            }
+
+            public function getAuthPasswordName(): string
+            {
+                return 'password';
+            }
+
+            public function getAuthPassword(): string
+            {
+                return 'x';
+            }
+
+            public function getRememberToken(): ?string
+            {
+                return null;
+            }
+
+            public function setRememberToken($value): void
+            {
+            }
+
+            public function getRememberTokenName(): string
+            {
+                return '';
+            }
+        };
+
+        $request = $this->openProxyRequest();
+        $request->setLaravelSession($this->app['session']->driver());
+        $request->setUserResolver(static fn () => $user);
+
+        $captured = null;
+        $manager = \Mockery::mock(\Mixudev\SecurityDefense\Services\SecurityDefenseManager::class);
+        $manager->shouldReceive('record')->andReturnUsing(function (array $data) use (&$captured): array {
+            $captured = $data;
+
+            return [];
+        });
+
+        (new \Mixudev\SecurityDefense\Middleware\AuthenticatedSessionScanner($manager))
+            ->handle($request, static fn ($r) => $r);
+
+        self::assertNotNull($captured, 'the authenticated branch never ran');
+        self::assertSame('9.9.9.9', $request->ip(), 'precondition: the raw header is still spoofable');
+        self::assertSame(
+            '203.0.113.50',
+            $captured['ip'],
+            'session-hijack detection keyed on the attacker-controlled X-Forwarded-For value; '
+            . 'rotating the header defeats ImpossibleTravelRule and the session fingerprint'
+        );
+    }
 }

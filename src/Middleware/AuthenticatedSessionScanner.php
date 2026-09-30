@@ -62,8 +62,16 @@ class AuthenticatedSessionScanner
                 $sessionId = $request->hasSession() ? $request->session()->getId() : null;
                 $identifier = (string) $user->getAuthIdentifier();
 
+                $clientIp = \Mixudev\SecurityDefense\Support\ClientIpResolver::resolve(
+                    $request,
+                    (array) config('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1'])
+                );
+                if ($clientIp === '') {
+                    $clientIp = '127.0.0.1';
+                }
+
                 $threats = $this->defenseManager->record([
-                    'ip' => (string) ($request->ip() ?: '127.0.0.1'),
+                    'ip' => $clientIp,
                     'identifier' => $identifier,
                     'eventType' => 'AuthenticatedSessionActivity',
                     'userAgent' => (string) ($request->userAgent() ?: ''),

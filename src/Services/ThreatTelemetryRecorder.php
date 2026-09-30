@@ -33,7 +33,16 @@ class ThreatTelemetryRecorder
         string $field,
         string $severity = 'high'
     ): SecurityThreat {
-        $ip = (string) ($request->ip() ?: '127.0.0.1');
+        // The fingerprint keys on this address, so it must be the verified TCP
+        // peer: an attacker-controlled X-Forwarded-For would rotate the dedupe
+        // key per request and defeat both deduplication and rate limiting.
+        $ip = \Mixudev\SecurityDefense\Support\ClientIpResolver::resolve(
+            $request,
+            (array) config('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1'])
+        );
+        if ($ip === '') {
+            $ip = '127.0.0.1';
+        }
         $identifier = $request->user()?->getAuthIdentifier() ?: ($request->input('email') ?: 'guest');
 
         $fingerprint = hash('sha256', sprintf('request_threat:%s:%s:%s', $category, $ip, $sample));
