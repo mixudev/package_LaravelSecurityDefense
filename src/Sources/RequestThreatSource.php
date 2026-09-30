@@ -56,8 +56,13 @@ class RequestThreatSource implements ThreatSource
         ], $this->extraMetadata));
         $metadata = array_slice($metadata, 0, 32, true);
 
+        $ip = \Mixudev\SecurityDefense\Support\ClientIpResolver::resolve(
+            $this->request,
+            (array) config('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1'])
+        );
+
         return new SecurityEvent(
-            ip: (string) ($this->request->ip() ?: '127.0.0.1'),
+            ip: $ip !== '' ? $ip : '127.0.0.1',
             identifier: (string) $identifier,
             eventType: $this->eventType,
             timestamp: now()->toIso8601String(),

@@ -16,6 +16,7 @@ use Mixudev\SecurityDefense\Services\PayloadDecoder;
 use Mixudev\SecurityDefense\Services\RequestFloodLimiter;
 use Mixudev\SecurityDefense\Services\SecurityDefenseManager;
 use Mixudev\SecurityDefense\Services\ThreatTelemetryRecorder;
+use Mixudev\SecurityDefense\Support\ClientIpResolver;
 use Mixudev\SecurityDefense\Support\ThreatResponseBuilder;
 
 /**
@@ -49,7 +50,18 @@ class RequestThreatScanner
             return $next($request);
         }
 
-        $ip = (string) ($request->ip() ?: '127.0.0.1');
+        // Resolve the client address from the verified TCP boundary. $request->ip()
+        // follows X-Forwarded-For whenever the host app configures an open
+        // trustProxies range, and that header is fully attacker-controlled — the
+        // dashboard gate already refuses to trust it (see ClientIpResolver), so
+        // quarantine and flood counters must agree or they key on a rotating value.
+        $ip = ClientIpResolver::resolve(
+            $request,
+            (array) config('security-defense.dashboard.trusted_proxies', ['127.0.0.1', '::1'])
+        );
+        if ($ip === '') {
+            $ip = '127.0.0.1';
+        }
 
         // 0. Unconditional block of TRACE/TRACK (reflective-XSS vector, no legitimate use)
         $method = strtoupper((string) $request->method());
