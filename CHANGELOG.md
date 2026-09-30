@@ -5,7 +5,7 @@ Semua perubahan penting pada paket `mixudev/security-defense` didokumentasikan d
 Format berbasis [Keep a Changelog](https://keepachangelog.com/id/1.1.0/), dan paket ini
 mengikuti [Semantic Versioning](https://semver.org/lang/id/).
 
-## [Unreleased]
+## [1.11.0] - 2026-09-30
 
 ### Diperbaiki
 
@@ -44,6 +44,40 @@ mengikuti [Semantic Versioning](https://semver.org/lang/id/).
   Seluruh jalur keamanan kini konsisten menyelesaikan alamat melalui `ClientIpResolver`
   dari batas TCP (`REMOTE_ADDR`), hanya mempercayai header bila hop terakhir adalah
   proxy terpercaya.
+
+### Changed — BREAKING
+
+- **`.env` kini hanya berisi kredensial.** Seluruh boolean, toggle, alamat email,
+  chat ID, URL non-secret, timeout, dan threshold dipindahkan menjadi literal di
+  `config/security-defense.php`. Aturan ini ditegakkan: `env()` hanya dibaca untuk
+  secret autentikasi.
+
+  Variabel env yang **dihapus** (pindah ke file config):
+
+  | Variabel lama | Lokasi config baru |
+  |---|---|
+  | `SECURITY_DEFENSE_ENABLED` | `security-defense.enabled` |
+  | `SECURITY_DEFENSE_CACHE_STORE` | `security-defense.cache_store` |
+  | `SECURITY_DEFENSE_OTP_ENABLED` | `security-defense.dashboard.otp.enabled` |
+  | `SECURITY_DEFENSE_OTP_CHANNEL` | `security-defense.dashboard.otp.channel` |
+  | `SECURITY_DEFENSE_OTP_EMAIL` | `security-defense.dashboard.otp.email` |
+  | `SECURITY_DEFENSE_OTP_TTL` | `security-defense.dashboard.otp.ttl_seconds` |
+  | `SECURITY_TELEGRAM_CHAT_ID` | `security-defense.alerts.telegram.chat_id` |
+  | `SECURITY_WEBHOOK_URL` | `security-defense.alerts.webhook.url` |
+  | `SECURITY_ALERT_EMAIL` | `security-defense.alerts.mail.to` |
+  | `SECURITY_DEFENSE_MAIL_TO` | `security-defense.alerts.mail.to` |
+
+  Variabel env yang **tetap** (kredensial murni, 4 buah):
+
+  - `SECURITY_DEFENSE_KEY`
+  - `SECURITY_TELEGRAM_BOT_TOKEN`
+  - `SECURITY_DISCORD_WEBHOOK`
+  - `SECURITY_WEBHOOK_SECRET`
+
+  **Cara upgrade:** hapus baris-baris tersebut dari `.env`, lalu publish ulang config
+  (`php artisan vendor:publish --tag=security-defense-config`) dan sesuaikan nilai
+  toggle di `config/security-defense.php`. Nilai lama Anda **tidak** dipindahkan
+  otomatis — konfigurasi menjadi eksplisit dan terlihat di satu file.
 
 ## [1.10.0] - 2026-09-29
 
