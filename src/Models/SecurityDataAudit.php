@@ -7,6 +7,7 @@ namespace Mixudev\SecurityDefense\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Str;
 
 /**
  * Eloquent model representing database mutation and audit record.
@@ -43,6 +44,15 @@ class SecurityDataAudit extends Model
     public const EVENT_RESTORED = 'restored';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $audit) {
+            if (empty($audit->audit_key)) {
+                $audit->audit_key = (string) Str::uuid();
+            }
+        });
+    }
 
     /**
      * Get the attributes that should be cast.

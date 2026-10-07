@@ -10,6 +10,7 @@ use Mixudev\SecurityDefense\Console\Commands\PruneSecurityDataCommand;
 use Mixudev\SecurityDefense\Middleware\ContentSecurityPolicyArmor;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
 use Mixudev\SecurityDefense\Models\SecurityDataAudit;
+use Mixudev\SecurityDefense\Support\Sanitizer;
 use Mixudev\SecurityDefense\Tests\TestCase;
 
 class PruneAndCspArmorTest extends TestCase
@@ -92,6 +93,45 @@ class PruneAndCspArmorTest extends TestCase
         $this->assertStringContainsString('escapeHtml(JSON.stringify(newVals[f]))', $view);
         $this->assertStringNotContainsString('${oldVals[f]}', $view);
         $this->assertStringNotContainsString('${newVals[f]}', $view);
+    }
+
+    public function test_audit_snapshot_defangs_stored_executable_payloads(): void
+    {
+        $request = Request::create('/submit', 'POST', [
+            'comment' => '<script>alert(1)</script><img src=x onerror=alert(2)>',
+            'nested' => ['value' => 'javascript:alert(3)'],
+            'password' => 'do-not-store',
+        ]);
+
+        $snapshot = (new \Mixudev\SecurityDefense\Services\AuditPayloadSanitizer())
+            ->resolvePayloadSnapshot($request);
+
+        $json = json_encode($snapshot, JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString('<script>', $json);
+        $this->assertStringNotContainsString('<img', $json);
+        $this->assertStringNotContainsString('javascript:', $json);
+        $this->assertStringContainsString('[REDACTED]', $json);
+        // Defanging must not mangle ordinary comparison/operator text.
+        $defanged = Sanitizer::clean(['q' => 'age<30 and age>18']);
+        $this->assertSame('age<30 and age>18', $defanged['q']);
+    }
+
+    public function test_audit_metadata_context_is_defanged_before_persistence(): void
+    {
+        $model = new class extends \Illuminate\Database\Eloquent\Model {
+            protected $table = 'audit_test_models';
+            protected $guarded = [];
+        };
+
+        $request = Request::create('/<script>alert(1)</script>', 'POST');
+        $request->headers->set('User-Agent', '<img src=x onerror=alert(1)>');
+        $service = new \Mixudev\SecurityDefense\Services\DataAuditService($request);
+
+        $audit = $service->recordMutation($model, \Mixudev\SecurityDefense\Models\SecurityDataAudit::EVENT_CREATED);
+
+        $this->assertNotNull($audit, 'Audit metadata must be persisted when data auditing is enabled.');
+        $this->assertStringNotContainsString('<img', (string) $audit->user_agent);
+        $this->assertStringNotContainsString('<script>', (string) $audit->request_url);
     }
 
     public function test_prune_command_runs_successfully(): void

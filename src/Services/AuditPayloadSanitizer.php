@@ -40,13 +40,60 @@ class AuditPayloadSanitizer
         $maxBytes = (int) config('security-defense.data_audit.max_payload_snapshot_bytes', 8192);
 
         if ($encoded !== false && strlen($encoded) > $maxBytes) {
+            $preview = $this->trimPreview($sanitized, $maxBytes);
+
             return [
                 '_snapshot_warning' => "Payload exceeded maximum allowed size ({$maxBytes} bytes). Truncated for security.",
-                'preview' => array_slice($sanitized, 0, 10, true),
+                'preview' => $preview,
             ];
         }
 
         return $sanitized;
+    }
+
+    /**
+     * Keep the warning envelope itself within the configured byte ceiling.
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function trimPreview(array $data, int $maxBytes): array
+    {
+        $preview = [];
+        foreach (array_slice($data, 0, 10, true) as $key => $value) {
+            $preview[$key] = $this->trimPreviewValue($value);
+        }
+
+        $warning = "Payload exceeded maximum allowed size ({$maxBytes} bytes). Truncated for security.";
+        while ($preview !== [] && strlen((string) json_encode([
+            '_snapshot_warning' => $warning,
+            'preview' => $preview,
+        ])) > $maxBytes) {
+            array_pop($preview);
+        }
+
+        if (strlen((string) json_encode(['_snapshot_warning' => $warning, 'preview' => $preview])) > $maxBytes) {
+            return [];
+        }
+
+        return $preview;
+    }
+
+    private function trimPreviewValue(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            $result = [];
+            foreach (array_slice($value, 0, 10, true) as $key => $child) {
+                $result[$key] = $this->trimPreviewValue($child);
+            }
+            return $result;
+        }
+
+        if (is_string($value) && strlen($value) > 256) {
+            return substr($value, 0, 256) . '...[TRUNCATED]';
+        }
+
+        return $value;
     }
 
     /**
@@ -109,19 +156,21 @@ class AuditPayloadSanitizer
      */
     public function resolveMaskedColumns(Model $model): array
     {
-        if (method_exists($model, 'getSecurityAuditMaskedColumns')) {
-            return $model->getSecurityAuditMaskedColumns();
-        }
-
         $configured = (array) config('security-defense.data_audit.default_masked_fields', []);
 
-        // Merge the package-wide sensitive-key vocabulary so a column the rest of
-        // the package treats as a credential (api_key, private_key, otp,
-        // bot_token, ...) is masked in audit rows too. Previously only 8 narrow
-        // patterns were listed, so mutating such a column persisted plaintext
-        // secrets to security_data_audits.
+        // Always merge the package-wide sensitive-key vocabulary, even when the
+        // model provides its own override. HasSecurityAudit's default list (or
+        // a narrow $securityAuditMasked property) omits api_key, access_token,
+        // private_key, otp, bot_token, webhook_url, ... and letting the model
+        // REPLACE the vocabulary let secrets persist to security_data_audits in
+        // plaintext. Model-specific fields are additive only.
+        $modelFields = method_exists($model, 'getSecurityAuditMaskedColumns')
+            ? (array) $model->getSecurityAuditMaskedColumns()
+            : [];
+
         return array_values(array_unique(array_merge(
             $configured,
+            $modelFields,
             Sanitizer::sensitiveKeys()
         )));
     }

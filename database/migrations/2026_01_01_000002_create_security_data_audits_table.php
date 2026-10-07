@@ -18,6 +18,7 @@ return new class extends Migration
         if (! Schema::hasTable($table)) {
             Schema::create($table, function (Blueprint $blueprint) {
                 $blueprint->id();
+                $blueprint->string('audit_key', 64)->unique();
                 $blueprint->string('event', 20); // created, updated, deleted, restored
                 $blueprint->string('auditable_type', 191);
                 $blueprint->string('auditable_id', 64);

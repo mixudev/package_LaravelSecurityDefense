@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Mixudev\SecurityDefense\Models\SecurityDataAudit;
 use Mixudev\SecurityDefense\Support\ClientIpResolver;
 use Mixudev\SecurityDefense\Support\RequestLocationRedactor;
+use Mixudev\SecurityDefense\Support\Sanitizer;
 use Throwable;
 
 /**
@@ -106,8 +107,8 @@ class DataAuditService
                 'actor_id' => $actor['id'],
                 'actor_type' => $actor['type'],
                 'ip_address' => $clientIp !== '' ? $clientIp : '127.0.0.1',
-                'user_agent' => substr((string) ($request?->userAgent() ?? 'CLI / System Process'), 0, 500),
-                'request_url' => $request ? RequestLocationRedactor::url($request) : 'CLI Console Command',
+                'user_agent' => substr(Sanitizer::cleanString((string) ($request?->userAgent() ?? 'CLI / System Process')), 0, 500),
+                'request_url' => $request ? Sanitizer::cleanString(RequestLocationRedactor::url($request)) : 'CLI Console Command',
                 'request_method' => $request?->method() ?? 'CLI',
                 'request_route' => $request?->route()?->getName(),
                 'old_values' => empty($oldValues) ? null : $oldValues,
@@ -116,6 +117,9 @@ class DataAuditService
                 'payload_snapshot' => $payloadSnapshot,
                 'is_tampered' => $tamperAnalysis['is_tampered'],
                 'tamper_reasons' => $tamperAnalysis['reasons'],
+                // Stable per mutation: queued retries of this event must be
+                // idempotent, while two identical mutations remain distinct.
+                'audit_key' => (string) \Illuminate\Support\Str::uuid(),
             ];
 
             // If queue is enabled, push to background worker for zero HTTP latency impact
@@ -195,11 +199,18 @@ class DataAuditService
 
         // 2. Unguarded / Non-Fillable Field Mutation Injected via Request
         $fillable = $model->getFillable();
-        if (! empty($fillable)) {
-            foreach ($modifiedFields as $field) {
-                if (! in_array($field, $fillable, true) && in_array($field, $payloadKeys, true)) {
-                    $reasons[] = "Field '{$field}' is not in fillable whitelist but was passed via request payload and persisted";
-                }
+        $guarded = $model->getGuarded();
+        foreach ($modifiedFields as $field) {
+            if (! in_array($field, $payloadKeys, true)) {
+                continue;
+            }
+
+            $isExplicitlyGuarded = in_array('*', $guarded, true)
+                || in_array($field, $guarded, true);
+            $isOutsideFillable = $fillable !== [] && ! in_array($field, $fillable, true);
+
+            if ($isExplicitlyGuarded || $isOutsideFillable) {
+                $reasons[] = "Field '{$field}' is not in the model mass-assignment whitelist but was passed via request payload and persisted";
             }
         }
 

@@ -36,8 +36,14 @@ class ProcessSecurityDataAuditJob implements ShouldQueue
     public function handle(DataAuditService $auditService): void
     {
         try {
+            $auditData = $this->auditData;
+            $auditData['audit_key'] ??= hash('sha256', (string) json_encode($auditData));
+
             /** @var SecurityDataAudit $audit */
-            $audit = SecurityDataAudit::query()->create($this->auditData);
+            $audit = SecurityDataAudit::query()->firstOrCreate(
+                ['audit_key' => $auditData['audit_key']],
+                $auditData
+            );
 
             if ($audit->is_tampered) {
                 event(new SecurityParameterTampered($audit, $audit->tamper_reasons ?? []));
