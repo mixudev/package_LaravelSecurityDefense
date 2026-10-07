@@ -120,13 +120,15 @@ return [
                     'eval_based' => true,
                     'php_code_execution' => true,
                     'template_injection' => true,
-                    'crlf_injection' => true,
-                    'ssrf' => true,
-                    // localhost/127.0.0.1 SSRF — OFF by default (host apps legitimately
-                    // post to their own origin, e.g. http://localhost:8000/ telemetry).
-                    // Set to true only on strict deployments without local loopback traffic.
+                    // These signatures are fail-closed opt-ins because their lexical
+                    // shapes occur in legitimate URLs, XML documents, and multiline
+                    // headers. Enable them per deployment after reviewing its corpus.
+                    'crlf_injection' => false,
+                    'ssrf' => false,
+                    // Loopback SSRF is especially noisy: local telemetry and dev OAuth
+                    // callbacks legitimately reference localhost/127.0.0.1.
                     'ssrf_localhost' => false,
-                    'xxe' => true,
+                    'xxe' => false,
                 ],
             ],
 
@@ -294,10 +296,11 @@ return [
             'auto_jail_on_critical' => true,  // Automatically jail on critical threat block
             'response_status' => 429,         // HTTP 429 Too Many Requests
             'response_message' => 'Your IP has been temporarily quarantined due to suspicious security activity.',
-            'persist_to_database' => false,
-            // DB lookup failure after cache miss: false avoids blocking clean traffic;
-            // true fails closed for deployments where active threat indicators require it.
-            'db_fail_closed' => false,
+            // Durable persistence and fail-closed lookup are the safe defaults.
+            // Deployments may explicitly opt out when DB availability must not
+            // block traffic, but that posture is not suitable for active defense.
+            'persist_to_database' => true,
+            'db_fail_closed' => true,
             'table' => 'security_quarantines',
             'whitelist' => [
                 '127.0.0.1',
@@ -422,6 +425,16 @@ return [
         'rate_limit' => [
             'enabled' => true,
             'max_probes_per_minute' => 30,
+        ],
+        'require_authenticated_user' => true,
+        'authorization' => [
+            'enabled' => false,
+            'mode' => 'none', // none | gate | role | custom
+            'roles' => [],
+            'role_method' => 'hasAnyRole', // hasAnyRole | hasRole
+            'role_attribute' => 'roles',
+            'name' => null, // for gate/ability
+            'resolver' => null, // for custom (class name or binding)
         ],
         // Opaque dashboard URL: discovery barrier, never an authenticator.
         // Capability is a one-time, session-bound encrypted+HMAC token derived
