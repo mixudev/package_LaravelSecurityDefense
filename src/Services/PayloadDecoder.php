@@ -43,7 +43,11 @@ class PayloadDecoder
             // Normalize CRLF/CR/LF to spaces so CRLF injection shows as literal pattern
             $decoded['raw_crlf_normalized'] = str_replace(["\r\n", "\r", "\n"], ' ', $rawContent);
             // Unicode escape sequences (Burp Suite / JS obfuscation): \u0027 -> '
-            $decoded['raw_unicode_decoded'] = preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/i', static fn ($m) => mb_chr((int) hexdec($m[1]), 'UTF-8'), $rawContent);
+            $decoded['raw_unicode_decoded'] = preg_replace_callback(
+                '/\\\\u([0-9a-fA-F]{4})/i',
+                fn (array $match): string => $this->unicodeCodepoint((int) hexdec($match[1])),
+                $rawContent
+            );
         }
 
         foreach (['query', 'body'] as $source) {
@@ -67,7 +71,11 @@ class PayloadDecoder
                 $parts[] = rawurldecode(rawurldecode($value));
                 $parts[] = str_replace(["\r\n", "\r", "\n"], ' ', $value);
                 // Unicode escape sequences: \u0027 -> ' (Burp/JS obfuscation)
-                $parts[] = preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/i', static fn ($m) => mb_chr((int) hexdec($m[1]), 'UTF-8'), $value);
+                $parts[] = preg_replace_callback(
+                    '/\\\\u([0-9a-fA-F]{4})/i',
+                    fn (array $match): string => $this->unicodeCodepoint((int) hexdec($match[1])),
+                    $value
+                );
                 // Fullwidth Unicode normalization: ＳＥＬＥＣＴ -> SELECT (NFKC) when intl available
                 $normalizer = class_exists('\Normalizer') ? \Normalizer::normalize($value, \Normalizer::FORM_KC) : null;
                 if ($normalizer !== false && $normalizer !== null && $normalizer !== $value) {
@@ -83,5 +91,33 @@ class PayloadDecoder
         }
 
         return array_merge($inputs, $decoded);
+    }
+
+    private function unicodeCodepoint(int $codepoint): string
+    {
+        if ($codepoint < 0 || $codepoint > 0x10FFFF || ($codepoint >= 0xD800 && $codepoint <= 0xDFFF)) {
+            return '';
+        }
+
+        if (function_exists('mb_chr')) {
+            return mb_chr($codepoint, 'UTF-8');
+        }
+
+        if ($codepoint <= 0x7F) {
+            return chr($codepoint);
+        }
+        if ($codepoint <= 0x7FF) {
+            return chr(0xC0 | ($codepoint >> 6)) . chr(0x80 | ($codepoint & 0x3F));
+        }
+        if ($codepoint <= 0xFFFF) {
+            return chr(0xE0 | ($codepoint >> 12))
+                . chr(0x80 | (($codepoint >> 6) & 0x3F))
+                . chr(0x80 | ($codepoint & 0x3F));
+        }
+
+        return chr(0xF0 | ($codepoint >> 18))
+            . chr(0x80 | (($codepoint >> 12) & 0x3F))
+            . chr(0x80 | (($codepoint >> 6) & 0x3F))
+            . chr(0x80 | ($codepoint & 0x3F));
     }
 }

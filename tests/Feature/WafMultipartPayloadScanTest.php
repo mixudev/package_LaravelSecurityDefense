@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Tests\Feature;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Illuminate\Http\UploadedFile;
 use Mixudev\SecurityDefense\Middleware\RequestThreatScanner;
 use Mixudev\SecurityDefense\Tests\TestCase;
@@ -44,9 +45,7 @@ class WafMultipartPayloadScanTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider attackProvider
-     */
+    #[DataProvider('attackProvider')]
     public function test_multipart_upload_with_payload_is_blocked(string $payload): void
     {
         $response = $this->post('/probe-target', [
@@ -62,9 +61,7 @@ class WafMultipartPayloadScanTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider attackProvider
-     */
+    #[DataProvider('attackProvider')]
     public function test_plain_form_post_with_payload_is_blocked(string $payload): void
     {
         $response = $this->post('/probe-target', ['q' => $payload]);

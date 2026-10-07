@@ -74,7 +74,9 @@ class SanitizerTest extends TestCase
 
         // Scripts neutralized
         $this->assertSame('[script]alert("pwned")[/script]', $cleaned['xss_script']);
-        $this->assertSame('<img src=x onerror_neutralized=alert(1)>', $cleaned['xss_event']);
+        // Every HTML tag is defanged before audit persistence; event attributes are
+        // also neutralized so a future renderer cannot reactivate the payload.
+        $this->assertSame('[img src=x onerror_neutralized=alert(1)]', $cleaned['xss_event']);
         $this->assertSame('java_script:document.location="http://evil.com"', $cleaned['xss_proto']);
         $this->assertSame('vb_script:msgbox("hello")', $cleaned['vbscript']);
         $this->assertSame('[svg onload_neutralized=alert(1)]', $cleaned['svg_tag']);

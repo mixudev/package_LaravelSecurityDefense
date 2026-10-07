@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Cache\LockProvider;
@@ -45,9 +46,7 @@ final class LockGuardRegressionTest extends TestCase
         self::assertInstanceOf(LockProvider::class, $cache->getStore());
     }
 
-    /**
-     * @dataProvider lockSiteProvider
-     */
+    #[DataProvider('lockSiteProvider')]
     public function test_no_source_file_uses_the_broken_method_exists_lock_guard(string $relativePath): void
     {
         $path = dirname(__DIR__, 2) . '/' . $relativePath;

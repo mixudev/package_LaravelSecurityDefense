@@ -171,8 +171,11 @@ class Sanitizer
         // Also catch unclosed opening tags (<script ...)
         $value = (string) preg_replace("/<(\/?)\s*({$tagsRegex})\b/i", '[$1$2', $value);
 
-        // Defang any remaining closing tags
-        $value = (string) preg_replace('/<\s*\/\s*([a-zA-Z0-9]+)\s*>/', '[/$1]', $value);
+        // Defang closing tags of ANY name, not just the executable vocabulary.
+        $value = (string) preg_replace('/<\s*\/\s*([a-zA-Z][a-zA-Z0-9:-]*)\s*>/', '[/$1]', $value);
+        // Defang opening tags of ANY name. The tag name must start immediately
+        // after '<' so forensic data like `age<30 and age>18` is left intact.
+        $value = (string) preg_replace('/<([a-zA-Z][a-zA-Z0-9:-]*)([^>]*)>/', '[$1$2]', $value);
 
         // Defang DOM event handlers (onerror= -> on_error=, onload= -> on_load=)
         $value = (string) preg_replace('/\b(on(?:error|load|click|mouseover|focus|blur|change|submit|input))\s*=/i', '$1_neutralized=', $value);

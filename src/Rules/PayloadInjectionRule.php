@@ -29,8 +29,8 @@ class PayloadInjectionRule extends AbstractDetectionRule
      * @var array<string, string>
      */
     protected array $signatures = [
-        'sqli' => '/(\b(union(\s+all)?\s+select|select\s+[\s\S]*?\s+from|insert\s+into|update\s+[\s\S]*?\s+set|delete\s+from|drop\s+(table|database)|truncate\s+table)\b|(\'|\")\s*(\b(or|and)\b)\s*(\'|\")?[^\s\']+?(\'|\")?\s*=\s*(\'|\")?[^\s\']+?|(\'|\")\s*--|(\bwaitfor\s+delay\b|\bsleep\(\d+\)|\bbenchmark\(\d+,)|(\bor\b|\band\b|\bunion\b)\s+\d+\s*=\s*\d+|(\bor\b|\band\b)\s+\d+\s*=\s*\d+)/is',
-        'xss' => '/(<script\b[^>]*>[\s\S]*?<\/script>|<script\b[^>]*>|<\/script>|javascript\s*:|on(error|load|click|mouseover|submit|focus)\s*=|document\.(cookie|location)|<[a-z0-9]+\b[^>]*?(onerror|onload|onclick)\s*=|alert\(|prompt\(|confirm\()/is',
+        'sqli' => '/(\b(union(\s+all)?\s+select|union\s*\/\*[\s\S]{0,100}?\*\/\s*select|select\s+[\s\S]{0,500}?\s+from\s+[\w.]+\s*(where\b|order\s+by\b|limit\b|group\s+by\b|having\b|--|;|\(|>|<|$)|insert\s+into\s+[\w.]+\s*\(|insert\s+into\s+[\w.]+\s+values\b|update\s+[\w.]+(?:\s*,\s*[\w.]+)*\s+set\s+[\w.]+\s*=|delete\s+from\s+[\w.]+\s*(where\b|--|;|\(|$)|drop\s+(table|database)\b|truncate\s+table\b)|(\'|\")\s*(\b(or|and)\b)\s*(\'|\")?[^\s\']+?(\'|\")?\s*=\s*(\'|\")?[^\s\']+?|(\')\s*\)?\s*(\bor\b|\band\b|\bxor\b)\s*\(?\s*(\'|\")?\d+(\'|\")?\s*=\s*(\'|\")?\d+|(\')\s*(\bor\b|\band\b)\s*\(\s*select\b[\s\S]{0,500}?\bfrom\b[\s\S]{0,100}?(--|;|>|<)|(\')\s*#|(\')\s*(\bor\b|\band\b|\bxor\b)\s+\d+\s+not\s+between\b|(\bor\b|\band\b|\bxor\b)\s+case\s+when\b|(\')\s*(\bor\b|\band\b)\s+\w+\s+(not\s+)?like\b|\border\s+by\s+\d+\b|(\'|\")\s*--|(\bwaitfor\s+delay\b|\bsleep\s*\(\s*\d+(?:\.\d+)?\s*\)|\bbenchmark\s*\(\s*\d+\s*,)|(\bor\b|\band\b|\bunion\b|\bxor\b)\s+\d+\s*=\s*\d+)/is',
+        'xss' => '/(<script\b[^>]*>[\s\S]*?<\/script>|<script\b[^>]*>|<\/script>|javascript\s*:|vbscript\s*:|data\s*:\s*text\/html|on(error|load|click|mouseover|submit|focus)\s*=|document\.(cookie|location)|window\.location(?:\.href)?\s*=|<[a-z0-9]+\b[^>]*?(onerror|onload|onclick)\s*=|<math\b|<maction\b|xlink:href\s*=|alert\(|prompt\(|confirm\()/is',
         'traversal' => '/(\.\.[\/\\\\]|\.\.%2f|\.\.%5c|%00|\b(etc[\/\\\\]passwd|windows[\/\\\\]win\.ini|boot\.ini)\b)/is',
         'command_injection' => '/(;|\&|\||\`|\$\()\s*(cat\s+[\/.]|ls\s+-|whoami|id|uname\s+-|netstat|curl\s+https?|wget\s+https?|cmd\.exe|powershell|bash\s+-c|nc\s+-e|ping\s+-c|(?:(?:\/)?bin\/)?bash\s+-c)\b|(^|[;|&])\s*(phpinfo|shell_exec|system|exec)\(/is',
         'eval_based' => '/(\beval\s*\(|\bbase64_decode\s*\(|\bpassthru\s*\(|\bshell_exec\s*\(|\bsystem\s*\(|\bphpinfo\s*\()/is',
@@ -41,7 +41,7 @@ class PayloadInjectionRule extends AbstractDetectionRule
                 // Opt back in via detection.rules.payload_injection.patterns.ssrf_localhost
                 // on hardened/strict deployments where local-only pivot targets matter.
                 'ssrf_localhost' => '/(?:https?:\/\/)?(?:127\.0\.0\.1|localhost)(?::\d{1,5})?[\/\s"\']/is',
-        'xxe' => '/(<!DOCTYPE\s+[a-z0-9_-]+|<!ENTITY\s+[a-z0-9_-]+\s+(SYSTEM|PUBLIC)|xsi:noNamespaceSchemaLocation|xmlns:xsi)/is',
+        'xxe' => '/(<!DOCTYPE\s+[a-z0-9_-]+|<!ENTITY\s+%?\s*[a-z0-9_-]+\s+(SYSTEM|PUBLIC)|xsi:noNamespaceSchemaLocation|xmlns:xsi)/is',
         'template_injection' => '/(\{\{\s*[\s\S]*?\b(system|exec|passthru|shell_exec|phpinfo)\b[\s\S]*?\}\}|\$\{\s*[\s\S]*?\b(env|cmd|exec)\b[\s\S]*?\})/is',
         'crlf_injection' => '/(\r\n|\r|\n)\s*([a-z0-9-]+:\s*.*|Set-Cookie:|Location:|X-)/is',
     ];
