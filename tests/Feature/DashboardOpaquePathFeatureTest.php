@@ -17,6 +17,8 @@ class DashboardOpaquePathFeatureTest extends TestCase
         $app['config']->set('app.key', 'base64:' . base64_encode(random_bytes(32)));
         $app['env'] = 'local';
         $app['config']->set('security-defense.dashboard.opaque_path.enabled', true);
+        $app['config']->set('security-defense.dashboard.require_authenticated_user', false);
+        $app['config']->set('security-defense.dashboard.authorization.enabled', false);
     }
 
     protected function tearDown(): void

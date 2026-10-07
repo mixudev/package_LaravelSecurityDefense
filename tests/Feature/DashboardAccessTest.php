@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Tests\Feature;
 
+use Illuminate\Auth\GenericUser;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Mixudev\SecurityDefense\Models\SecurityAlert;
 use Mixudev\SecurityDefense\Tests\TestCase;
@@ -18,6 +20,13 @@ class DashboardAccessTest extends TestCase
         $app['config']->set('security-defense.dashboard.enabled', true);
         $app['config']->set('security-defense.dashboard.local_only', true);
         $app['config']->set('security-defense.dashboard.allowed_ips', ['127.0.0.1', '::1']);
+        $app['config']->set('security-defense.dashboard.require_authenticated_user', true);
+        $app['config']->set('security-defense.dashboard.authorization.enabled', false);
+    }
+
+    private function loginDashboardUser(): void
+    {
+        Auth::setUser(new GenericUser(['id' => 1]));
     }
 
     protected function tearDown(): void
@@ -34,6 +43,7 @@ class DashboardAccessTest extends TestCase
     public function test_dashboard_is_accessible_in_local_environment_with_localhost_ip(): void
     {
         $this->app['env'] = 'local';
+        $this->loginDashboardUser();
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
             ->get('/security-defense');
@@ -43,9 +53,42 @@ class DashboardAccessTest extends TestCase
         $response->assertSee('Strict Local Mode Active');
     }
 
+    public function test_dashboard_requires_authentication_before_local_policy(): void
+    {
+        $this->app['env'] = 'local';
+        $response = $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->get('/security-defense');
+
+        $response->assertStatus(403);
+    }
+
+    public function test_dashboard_role_mode_uses_server_side_user_role(): void
+    {
+        $this->app['env'] = 'local';
+        config()->set('security-defense.dashboard.authorization', [
+            'enabled' => true,
+            'mode' => 'role',
+            'roles' => ['security-admin'],
+            'role_attribute' => 'roles',
+        ]);
+
+        $user = new GenericUser(['id' => 1, 'roles' => ['security-admin']]);
+        Auth::setUser($user);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->get('/security-defense')
+            ->assertOk();
+
+        Auth::setUser(new GenericUser(['id' => 2, 'roles' => ['customer']]));
+        $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->get('/security-defense')
+            ->assertForbidden();
+    }
+
     public function test_dashboard_is_forbidden_in_production_environment(): void
     {
         $this->app['env'] = 'production';
+        $this->loginDashboardUser();
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
             ->get('/security-defense');
@@ -88,6 +131,7 @@ class DashboardAccessTest extends TestCase
     public function test_dashboard_probe_returns_generic_client_error(): void
     {
         $this->app['env'] = 'local';
+        $this->loginDashboardUser();
         $this->mock(\Mixudev\SecurityDefense\Services\ChannelTestService::class)
             ->shouldReceive('testChannel')->once()->andThrow(new \RuntimeException('secret provider failure'));
 
@@ -139,6 +183,7 @@ class DashboardAccessTest extends TestCase
     public function test_test_channel_endpoint_executes_probe_and_returns_json(): void
     {
         $this->app['env'] = 'local';
+        $this->loginDashboardUser();
 
         $token = 'test-valid-csrf-token-12345';
 
@@ -176,6 +221,7 @@ class DashboardAccessTest extends TestCase
         $this->assertSame('new', $alert->status);
 
         $token = 'test-valid-csrf-token-789';
+        $this->loginDashboardUser();
 
         // Acknowledge
         $ackResponse = $this->withSession(['_token' => $token])

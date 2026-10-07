@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mixudev\SecurityDefense\Tests\Feature;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
@@ -28,6 +29,7 @@ final class DashboardOtpFlowTest extends TestCase
         $app['env'] = 'local';
         $app['config']->set('security-defense.dashboard.opaque_path.enabled', true);
         $app['config']->set('security-defense.dashboard.otp.enabled', true);
+        $app['config']->set('security-defense.dashboard.require_authenticated_user', false);
         $app['config']->set('security-defense.dashboard.otp.channel', 'email');
         $app['config']->set('security-defense.dashboard.otp.email', 'ops@example.com');
     }
@@ -287,9 +289,7 @@ final class DashboardOtpFlowTest extends TestCase
 
     // ---- input hardening -----------------------------------------------
 
-    /**
-     * @dataProvider malformedCodeProvider
-     */
+    #[DataProvider('malformedCodeProvider')]
     public function test_malformed_codes_are_rejected_without_touching_the_service(string $payload): void
     {
         Mail::fake();

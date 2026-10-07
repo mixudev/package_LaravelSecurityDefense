@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Mixudev\SecurityDefense\Services\DashboardAccessPolicy;
+use Mixudev\SecurityDefense\Services\DashboardAuthorization;
 use Mixudev\SecurityDefense\Support\ClientIpResolver;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -46,7 +47,36 @@ class EnsureLocalAccess
         $authorized = false;
         $denyReason = 'policy';
 
+        // Layer 1: authentication. A logged-in host-app user is required
+        // before any environment/IP/gate layer is evaluated. Local mode uses
+        // the package-level toggle; public mode keeps its per-mode toggle.
+        $authorization = (array) config('security-defense.dashboard.authorization', []);
+        // A non-string mode is malformed configuration: treat the layer as
+        // active so DashboardAuthorization denies instead of the cast below
+        // raising an uncaught error (a 500 is not a controlled denial).
+        $authorizationMode = $authorization['mode'] ?? 'none';
+        $authorizationEnabled = (bool) ($authorization['enabled'] ?? false)
+            && (!is_string($authorizationMode) || $authorizationMode !== 'none');
+
         if ($localOnly) {
+            $requiresAuthenticatedUser = (bool) config(
+                'security-defense.dashboard.require_authenticated_user',
+                true
+            );
+        } else {
+            $publicCfg = (array) config('security-defense.dashboard.public', []);
+            $requiresAuthenticatedUser = (bool) ($publicCfg['require_authenticated_user'] ?? true);
+        }
+
+        $authenticationRequired = $requiresAuthenticatedUser || $authorizationEnabled;
+        if ($authenticationRequired && $request->user() === null) {
+            $denyReason = 'unauthenticated';
+        } elseif ($authorizationEnabled && !app(DashboardAuthorization::class)->allows(
+            $request,
+            $authorization
+        )) {
+            $denyReason = 'role';
+        } elseif ($localOnly) {
             // Local mode is a strict loopback-only boundary. A host Gate must
             // NOT be able to elevate a remote/non-loopback request into the
             // local dashboard: local access always requires a local env AND a
@@ -64,7 +94,14 @@ class EnsureLocalAccess
                 $denyReason = 'ip';
             } elseif ((bool) ($public['require_authenticated_user'] ?? true) && $request->user() === null) {
                 $denyReason = 'unauthenticated';
-            } elseif (!$this->gateAllows($public, $request)) {
+            } elseif ((bool) ($public['require_authenticated_user'] ?? true) && !app(DashboardAuthorization::class)->allows(
+                $request,
+                (array) config('security-defense.dashboard.authorization', [])
+            )) {
+                $denyReason = 'role';
+            } elseif (!$this->hasConfiguredGate($public) && !$authorizationEnabled) {
+                $denyReason = 'gate';
+            } elseif ($this->hasConfiguredGate($public) && !$this->gateAllows($public, $request)) {
                 $denyReason = 'gate';
             } elseif ($this->stepUpDenied($public, $request)) {
                 $denyReason = 'step-up';
@@ -108,6 +145,13 @@ class EnsureLocalAccess
         );
 
         return $policy->allows($clientIp);
+    }
+
+    private function hasConfiguredGate(array $public): bool
+    {
+        $gateName = $public['authorization_gate'] ?? null;
+
+        return is_string($gateName) && $gateName !== '';
     }
 
     private function gateAllows(array $public, Request $request): bool

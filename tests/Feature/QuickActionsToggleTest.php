@@ -33,6 +33,7 @@ class QuickActionsToggleTest extends TestCase
         $app['config']->set('security-defense.dashboard.enabled', true);
         $app['config']->set('security-defense.dashboard.local_only', true);
         $app['config']->set('security-defense.dashboard.allowed_ips', ['127.0.0.1', '::1']);
+        $app['config']->set('security-defense.dashboard.require_authenticated_user', false);
         $app['config']->set('security-defense.enabled', true);
         $app['config']->set('security-defense.detection.enabled', true);
         $app['config']->set('security-defense.detection.rules.user_agent_anomaly.enabled', true);

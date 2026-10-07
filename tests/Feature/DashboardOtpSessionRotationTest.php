@@ -33,6 +33,7 @@ final class DashboardOtpSessionRotationTest extends TestCase
         $app['config']->set('app.key', 'base64:7VzK9gG2e+x8UfXoN9uC7x/2j6yD8Hw0Z1A2B3C4D5E=');
         $app['env'] = 'local';
         $app['config']->set('security-defense.dashboard.opaque_path.enabled', true);
+        $app['config']->set('security-defense.dashboard.require_authenticated_user', false);
         $app['config']->set('security-defense.dashboard.otp.enabled', true);
         $app['config']->set('security-defense.dashboard.otp.channel', 'email');
         $app['config']->set('security-defense.dashboard.otp.email', 'ops@example.com');
