@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mixudev\SecurityDefense\Mail;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
@@ -14,8 +15,12 @@ use Illuminate\Queue\SerializesModels;
  * The $code property is intentionally public so Mail::assertSent closures
  * can inspect it in tests, but it is marked readonly so nothing can modify it.
  * It should NEVER appear in any log statement.
+ *
+ * Implements ShouldBeEncrypted so a queued copy of this mailable is encrypted
+ * at rest in the queue payload (database/Redis) instead of storing the OTP
+ * code in plaintext rows readable by anyone with queue-table access.
  */
-final class DashboardOtpMail extends Mailable
+final class DashboardOtpMail extends Mailable implements ShouldBeEncrypted
 {
     use Queueable, SerializesModels;
 

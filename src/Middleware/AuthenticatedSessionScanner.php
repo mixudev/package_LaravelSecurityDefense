@@ -76,7 +76,12 @@ class AuthenticatedSessionScanner
                     'eventType' => 'AuthenticatedSessionActivity',
                     'userAgent' => (string) ($request->userAgent() ?: ''),
                     'metadata' => [
-                        'session_id' => $sessionId,
+                        // One-way fingerprint only: a raw session ID in
+                        // telemetry (DB, alerts, queue, SIEM) is a replayable
+                        // session credential if any sink leaks.
+                        'session_hash' => is_string($sessionId) && $sessionId !== ''
+                            ? hash('sha256', $sessionId)
+                            : null,
                         'url' => RequestLocationRedactor::path($request),
                         'method' => $request->method(),
                         'headers' => $this->safeHeaders($request),

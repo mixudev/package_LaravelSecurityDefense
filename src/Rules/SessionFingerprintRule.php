@@ -30,13 +30,21 @@ class SessionFingerprintRule extends AbstractDetectionRule
             return null;
         }
 
-        $sessionId = $event->metadata['session_id'] ?? null;
-        if (! is_string($sessionId) || $sessionId === '') {
+        // Prefer the pre-hashed, non-reversible fingerprint emitted by
+        // AuthenticatedSessionScanner; fall back to hashing a raw session ID
+        // supplied by host integrations so they keep working.
+        $sessionHash = null;
+        if (is_string($event->metadata['session_hash'] ?? null) && $event->metadata['session_hash'] !== '') {
+            $sessionHash = $event->metadata['session_hash'];
+        } elseif (is_string($event->metadata['session_id'] ?? null) && $event->metadata['session_id'] !== '') {
+            $sessionHash = hash('sha256', $event->metadata['session_id']);
+        }
+
+        if ($sessionHash === null) {
             return null;
         }
 
         $cache = $this->getCache();
-        $sessionHash = hash('sha256', $sessionId);
         $fingerprintKey = $this->getCacheKey("session:{$sessionHash}");
 
         $currentSubnet = $this->extractSubnet($event->ip);
