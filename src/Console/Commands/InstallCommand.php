@@ -53,8 +53,17 @@ class InstallCommand extends Command
         }
 
         if (! (bool) $this->option('no-cache')) {
-            $this->call('route:clear');
-            $this->call('config:clear');
+            if ($this->call('route:clear') !== self::SUCCESS) {
+                $this->error('Failed to clear the route cache.');
+
+                return self::FAILURE;
+            }
+
+            if ($this->call('config:clear') !== self::SUCCESS) {
+                $this->error('Failed to clear the configuration cache.');
+
+                return self::FAILURE;
+            }
 
             if ($this->call('route:cache') !== self::SUCCESS) {
                 $this->error('Failed to build the route cache. Dashboard routes may not resolve.');

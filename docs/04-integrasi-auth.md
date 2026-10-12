@@ -33,23 +33,23 @@ php artisan auth:sync --dry-run
 
 ## 2. Pendaftaran Subscriber
 
-Jika menggunakan Laravel 11+, daftarkan subscriber tersebut di file `app/Providers/AppServiceProvider.php`:
+Laravel 11+ otomatis menemukan subscriber di `app/Listeners`. Setelah menjalankan:
+
+```bash
+php artisan auth:sync
+php artisan event:list
+```
+
+pastikan `AuthenticationSecuritySubscriber` muncul satu kali untuk setiap event.
+Jangan menambahkan `Event::subscribe()` manual di `AppServiceProvider`; itu akan menggandakan 12 handler dan membuat counter keamanan naik dua kali.
+
+Untuk Laravel lama yang tidak mengaktifkan event discovery, gunakan registrasi manual hanya setelah memastikan discovery memang tidak tersedia:
 
 ```php
-namespace App\Providers;
-
-use App\Listeners\AuthenticationSecuritySubscriber;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\ServiceProvider;
-
-class AppServiceProvider extends ServiceProvider
-{
-    public function boot(): void
-    {
-        Event::subscribe(AuthenticationSecuritySubscriber::class);
-    }
-}
+Event::subscribe(\App\Listeners\AuthenticationSecuritySubscriber::class);
 ```
+
+Jangan gunakan dua mekanisme tersebut bersamaan.
 
 ---
 

@@ -81,6 +81,63 @@ class AuthSyncCommandTest extends TestCase
         $files->deleteDirectory($tmpBase);
     }
 
+    /**
+     * Bridge registration must be verified against the LIVE dispatcher.
+     *
+     * The old logic only grepped AppServiceProvider for the subscriber name,
+     * so a Laravel 11+ app discovered via app/Listeners looked "not
+     * registered" and auth:sync told the operator to add Event::subscribe() —
+     * doubling every handler (SecurityDefense::record() twice per auth event,
+     * lockout at half the configured threshold).
+     */
+    public function test_auto_discovered_subscriber_is_reported_without_manual_hint(): void
+    {
+        $command = $this->bridgeProbe();
+
+        $this->app['events']->listen(
+            \Vendor\LaravelAuthentication\Events\LoginFailed::class,
+            'App\\Listeners\\AuthenticationSecuritySubscriber@handleLoginFailed'
+        );
+
+        $this->assertSame('auto-discovered', $command->registrationMode());
+
+        $report = $command->registrationReport();
+        $this->assertStringContainsString('discovered from app/Listeners', $report);
+        $this->assertStringNotContainsString('Register the subscriber in AppServiceProvider', $report);
+    }
+
+    public function test_duplicate_bridge_registration_is_detected_and_never_recommends_manual_subscribe(): void
+    {
+        $command = $this->bridgeProbe();
+
+        // Two registrations on one event = discovery + manual Event::subscribe().
+        $this->app['events']->listen(
+            \Vendor\LaravelAuthentication\Events\LoginFailed::class,
+            'App\\Listeners\\AuthenticationSecuritySubscriber@handleLoginFailed'
+        );
+        $this->app['events']->listen(
+            \Vendor\LaravelAuthentication\Events\LoginFailed::class,
+            'App\\Listeners\\AuthenticationSecuritySubscriber@handleLoginFailed'
+        );
+
+        $this->assertSame('duplicate', $command->registrationMode());
+
+        $report = $command->registrationReport();
+        $this->assertStringContainsString('registered more than once', $report);
+        $this->assertStringNotContainsString('Register the subscriber in AppServiceProvider', $report);
+    }
+
+    public function test_unregistered_subscriber_reports_next_step_not_registered(): void
+    {
+        $command = $this->bridgeProbe();
+
+        $this->assertSame('none', $command->registrationMode());
+
+        $report = $command->registrationReport();
+        $this->assertStringContainsString('[NEXT]', $report);
+        $this->assertStringNotContainsString('already registered', $report);
+    }
+
     public function test_generated_subscriber_body_is_valid_php(): void
     {
         $command = new AuthSyncCommand();
@@ -100,5 +157,50 @@ class AuthSyncCommandTest extends TestCase
         $this->assertSame(0, $exitCode, implode("\n", $output));
         $this->assertStringContainsString('class AuthenticationSecuritySubscriber', $body);
         $this->assertStringContainsString('handleLoginSucceeded', $body);
+    }
+
+    /**
+     * Command probe exposing the protected registration report with output
+     * captured in memory (no console side effects).
+     *
+     * @return AuthSyncCommand&object{
+     *     registrationMode(): string,
+     *     registrationReport(): string
+     * }
+     */
+    private function bridgeProbe(): object
+    {
+        $command = new class extends AuthSyncCommand {
+            /** @var list<string> */
+            public array $captured = [];
+
+            public function registrationMode(): string
+            {
+                return $this->bridgeRegistrationMode();
+            }
+
+            public function registrationReport(): string
+            {
+                $this->captured = [];
+
+                $this->reportBridgeRegistration();
+
+                return implode("\n", $this->captured);
+            }
+
+            public function line($string, $style = null, $verbosity = null)
+            {
+                $this->captured[] = (string) $string;
+            }
+
+            public function error($string, $verbosity = null)
+            {
+                $this->captured[] = (string) $string;
+            }
+        };
+
+        $command->setLaravel($this->app);
+
+        return $command;
     }
 }

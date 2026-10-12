@@ -68,12 +68,7 @@ class AuthSyncCommand extends Command
             return self::SUCCESS;
         }
 
-        if (! $this->isBridgeRegistered()) {
-            $this->line('  [NEXT] Register the subscriber in AppServiceProvider::boot():');
-            $this->line('    Event::subscribe(\\App\\Listeners\\AuthenticationSecuritySubscriber::class);');
-        } else {
-            $this->line('  [OK] Bridge subscriber already registered.');
-        }
+        $this->reportBridgeRegistration();
 
         $this->newLine();
         $this->info('[DONE] auth:sync selesai. Bridge subscriber siap mendengarkan semua event package auth.');
@@ -398,7 +393,128 @@ PHP;
 
         $content = (string) file_get_contents($providerPath);
 
-        return str_contains($content, 'AuthenticationSecuritySubscriber')
-            || str_contains($content, 'AuthenticationSecuritySubscriber::class');
+        // Only executable code counts; comments mentioning Event::subscribe()
+        // must not make auto-discovery look like manual registration.
+        $code = preg_replace('~/\\*.*?\\*/|//[^\\r\\n]*|#[^\\r\\n]*~s', '', $content) ?? $content;
+
+        return str_contains($code, 'AuthenticationSecuritySubscriber')
+            && preg_match('/\\bEvent\\s*::\\s*subscribe\\s*\\(/', $code) === 1;
+    }
+
+    /**
+     * Report how the bridge subscriber is wired, and what to do next.
+     *
+     * A manual Event::subscribe() recommendation is only safe when discovery is
+     * unavailable; on Laravel 11+ it doubles every handler.
+     */
+    protected function reportBridgeRegistration(): void
+    {
+        $registration = $this->bridgeRegistrationMode();
+        $subscriberPath = app_path('Listeners/AuthenticationSecuritySubscriber.php');
+        $hasSubscriberFile = is_file($subscriberPath);
+
+        if ($registration === 'duplicate') {
+            $this->error('  [ERROR] Bridge subscriber registered more than once on the same event.');
+            $this->error('           Remove the manual Event::subscribe() from AppServiceProvider;');
+            $this->error('           Laravel event discovery already registers app/Listeners.');
+
+            return;
+        }
+
+        if ($registration === 'auto-discovered') {
+            $this->line('  [OK] Bridge subscriber discovered from app/Listeners.');
+            $this->line('  [OK] Do not add Event::subscribe() manually; it would register handlers twice.');
+
+            return;
+        }
+
+        if ($registration === 'manual') {
+            $this->line('  [OK] Bridge subscriber already registered.');
+
+            return;
+        }
+
+        if ($hasSubscriberFile) {
+            $this->line('  [WARN] app/Listeners/AuthenticationSecuritySubscriber.php exists but no listener is registered.');
+            $this->line('    Jalankan: php artisan event:clear  lalu  php artisan event:list  untuk verifikasi discovery.');
+            $this->line('    Daftarkan manual HANYA jika discovery tidak tersedia:');
+            $this->line('      Event::subscribe(\\\\App\\\\Listeners\\\\AuthenticationSecuritySubscriber::class);');
+
+            return;
+        }
+
+        $this->line('  [NEXT] Buat subscriber-nya dulu: jalankan auth:sync tanpa --dry-run.');
+        $this->line('    Laravel 11+ mendaftarkan app/Listeners otomatis (event discovery).');
+        $this->line('    Tanpa discovery (Laravel lama) daftarkan manual:');
+        $this->line('      Event::subscribe(\\\\App\\\\Listeners\\\\AuthenticationSecuritySubscriber::class);');
+    }
+
+    /**
+     * How (or whether) the bridge subscriber is wired into the host app.
+     *
+     * Laravel 11+ discovers listeners in app/Listeners automatically, so a
+     * manual Event::subscribe() recommendation there DOUBLE-registers every
+     * handler: SecurityDefense::record() would run twice per auth event and
+     * brute-force counters would reach their threshold at half the configured
+     * attempts. Registration is therefore verified against the live dispatcher
+     * first, not against the provider source alone.
+     *
+     * @return 'auto-discovered'|'manual'|'duplicate'|'none'
+     */
+    protected function bridgeRegistrationMode(): string
+    {
+        $runtime = $this->bridgeListenerCount();
+
+        if ($runtime === null) {
+            // Dispatcher introspection unavailable: fall back to static detection.
+            return $this->isBridgeRegistered() ? 'manual' : 'none';
+        }
+
+        if ($runtime > 1) {
+            return 'duplicate';
+        }
+
+        if ($runtime === 1) {
+            return $this->isBridgeRegistered() ? 'manual' : 'auto-discovered';
+        }
+
+        return $this->isBridgeRegistered() ? 'manual' : 'none';
+    }
+
+    /**
+     * Number of bridge listener registrations on any mapped auth event.
+     *
+     * Null when the dispatcher cannot be introspected.
+     */
+    protected function bridgeListenerCount(): ?int
+    {
+        $dispatcher = $this->laravel?->bound('events') ? $this->laravel->make('events') : null;
+
+        if ($dispatcher === null || ! method_exists($dispatcher, 'getRawListeners')) {
+            return null;
+        }
+
+        $raw = (array) $dispatcher->getRawListeners();
+        $highest = null;
+
+        foreach ($this->authEventMapping() as $mapping) {
+            $count = 0;
+
+            foreach ((array) ($raw[$mapping['event']] ?? []) as $listener) {
+                $name = is_string($listener)
+                    ? $listener
+                    : (is_array($listener) && isset($listener[0])
+                        ? (is_object($listener[0]) ? get_class($listener[0]) : (string) $listener[0])
+                        : null);
+
+                if ($name !== null && str_contains($name, 'AuthenticationSecuritySubscriber')) {
+                    $count++;
+                }
+            }
+
+            $highest = max($highest ?? 0, $count);
+        }
+
+        return $highest;
     }
 }
