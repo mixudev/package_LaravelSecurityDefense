@@ -312,5 +312,18 @@ class SecurityDefenseServiceProvider extends ServiceProvider
         }
 
         $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
+
+        // Register middleware alias 'csp' untuk AddContentSecurityPolicy.
+        // Host application dapat menambahkan ke grup web via bootstrap/app.php:
+        //
+        //   ->withMiddleware(function (Middleware $middleware) {
+        //       $middleware->web(append: [
+        //           \Mixudev\SecurityDefense\Http\Middleware\AddContentSecurityPolicy::class,
+        //       ]);
+        //   })
+        //
+        // Atau pakai alias di route tertentu: Route::middleware('csp')->group(...)
+        $router = $this->app->make(\Illuminate\Routing\Router::class);
+        $router->aliasMiddleware('csp', \Mixudev\SecurityDefense\Http\Middleware\AddContentSecurityPolicy::class);
     }
 }

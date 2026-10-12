@@ -499,5 +499,54 @@ return [
             'adapter' => null,
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Content Security Policy (CSP)
+    |--------------------------------------------------------------------------
+    | Middleware: \Mixudev\SecurityDefense\Http\Middleware\AddContentSecurityPolicy
+    |
+    | Tambahkan middleware ini ke grup 'web' di bootstrap/app.php:
+    |   ->withMiddleware(function (Middleware $middleware) {
+    |       $middleware->web(append: [
+    |           \Mixudev\SecurityDefense\Http\Middleware\AddContentSecurityPolicy::class,
+    |       ]);
+    |   })
+    |
+    | Bedaan local vs production:
+    |   - local/testing  : Content-Security-Policy-Report-Only (tidak blokir)
+    |   - production     : Content-Security-Policy (enforcement penuh)
+    |
+    | Override eksplisit via .env:
+    |   SECURITY_CSP_ENABLED=true
+    |   SECURITY_CSP_REPORT_ONLY=false
+    */
+    'csp' => [
+        // Master switch CSP middleware
+        'enabled' => env('SECURITY_CSP_ENABLED', true),
+
+        // null  = otomatis (local/testing → Report-Only, production → Enforce)
+        // true  = selalu Report-Only (aman untuk onboarding bertahap)
+        // false = selalu Enforce
+        'report_only' => env('SECURITY_CSP_REPORT_ONLY') !== null
+            ? (bool) env('SECURITY_CSP_REPORT_ONLY')
+            : null,
+
+        // URI untuk menerima laporan CSP violation (opsional)
+        // Contoh: '/security/csp-report' atau 'https://csp.example.com/report'
+        'report_uri' => env('SECURITY_CSP_REPORT_URI', ''),
+
+        // Izinkan Tailwind CDN (https://cdn.tailwindcss.com) dalam script-src
+        // Aktifkan hanya jika host app tidak memakai Vite
+        'allow_tailwind_cdn' => env('SECURITY_CSP_ALLOW_TAILWIND_CDN', false),
+
+        // Izinkan Alpine.js CDN (https://cdn.jsdelivr.net) dalam script-src
+        // Aktifkan hanya jika host app tidak memakai Vite (Alpine tidak di-bundle)
+        'allow_alpine_cdn' => env('SECURITY_CSP_ALLOW_ALPINE_CDN', false),
+
+        // Nonce untuk inline script (opsional, dikelola host application)
+        // Jika diset, nilai ini ditambahkan ke script-src sebagai 'nonce-{value}'
+        'nonce' => env('SECURITY_CSP_NONCE', ''),
+    ],
 ];
 
