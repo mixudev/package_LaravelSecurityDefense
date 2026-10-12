@@ -74,13 +74,16 @@ protected $middleware = [
 ];
 ```
 
-### Setup dashboard satu perintah
+### Setup Satu Perintah Otomatis
+
+Cukup jalankan satu perintah berikut:
 
 ```bash
-php artisan security-defense:install --with-opaque-path
+php artisan security-defense:install
 ```
+*(atau alias singkat: `php artisan security:install`)*
 
-Command idempotent ini menjaga config custom, mengaktifkan flow opaque dashboard, menjalankan migrasi, dan me-rebuild route cache. URL dashboard diturunkan dari `APP_KEY` via HKDF (AES-256-CBC + HMAC-SHA256), sekali pakai (one-time nonce), dan terikat sesi — tanpa token manual di `.env`. Untuk isolasi total dari enkripsi database host, set `SECURITY_DEFENSE_KEY` (opsional): rotasi kunci dashboard lalu tidak menyentuh data terenkripsi / sesi klien. Lihat [panduan instalasi](./docs/01-instalasi.md) untuk detail dan [operasi & troubleshooting](./docs/06-operasi-dan-troubleshooting.md).
+Command ini otomatis mempublish konfigurasi, menginjeksi middleware WAF & CSP ke `bootstrap/app.php`, mengaktifkan opaque dashboard capability, menjalankan migrasi database, dan me-rebuild cache aplikasi. Jika ingin kustomisasi, gunakan opsi seperti `--no-csp`, `--no-migrate`, atau `--force`. Lihat [panduan instalasi](./docs/01-instalasi.md).
 
 ### 4. Hubungkan Telemetri Autentikasi
 

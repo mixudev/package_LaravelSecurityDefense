@@ -110,4 +110,35 @@ class SecurityDefenseInstallCommandTest extends TestCase
         $overrides = (string) (is_file(config_path('security-defense-overrides.php')) ? file_get_contents(config_path('security-defense-overrides.php')) : '');
         $this->assertStringNotContainsString('SECURITY_DEFENSE_DASHBOARD_PATH', $overrides);
     }
+
+    public function test_default_run_installs_all_components_without_any_options(): void
+    {
+        $this->artisan('security-defense:install')
+            ->expectsOutputToContain('Installing mixudev/security-defense')
+            ->expectsOutputToContain('Active Defensive Layers')
+            ->assertSuccessful();
+
+        $this->assertFileExists(config_path('security-defense-overrides.php'));
+        $overrides = require config_path('security-defense-overrides.php');
+        $this->assertTrue($overrides['dashboard.opaque_path.enabled']);
+    }
+
+    public function test_security_install_alias_runs_successfully(): void
+    {
+        $this->artisan('security:install', [
+            '--no-migrate' => true,
+            '--no-cache' => true,
+        ])->assertSuccessful();
+    }
+
+    public function test_customization_flags_are_respected(): void
+    {
+        $this->artisan('security-defense:install', [
+            '--without-opaque-path' => true,
+            '--no-migrate' => true,
+            '--no-cache' => true,
+        ])->assertSuccessful();
+
+        $this->assertFalse((bool) config('security-defense.dashboard.opaque_path.enabled', false));
+    }
 }

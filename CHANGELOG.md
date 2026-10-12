@@ -5,6 +5,16 @@ Semua perubahan penting pada paket `mixudev/security-defense` didokumentasikan d
 Format berbasis [Keep a Changelog](https://keepachangelog.com/id/1.1.0/), dan paket ini
 mengikuti [Semantic Versioning](https://semver.org/lang/id/).
 
+## [1.12.1] - 2026-10-12
+
+### Ditambahkan & Ditingkatkan
+
+- **Zero-Flag Enterprise Installer (`security-defense:install`):**
+  - Cukup satu perintah tunggal tanpa flag apa pun (`php artisan security-defense:install` atau alias `php artisan security:install`) untuk menginstal seluruh benteng keamanan.
+  - Otomatis mempublish konfigurasi, menginjeksi middleware WAF (`RequestThreatScanner`) & CSP (`AddContentSecurityPolicy`) ke `bootstrap/app.php`, mengaktifkan opaque dashboard capability, menjalankan migrasi database, dan me-rebuild cache aplikasi.
+  - Menghilangkan dialog konfirmasi yang memblokir proses non-interaktif/scripting.
+  - Menyediakan opsi kustomisasi granular bila dibutuhkan: `--without-csp` (`--no-csp`), `--without-scanner` (`--no-scanner`), `--without-opaque-path` (`--no-opaque-path`), `--without-migrations` (`--no-migrate`), `--without-cache` (`--no-cache`), `--force`, dan `--dry-run`.
+
 ## [1.11.0] - 2026-09-30
 
 ### Diperbaiki

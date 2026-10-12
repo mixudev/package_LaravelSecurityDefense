@@ -36,10 +36,10 @@ Procedural runbook for AI agents installing, wiring, configuring, and verifying 
 # 1. Composer require
 composer require mixudev/security-defense
 
-# 2. Automated installer (publishes config, migrates tables, registers opaque path, clears caches)
-php artisan security-defense:install --with-opaque-path
+# 2. Automated installer (publishes config, migrates tables, registers middlewares, enables opaque path, clears caches)
+php artisan security-defense:install
 
-# 3. Synchronize WAF middleware and auth subscriber
+# 3. Synchronize WAF middleware and auth subscriber (optional check)
 php artisan auth:sync
 
 # 4. Verify deployment
@@ -57,7 +57,7 @@ Follow every numbered step. Every step has a verifiable completion criterion.
 Inside the target host application root:
 
 ```bash
-composer require mixudev/security-defense:^1.10.1
+composer require mixudev/security-defense
 ```
 
 *Verification*: Check `composer.json` contains `"mixudev/security-defense"` in `require`, and `vendor/mixudev/security-defense` exists on disk.
@@ -65,8 +65,9 @@ composer require mixudev/security-defense:^1.10.1
 ### Step 2: Run Package Installer
 
 ```bash
-php artisan security-defense:install --with-opaque-path
+php artisan security-defense:install
 ```
+*(or alias `php artisan security:install`)*
 
 This automated command executes:
 1. `vendor:publish --tag=security-defense-config` (places `config/security-defense.php`).

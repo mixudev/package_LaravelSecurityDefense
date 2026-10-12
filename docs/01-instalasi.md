@@ -25,44 +25,40 @@ composer require mixudev/security-defense
 
 ## 3. Instalasi Cepat Satu Perintah
 
-Package ini menyediakan satu perintah artisan yang menjalankan seluruh setup dasar:
-- Mempublish file konfigurasi (`config/security-defense.php`)
-- Menjalankan migrasi database keamanan
-- Mengaktifkan fitur dashboard opaque berkemampuan one-time
-- Me-refresh konfigurasi dan route cache
-
-Jalankan:
+Cukup satu perintah tunggal tanpa flag tambahan untuk menginstal dan mengaktifkan seluruh benteng keamanan:
 
 ```bash
-php artisan security-defense:install --with-opaque-path
+php artisan security-defense:install
+```
+Atau via alias praktis:
+```bash
+php artisan security:install
 ```
 
-Output yang diharapkan:
-```text
-INFO Publishing [security-defense-config] assets.
-INFO Running migrations.
-INFO Routes cached successfully.
-Security Defense installed.
-```
+Perintah di atas secara otomatis dan profesional akan:
+- Mempublish file konfigurasi (`config/security-defense.php`)
+- Menjalankan migrasi database keamanan
+- Mengaktifkan fitur dashboard opaque capability-gated
+- Menginjeksi middleware WAF (`RequestThreatScanner`) & CSP (`AddContentSecurityPolicy`) ke `bootstrap/app.php`
+- Me-refresh dan mengoptimalkan konfigurasi serta route cache
 
 > **Catatan View:** Perintah instalasi ini secara sengaja **TIDAK** mempublish file template Blade dashboard ke project Anda agar kode view tetap bersih dan selalu mengikuti update terbaru dari package. Jika Anda perlu mengkustomisasi tampilan UI dashboard, lakukan publish manual (lihat bagian 5).
 
 ---
 
-## 4. Opsi Perintah Instalasi
+## 4. Opsi Kustomisasi (Jika Diperlukan)
+
+Jika Anda ingin menyesuaikan instalasi secara granular, gunakan flag `--`:
 
 | Opsi | Fungsi |
 |---|---|
-| `--with-opaque-path` | Mengaktifkan perlindungan gate `/security-defense` dan URL dashboard acak sekali pakai |
-| `--force` | Menimpa file konfigurasi yang sudah ada jika ingin reset ke default pabrik |
-| `--no-migrate` | Melewati proses migrasi database (berguna jika skema diatur terpusat) |
-| `--no-cache` | Melewati pembersihan dan pembuatan ulang route/config cache |
+| `--without-csp` / `--no-csp` | Melewati injeksi middleware Content-Security-Policy ke `bootstrap/app.php` |
+| `--without-scanner` / `--no-scanner` | Melewati injeksi middleware WAF `RequestThreatScanner` |
+| `--without-opaque-path` / `--no-opaque-path` | Tidak mengaktifkan portal dashboard opaque |
+| `--without-migrations` / `--no-migrate` | Melewati proses migrasi database |
+| `--without-cache` / `--no-cache` | Melewati pembersihan dan pembuatan ulang route/config cache |
+| `--force` | Menimpa file konfigurasi yang sudah ada |
 | `--dry-run` | Menampilkan simulasi langkah yang akan dijalankan tanpa mengubah file apa pun |
-
-Contoh instalasi tanpa migrasi:
-```bash
-php artisan security-defense:install --no-migrate
-```
 
 ---
 
